@@ -250,7 +250,11 @@ export default function Taquilla() {
   const necesitaComprobante = metodoRequiereComprobante(pago.metodo_pago);
 
   return (
-    <Layout title="Taquilla" subtitle="Venta por turno — Izquierda y Derecha">
+    <Layout
+      title="Taquilla"
+      subtitle="Venta por turno — Izquierda y Derecha"
+      className={`app-content--taquilla${selectedBrazo ? ' taquilla--venta-abierta' : ''}`}
+    >
       {ventaOk && (
         <div className="alert alert--success">
           <div>
@@ -317,7 +321,25 @@ export default function Taquilla() {
         </div>
 
         {selectedBrazo && (
-          <aside className="venta-panel">
+          <>
+            <button
+              type="button"
+              className="venta-backdrop"
+              aria-label="Cerrar venta"
+              onClick={resetVentaPanel}
+            />
+            <aside className="venta-panel venta-panel--sheet">
+              <div className="venta-panel__top">
+                <h3 className="venta-panel__titulo-movil">Venta en curso</h3>
+                <button
+                  type="button"
+                  className="venta-panel__cerrar"
+                  aria-label="Cerrar"
+                  onClick={resetVentaPanel}
+                >
+                  ×
+                </button>
+              </div>
             <div className="venta-pasos">
               <span className={pasoVenta === 1 ? 'venta-paso--active' : 'venta-paso--done'}>1. Cargador</span>
               <span className={pasoVenta === 2 ? 'venta-paso--active' : ''}>2. Pago</span>
@@ -486,6 +508,7 @@ export default function Taquilla() {
               </>
             )}
           </aside>
+          </>
         )}
       </div>
     </Layout>

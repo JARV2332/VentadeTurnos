@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
+import Loader from '../components/Loader';
 import { useAuth } from '../context/AuthContext';
 import { getFinanzasByOrg, subscribeMock } from '../services/mockService';
 import { labelMetodoPago } from '../utils/pagoUtils';
@@ -23,10 +24,16 @@ export default function CajaSaaS() {
     return subscribeMock(refresh);
   }, [organizacionId]);
 
-  if (!finanzas) return null;
-
   const formatQ = (n) =>
     new Intl.NumberFormat('es-GT', { style: 'currency', currency: 'GTQ' }).format(n);
+
+  if (!finanzas) {
+    return (
+      <Layout title="Caja y Finanzas" subtitle="Cuadre por mesa y vendedor">
+        <Loader text="Cargando finanzas..." />
+      </Layout>
+    );
+  }
 
   let ventasFiltradas = finanzas.ventas;
   if (filtroMesa !== 'all') {

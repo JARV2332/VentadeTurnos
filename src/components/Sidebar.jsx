@@ -3,19 +3,24 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { PANTALLAS } from '../config/permisos';
 
-export default function Sidebar() {
+export default function Sidebar({ mobileOpen = false, onClose }) {
   const { organizacion, rolNombre, logout, hasPermiso } = useAuth();
   const navigate = useNavigate();
 
   const navItems = PANTALLAS.filter((p) => hasPermiso(p.id));
 
   const handleLogout = async () => {
+    onClose?.();
     await logout();
     navigate('/');
   };
 
+  const handleNav = () => {
+    onClose?.();
+  };
+
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${mobileOpen ? ' sidebar--open' : ''}`}>
       <div className="sidebar__brand">
         <div className="sidebar__logo">VT</div>
         <div>
@@ -35,6 +40,7 @@ export default function Sidebar() {
           <NavLink
             key={item.id}
             to={item.path}
+            onClick={handleNav}
             className={({ isActive }) =>
               `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`
             }

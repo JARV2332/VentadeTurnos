@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
+import Loader from '../components/Loader';
 import StatusBadge from '../components/StatusBadge';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -22,8 +23,6 @@ export default function Dashboard() {
     return subscribeMock(refresh);
   }, [organizacionId]);
 
-  if (!metrics) return null;
-
   const formatQ = (n) =>
     new Intl.NumberFormat('es-GT', { style: 'currency', currency: 'GTQ' }).format(n);
 
@@ -32,6 +31,10 @@ export default function Dashboard() {
       title="Dashboard"
       subtitle="Métricas macro de tu organización"
     >
+      {!metrics ? (
+        <Loader text="Cargando métricas..." />
+      ) : (
+      <>
       <div className="metrics-grid">
         <div className="metric-card metric-card--primary">
           <span className="metric-card__label">Ingresos recaudados</span>
@@ -89,6 +92,8 @@ export default function Dashboard() {
           <div className="legend-item"><StatusBadge status="vendido" /> Vendido y confirmado</div>
         </div>
       </section>
+      </>
+      )}
     </Layout>
   );
 }
