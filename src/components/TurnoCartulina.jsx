@@ -1,6 +1,8 @@
 import React from 'react';
 import StatusBadge from './StatusBadge';
 import { repertorioTurnoLista } from '../utils/turnoUtils';
+import { etiquetaAsignado } from '../utils/importReservasUtils';
+import { getStore } from '../services/mockService';
 
 const ESTADO_CLASS = {
   disponible: 'espacio--disponible',
@@ -10,18 +12,33 @@ const ESTADO_CLASS = {
 
 export default function EspacioBrazo({ brazo, selected, onClick, readOnly = false }) {
   const vendido = brazo.estado === 'vendido';
+  const cargador = brazo.cargador_id
+    ? getStore().cargadores.find((c) => c.id === brazo.cargador_id)
+    : null;
+  const asignado = etiquetaAsignado(brazo, cargador);
+  const titleParts = [
+    `Brazo ${brazo.numero_brazo} ${brazo.lado}`,
+    brazo.estado,
+    asignado ? `→ ${asignado}` : '',
+    brazo.apartado_notas ? `(${brazo.apartado_notas})` : '',
+  ].filter(Boolean);
 
   return (
     <button
       type="button"
       className={`espacio-brazo ${ESTADO_CLASS[brazo.estado] || ''} ${
-        selected ? 'espacio-brazo--selected' : ''
-      } ${readOnly ? 'espacio-brazo--readonly' : ''}`}
+        brazo.reserva_apartado ? 'espacio-brazo--apartado' : ''
+      } ${selected ? 'espacio-brazo--selected' : ''} ${
+        readOnly ? 'espacio-brazo--readonly' : ''
+      }`}
       onClick={() => !readOnly && onClick(brazo)}
       disabled={vendido || readOnly}
-      title={`Brazo ${brazo.numero_brazo} ${brazo.lado} — ${brazo.estado}`}
+      title={titleParts.join(' · ')}
     >
       <span className="espacio-brazo__num">{brazo.numero_brazo}</span>
+      {asignado && brazo.estado !== 'disponible' && (
+        <span className="espacio-brazo__asignado">{asignado.split(' ')[0]}</span>
+      )}
     </button>
   );
 }

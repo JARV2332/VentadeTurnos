@@ -9,6 +9,7 @@ const ORG_B = 'org-demo-002';
 export const DEMO_NOMBRE_ORGANIZACION =
   'Pastoral de Religiosidad Popular Nuestra Señora de La Asunción';
 
+/** @deprecated usar DEMO_USUARIOS — mantenido para referencias */
 export const DEMO_USERS = {
   admin: {
     id: 'user-admin-001',
@@ -16,7 +17,15 @@ export const DEMO_USERS = {
     password: 'demo123',
     nombre: 'María Administradora',
     organizacion_id: ORG_A,
-    rol: 'administrador',
+    rol_id: 'rol-admin',
+  },
+  caja: {
+    id: 'user-caja-001',
+    email: 'caja@demo.com',
+    password: 'demo123',
+    nombre: 'Ana Operadora Caja',
+    organizacion_id: ORG_A,
+    rol_id: 'rol-caja',
   },
   vendedor: {
     id: 'user-vendedor-001',
@@ -24,9 +33,76 @@ export const DEMO_USERS = {
     password: 'demo123',
     nombre: 'Carlos Vendedor',
     organizacion_id: ORG_A,
-    rol: 'vendedor',
+    rol_id: 'rol-vendedor',
   },
 };
+
+export const DEMO_ROLES = [
+  {
+    id: 'rol-admin',
+    organizacion_id: ORG_A,
+    nombre: 'Administrador',
+    descripcion: 'Acceso total: configuración, usuarios y operación.',
+    es_sistema: true,
+    permisos: [
+      'dashboard',
+      'taquilla',
+      'entrega',
+      'caja',
+      'impresion',
+      'config',
+      'config_correo',
+      'usuarios',
+      'import_reservas',
+    ],
+  },
+  {
+    id: 'rol-caja',
+    organizacion_id: ORG_A,
+    nombre: 'Operador de caja',
+    descripcion: 'Taquilla, entrega de turnos e impresión de boletas.',
+    es_sistema: false,
+    permisos: ['taquilla', 'entrega', 'impresion'],
+  },
+  {
+    id: 'rol-vendedor',
+    organizacion_id: ORG_A,
+    nombre: 'Vendedor taquilla',
+    descripcion: 'Solo venta en taquilla.',
+    es_sistema: false,
+    permisos: ['taquilla'],
+  },
+];
+
+export const DEMO_USUARIOS = [
+  {
+    id: 'user-admin-001',
+    email: 'admin@demo.com',
+    password: 'demo123',
+    nombre: 'María Administradora',
+    organizacion_id: ORG_A,
+    rol_id: 'rol-admin',
+    activo: true,
+  },
+  {
+    id: 'user-caja-001',
+    email: 'caja@demo.com',
+    password: 'demo123',
+    nombre: 'Ana Operadora Caja',
+    organizacion_id: ORG_A,
+    rol_id: 'rol-caja',
+    activo: true,
+  },
+  {
+    id: 'user-vendedor-001',
+    email: 'vendedor@demo.com',
+    password: 'demo123',
+    nombre: 'Carlos Vendedor',
+    organizacion_id: ORG_A,
+    rol_id: 'rol-vendedor',
+    activo: true,
+  },
+];
 
 export const DEMO_ORGANIZACIONES = {
   [ORG_A]: {
@@ -159,6 +235,8 @@ export const DEMO_BRAZOS = generarBrazosIniciales();
 export function crearStoreInicial() {
   return {
     organizaciones: { ...DEMO_ORGANIZACIONES },
+    roles: DEMO_ROLES.map((r) => ({ ...r, permisos: [...r.permisos] })),
+    usuarios: DEMO_USUARIOS.map((u) => ({ ...u })),
     cortejos: [...DEMO_CORTEJOS],
     turnos: [...DEMO_TURNOS],
     mesas: [...DEMO_MESAS],

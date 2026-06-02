@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { MOCK_MODE } from '../config/supabaseClient';
+import { rutaInicioPorPermisos } from '../config/permisos';
 
 export default function Landing() {
-  const { login, register, isAuthenticated } = useAuth();
+  const { login, register, isAuthenticated, rutaInicio } = useAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState('login');
   const [loading, setLoading] = useState(false);
@@ -16,20 +17,24 @@ export default function Landing() {
   });
 
   React.useEffect(() => {
-    if (isAuthenticated) navigate('/dashboard');
-  }, [isAuthenticated, navigate]);
+    if (isAuthenticated) navigate(rutaInicio);
+  }, [isAuthenticated, rutaInicio, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
+      let session;
       if (tab === 'login') {
-        await login(form.email, form.password);
+        session = await login(form.email, form.password);
       } else {
         await register(form.email, form.password, form.orgName);
+        session = { permisos: ['dashboard', 'usuarios', 'config', 'config_correo', 'taquilla', 'entrega', 'caja', 'impresion'] };
       }
-      navigate('/dashboard');
+      navigate(
+        session?.permisos ? rutaInicioPorPermisos(session.permisos) : rutaInicio
+      );
     } catch (err) {
       setError(err.message || 'Error al iniciar sesión');
     } finally {
@@ -131,8 +136,9 @@ export default function Landing() {
 
           {MOCK_MODE && (
             <div className="auth-demo">
-              <p><strong>Demo:</strong> admin@demo.com / demo123</p>
-              <p><strong>Vendedor:</strong> vendedor@demo.com / demo123</p>
+              <p><strong>Administrador:</strong> admin@demo.com / demo123</p>
+              <p><strong>Caja</strong> (taquilla, entrega, impresión): caja@demo.com / demo123</p>
+              <p><strong>Vendedor</strong> (solo taquilla): vendedor@demo.com / demo123</p>
             </div>
           )}
         </div>

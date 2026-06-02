@@ -4,6 +4,7 @@ import {
   crearBrazosParaTurno,
   agruparTurnosConBrazos,
 } from '../utils/turnoUtils';
+import { normalizarLado } from '../utils/importReservasUtils';
 
 let store = crearStoreInicial();
 const listeners = new Set();
@@ -195,6 +196,10 @@ export function reservarBrazoMock(brazoId, mesaId, vendedorId, organizacionId) {
     brazo.bloqueado_hasta &&
     new Date(brazo.bloqueado_hasta) < new Date();
 
+  if (brazo.estado === 'reservado' && brazo.reserva_apartado) {
+    return { error: 'Espacio apartado por importación. Continúe la venta desde taquilla.' };
+  }
+
   if (brazo.estado !== 'disponible' && !expirado) {
     return { error: 'El espacio no está disponible' };
   }
@@ -218,6 +223,11 @@ export function confirmarVentaMock(brazoId, cargadorData, precioPagado, organiza
   );
   if (!brazo || brazo.estado !== 'reservado') {
     return { error: 'Reserva no válida' };
+  }
+
+  const whatsappReq = cargadorData.whatsapp?.replace(/\D/g, '');
+  if (!whatsappReq || whatsappReq.length < 8) {
+    return { error: 'WhatsApp obligatorio para confirmar la venta' };
   }
 
   let cargador = buscarCargadorPorWhatsapp(organizacionId, cargadorData.whatsapp);
@@ -251,6 +261,9 @@ export function confirmarVentaMock(brazoId, cargadorData, precioPagado, organiza
     precio_pagado: precioPagado,
     codigo_boleta_qr: codigo,
     bloqueado_hasta: null,
+    reserva_apartado: false,
+    asignado_nombre: null,
+    apartado_notas: null,
     estado_entrega: 'pendiente',
     entregado_en: null,
     entregado_por: null,
@@ -389,4 +402,296 @@ export function getDashboardMetrics(organizacionId) {
   const fin = getFinanzasByOrg(organizacionId);
   const cortejos = getCortejosByOrg(organizacionId);
   return { ...fin, cortejosActivos: cortejos.length };
+}
+
+// ── Roles y usuarios (RBAC) ──
+
+export function getRolesByOrg(organizacionId) {
+  return store.roles
+    .filter((r) => r.organizacion_id === organizacionId)
+    .sort((a, b) => (a.es_sistema === b.es_sistema ? 0 : a.es_sistema ? -1 : 1));
+}
+
+export function getRolById(rolId, organizacionId) {
+  return store.roles.find(
+    (r) => r.id === rolId && r.organizacion_id === organizacionId
+  );
+}
+
+export function getUsuariosByOrg(organizacionId) {
+  return store.usuarios
+    .filter((u) => u.organizacion_id === organizacionId)
+    .map((u) => {
+      const rol = getRolById(u.rol_id, organizacionId);
+      return { ...u, rol_nombre: rol?.nombre || '—', permisos: rol?.permisos || [] };
+    });
+}
+
+export function buscarUsuarioLogin(email, password) {
+  const emailNorm = email?.trim().toLowerCase();
+  const usuario = store.usuarios.find(
+    (u) => u.email.toLowerCase() === emailNorm && u.password === password && u.activo !== false
+  );
+  if (!usuario) return null;
+  const rol = getRolById(usuario.rol_id, usuario.organizacion_id);
+  if (!rol) return null;
+  return { usuario, rol };
+}
+
+export function saveRolMock(organizacionId, datos, rolId = null) {
+  const permisos = [...new Set((datos.permisos || []).filter(Boolean))];
+  if (permisos.length === 0) {
+    return { error: 'El rol debe tener al menos un permiso de pantalla.' };
+  }
+
+  if (rolId) {
+    const idx = store.roles.findIndex(
+      (r) => r.id === rolId && r.organizacion_id === organizacionId
+    );
+    if (idx < 0) return { error: 'Rol no encontrado.' };
+    if (store.roles[idx].es_sistema && !permisos.includes('usuarios')) {
+      return { error: 'El rol Administrador debe conservar acceso a Usuarios y roles.' };
+    }
+    store.roles[idx] = {
+      ...store.roles[idx],
+      nombre: datos.nombre?.trim() || store.roles[idx].nombre,
+      descripcion: datos.descripcion?.trim() || '',
+      permisos,
+    };
+    emit('roles', { eventType: 'UPDATE' });
+    return { data: store.roles[idx] };
+  }
+
+  const nuevo = {
+    id: `rol-${Date.now()}`,
+    organizacion_id: organizacionId,
+    nombre: datos.nombre?.trim() || 'Nuevo rol',
+    descripcion: datos.descripcion?.trim() || '',
+    es_sistema: false,
+    permisos,
+  };
+  store.roles.push(nuevo);
+  emit('roles', { eventType: 'INSERT', new: nuevo });
+  return { data: nuevo };
+}
+
+export function deleteRolMock(rolId, organizacionId) {
+  const rol = getRolById(rolId, organizacionId);
+  if (!rol) return { error: 'Rol no encontrado.' };
+  if (rol.es_sistema) return { error: 'No se puede eliminar un rol del sistema.' };
+  const enUso = store.usuarios.some((u) => u.rol_id === rolId);
+  if (enUso) return { error: 'Hay usuarios con este rol. Reasígnelos antes de eliminar.' };
+  store.roles = store.roles.filter((r) => r.id !== rolId);
+  emit('roles', { eventType: 'DELETE' });
+  return { ok: true };
+}
+
+export function saveUsuarioMock(organizacionId, datos, usuarioId = null) {
+  const rol = getRolById(datos.rol_id, organizacionId);
+  if (!rol) return { error: 'Seleccione un rol válido.' };
+
+  const emailNorm = datos.email?.trim().toLowerCase();
+  if (!emailNorm) return { error: 'El correo es obligatorio.' };
+
+  const duplicado = store.usuarios.find(
+    (u) => u.email.toLowerCase() === emailNorm && u.id !== usuarioId
+  );
+  if (duplicado) return { error: 'Ya existe un usuario con ese correo.' };
+
+  if (usuarioId) {
+    const idx = store.usuarios.findIndex(
+      (u) => u.id === usuarioId && u.organizacion_id === organizacionId
+    );
+    if (idx < 0) return { error: 'Usuario no encontrado.' };
+    const actual = store.usuarios[idx];
+    store.usuarios[idx] = {
+      ...actual,
+      nombre: datos.nombre?.trim() || actual.nombre,
+      email: emailNorm,
+      rol_id: datos.rol_id,
+      activo: datos.activo !== false,
+      ...(datos.password?.trim() ? { password: datos.password } : {}),
+    };
+    emit('usuarios', { eventType: 'UPDATE' });
+    return { data: store.usuarios[idx] };
+  }
+
+  if (!datos.password?.trim()) {
+    return { error: 'La contraseña es obligatoria para usuarios nuevos.' };
+  }
+
+  const nuevo = {
+    id: `user-${Date.now()}`,
+    organizacion_id: organizacionId,
+    nombre: datos.nombre?.trim() || 'Usuario',
+    email: emailNorm,
+    password: datos.password,
+    rol_id: datos.rol_id,
+    activo: true,
+  };
+  store.usuarios.push(nuevo);
+  emit('usuarios', { eventType: 'INSERT', new: nuevo });
+  return { data: nuevo };
+}
+
+// ── Importación apartados (Excel / CSV) ──
+
+function buscarBrazoPorCoordenadas(cortejoId, organizacionId, numeroTurno, numeroBrazo, lado) {
+  const turno = store.turnos.find(
+    (t) =>
+      t.cortejo_id === cortejoId &&
+      t.organizacion_id === organizacionId &&
+      t.numero_turno === numeroTurno
+  );
+  if (!turno) return null;
+  return store.brazos.find(
+    (b) =>
+      b.turno_id === turno.id &&
+      b.numero_brazo === numeroBrazo &&
+      b.lado === lado
+  );
+}
+
+function upsertCargadorParcial(organizacionId, datos) {
+  const whatsapp = datos.whatsapp?.replace(/\D/g, '');
+  if (whatsapp && whatsapp.length >= 8) {
+    let cargador = buscarCargadorPorWhatsapp(organizacionId, whatsapp);
+    if (!cargador) {
+      cargador = {
+        id: `carg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        organizacion_id: organizacionId,
+        nombre_completo: datos.nombre?.trim() || 'Sin nombre',
+        whatsapp,
+        correo: datos.correo?.trim() || '',
+        cui_o_identificacion: datos.cui?.trim() || '',
+        telefono_emergencia: datos.telefono_emergencia?.trim() || '',
+      };
+      store.cargadores.push(cargador);
+    } else {
+      cargador = {
+        ...cargador,
+        nombre_completo: datos.nombre?.trim() || cargador.nombre_completo,
+        correo: datos.correo?.trim() || cargador.correo,
+        cui_o_identificacion: datos.cui?.trim() || cargador.cui_o_identificacion,
+        telefono_emergencia:
+          datos.telefono_emergencia?.trim() || cargador.telefono_emergencia,
+      };
+      store.cargadores = store.cargadores.map((c) =>
+        c.id === cargador.id ? cargador : c
+      );
+    }
+    return cargador;
+  }
+  return null;
+}
+
+export function getResumenApartados(cortejoId, organizacionId) {
+  const turnos = store.turnos
+    .filter((t) => t.cortejo_id === cortejoId && t.organizacion_id === organizacionId)
+    .sort((a, b) => a.numero_turno - b.numero_turno);
+
+  return turnos.map((turno) => {
+    const brazos = store.brazos.filter((b) => b.turno_id === turno.id);
+    const apartados = brazos.filter(
+      (b) => b.estado === 'reservado' && b.reserva_apartado
+    );
+    const vendidos = brazos.filter((b) => b.estado === 'vendido');
+    const libres = brazos.filter((b) => b.estado === 'disponible');
+    return {
+      turno,
+      total: brazos.length,
+      apartados: apartados.length,
+      vendidos: vendidos.length,
+      libres: libres.length,
+      detalle: apartados.map((b) => {
+        const cargador = store.cargadores.find((c) => c.id === b.cargador_id);
+        return {
+          brazo: b,
+          cargador,
+          etiqueta:
+            cargador?.nombre_completo ||
+            b.asignado_nombre ||
+            b.apartado_notas ||
+            'Apartado',
+        };
+      }),
+    };
+  });
+}
+
+export function aplicarImportApartadosMock(cortejoId, organizacionId, filas, { usuarioId } = {}) {
+  const resultados = [];
+  let ok = 0;
+  let omitidos = 0;
+
+  filas.forEach((fila) => {
+    const numeroTurno = parseInt(fila.turno, 10);
+    const numeroBrazo = parseInt(fila.brazo, 10);
+    const lado = normalizarLado(fila.lado);
+
+    if (!numeroTurno || !numeroBrazo || !lado) {
+      resultados.push({
+        fila: fila.filaExcel,
+        ok: false,
+        mensaje: 'Turno, brazo o lado inválido',
+      });
+      omitidos += 1;
+      return;
+    }
+
+    const brazo = buscarBrazoPorCoordenadas(
+      cortejoId,
+      organizacionId,
+      numeroTurno,
+      numeroBrazo,
+      lado
+    );
+
+    if (!brazo) {
+      resultados.push({
+        fila: fila.filaExcel,
+        ok: false,
+        mensaje: `No existe turno ${numeroTurno}, brazo ${numeroBrazo} ${lado}`,
+      });
+      omitidos += 1;
+      return;
+    }
+
+    if (brazo.estado === 'vendido') {
+      resultados.push({
+        fila: fila.filaExcel,
+        ok: false,
+        mensaje: 'Ya está vendido',
+      });
+      omitidos += 1;
+      return;
+    }
+
+    const cargador = upsertCargadorParcial(organizacionId, fila);
+    const nombreSolo = fila.nombre?.trim() || null;
+
+    const actualizado = {
+      ...brazo,
+      estado: 'reservado',
+      reserva_apartado: true,
+      bloqueado_hasta: null,
+      cargador_id: cargador?.id || null,
+      asignado_nombre: cargador ? null : nombreSolo,
+      apartado_notas: fila.notas?.trim() || null,
+      vendedor_id: usuarioId || null,
+      mesa_id: null,
+    };
+
+    store.brazos = store.brazos.map((b) => (b.id === brazo.id ? actualizado : b));
+    resultados.push({
+      fila: fila.filaExcel,
+      ok: true,
+      mensaje: `Apartado T${numeroTurno} B${numeroBrazo} ${lado}`,
+      brazo: actualizado,
+    });
+    ok += 1;
+  });
+
+  emit('brazos', { eventType: 'IMPORT', cortejoId });
+  return { ok, omitidos, total: filas.length, resultados };
 }

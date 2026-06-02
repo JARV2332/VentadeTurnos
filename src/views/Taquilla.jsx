@@ -126,6 +126,18 @@ export default function Taquilla() {
         cui_o_identificacion: '',
         telefono_emergencia: '',
       });
+    } else if (brazo.reserva_apartado && brazo.estado === 'reservado') {
+      const cargador = getStore().cargadores.find((c) => c.id === brazo.cargador_id);
+      setSelectedBrazo(brazo);
+      setPasoVenta(1);
+      setPago({ metodo_pago: 'efectivo', comprobante_url: null, comprobante_nombre: '' });
+      setForm({
+        nombre_completo: cargador?.nombre_completo || brazo.asignado_nombre || '',
+        whatsapp: cargador?.whatsapp || '',
+        correo: cargador?.correo || '',
+        cui_o_identificacion: cargador?.cui_o_identificacion || '',
+        telefono_emergencia: cargador?.telefono_emergencia || '',
+      });
     } else if (brazo.vendedor_id === user?.id) {
       setSelectedBrazo(brazo);
       setPasoVenta(1);

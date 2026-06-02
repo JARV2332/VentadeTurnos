@@ -6,6 +6,8 @@ import Landing from './views/Landing';
 import Dashboard from './views/Dashboard';
 import ConfigSaaS from './views/ConfigSaaS';
 import ConfigCorreo from './views/ConfigCorreo';
+import ConfigUsuarios from './views/ConfigUsuarios';
+import ConfigImportReservas from './views/ConfigImportReservas';
 import Taquilla from './views/Taquilla';
 import CajaSaaS from './views/CajaSaaS';
 import Impresion from './views/Impresion';
@@ -20,15 +22,31 @@ function App() {
           <Route
             path="/dashboard"
             element={
-              <PrivateRoute>
+              <PrivateRoute permission="dashboard">
                 <Dashboard />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/config/usuarios"
+            element={
+              <PrivateRoute permission="usuarios">
+                <ConfigUsuarios />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/config/reservas"
+            element={
+              <PrivateRoute permission="import_reservas">
+                <ConfigImportReservas />
               </PrivateRoute>
             }
           />
           <Route
             path="/config/correo"
             element={
-              <PrivateRoute adminOnly>
+              <PrivateRoute permission="config_correo">
                 <ConfigCorreo />
               </PrivateRoute>
             }
@@ -36,7 +54,7 @@ function App() {
           <Route
             path="/config"
             element={
-              <PrivateRoute adminOnly>
+              <PrivateRoute permission="config">
                 <ConfigSaaS />
               </PrivateRoute>
             }
@@ -44,7 +62,7 @@ function App() {
           <Route
             path="/taquilla"
             element={
-              <PrivateRoute>
+              <PrivateRoute permission="taquilla">
                 <Taquilla />
               </PrivateRoute>
             }
@@ -52,7 +70,7 @@ function App() {
           <Route
             path="/caja"
             element={
-              <PrivateRoute>
+              <PrivateRoute permission="caja">
                 <CajaSaaS />
               </PrivateRoute>
             }
@@ -60,7 +78,7 @@ function App() {
           <Route
             path="/entrega"
             element={
-              <PrivateRoute>
+              <PrivateRoute permission="entrega">
                 <EntregaTurno />
               </PrivateRoute>
             }
@@ -68,7 +86,7 @@ function App() {
           <Route
             path="/impresion"
             element={
-              <PrivateRoute>
+              <PrivateRoute permission="impresion">
                 <Impresion />
               </PrivateRoute>
             }

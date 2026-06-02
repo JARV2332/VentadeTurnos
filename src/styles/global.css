@@ -1774,6 +1774,258 @@ body {
   .boleta-card { border: 1px solid #000; box-shadow: none; max-width: 100%; }
 }
 
+/* ── Usuarios y roles (RBAC) ── */
+.panel__head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.panel__head-row .panel__title { margin: 0; }
+
+.usuarios-tabs {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.5rem;
+}
+
+.usuarios-tabs__btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  background: transparent;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 8px 8px 0 0;
+}
+
+.usuarios-tabs__btn--active {
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
+.roles-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.rol-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  background: var(--surface);
+}
+
+.rol-card--active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary-light);
+}
+
+.rol-card__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.rol-card__desc {
+  font-size: 0.78rem;
+  margin: 0 0 0.5rem;
+}
+
+.rol-card__permisos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.5rem;
+}
+
+.permiso-chip {
+  font-size: 0.68rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.rol-card__actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.permisos-fieldset {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.permisos-fieldset legend {
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0 0.35rem;
+}
+
+.permisos-grupo {
+  margin-bottom: 0.85rem;
+}
+
+.permisos-grupo:last-child { margin-bottom: 0; }
+
+.permisos-grupo__titulo {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
+}
+
+.permisos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.35rem;
+}
+
+.permiso-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  background: var(--bg);
+}
+
+.permiso-check:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
+.permiso-check input { margin-top: 0.15rem; flex-shrink: 0; }
+
+.permiso-check__icon {
+  margin-right: 0.2rem;
+  opacity: 0.7;
+}
+
+.usuarios-permisos-mini {
+  font-size: 0.72rem;
+  max-width: 14rem;
+  display: inline-block;
+}
+
+/* ── Import apartados ── */
+.import-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.import-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.import-upload-btn {
+  position: relative;
+  cursor: pointer;
+  margin: 0;
+}
+
+.import-upload-btn input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+}
+
+.import-preview-table {
+  max-height: 280px;
+  overflow: auto;
+}
+
+.data-table--compact td,
+.data-table--compact th {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.78rem;
+}
+
+.import-resultados {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 0.8rem;
+}
+
+.import-resultado--ok { color: var(--success); }
+.import-resultado--err { color: var(--danger); }
+
+.resumen-apartados {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.resumen-apartados__turno {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  background: var(--bg);
+}
+
+.resumen-apartados__head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.resumen-apartados__lista {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.82rem;
+}
+
+.resumen-apartados__vacio {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.espacio-brazo--apartado {
+  border-color: #b45309 !important;
+  background: #fffbeb !important;
+}
+
+.espacio-brazo__asignado {
+  display: block;
+  font-size: 0.45rem;
+  line-height: 1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #92400e;
+  font-weight: 600;
+}
+
 /* ── Responsive ── */
 @media (max-width: 1024px) {
   .landing { grid-template-columns: 1fr; }

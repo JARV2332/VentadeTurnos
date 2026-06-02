@@ -1,20 +1,13 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-
-const NAV_ITEMS = [
-  { to: '/dashboard', label: 'Dashboard', icon: '◫' },
-  { to: '/taquilla', label: 'Taquilla', icon: '▦' },
-  { to: '/entrega', label: 'Entrega turnos', icon: '⎔' },
-  { to: '/caja', label: 'Caja', icon: '◈' },
-  { to: '/impresion', label: 'Impresión', icon: '▣' },
-  { to: '/config', label: 'Procesiones', icon: '⚙', admin: true },
-  { to: '/config/correo', label: 'Correo y boletas', icon: '✉', admin: true },
-];
+import { PANTALLAS } from '../config/permisos';
 
 export default function Sidebar() {
-  const { organizacion, rol, logout } = useAuth();
+  const { organizacion, rolNombre, logout, hasPermiso } = useAuth();
   const navigate = useNavigate();
+
+  const navItems = PANTALLAS.filter((p) => hasPermiso(p.id));
 
   const handleLogout = async () => {
     await logout();
@@ -34,14 +27,14 @@ export default function Sidebar() {
       <div className="sidebar__org">
         <span className="sidebar__org-label">Organización activa</span>
         <p className="sidebar__org-name">{organizacion?.nombre_oficial}</p>
-        <span className="badge badge--info">{rol}</span>
+        <span className="badge badge--info">{rolNombre}</span>
       </div>
 
       <nav className="sidebar__nav">
-        {NAV_ITEMS.filter((item) => !item.admin || rol === 'administrador').map((item) => (
+        {navItems.map((item) => (
           <NavLink
-            key={item.to}
-            to={item.to}
+            key={item.id}
+            to={item.path}
             className={({ isActive }) =>
               `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`
             }
