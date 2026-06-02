@@ -1,4 +1,14 @@
 {
+  "buildCommand": "npm run build",
+  "installCommand": "npm ci || npm install",
+  "framework": "create-react-app",
+  "outputDirectory": "build",
+  "env": {
+    "REACT_APP_MOCK_MODE": "true",
+    "DISABLE_ESLINT_PLUGIN": "true",
+    "GENERATE_SOURCEMAP": "false",
+    "CI": "false"
+  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
