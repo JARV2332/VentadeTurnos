@@ -8,6 +8,18 @@ export default function BrandLogo({
   className = '',
   alt = 'Ventadeturnos.com',
 }) {
+  if (variant === 'hero') {
+    return (
+      <div className={`brand-logo brand-logo--hero ${className}`.trim()} aria-label={alt}>
+        <img src={ICON} alt="" className="brand-logo__hero-icon" aria-hidden />
+        <p className="brand-logo__hero-name">
+          <strong>ventadeturnos</strong>
+          <span>.com</span>
+        </p>
+      </div>
+    );
+  }
+
   if (variant === 'full') {
     return (
       <img

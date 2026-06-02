@@ -46,7 +46,7 @@ export default function Landing() {
   return (
     <div className="landing">
       <div className="landing__hero">
-        <BrandLogo variant="full" className="landing__logo" />
+        <BrandLogo variant="hero" className="landing__brand" />
         <div className="landing__badge">Plataforma SaaS · Multi-tenant</div>
         <h1 className="landing__title">
           Gestión universal de
