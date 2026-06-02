@@ -58,18 +58,18 @@ export const DEMO_CORTEJOS = [
 
 /** Turnos demo: #1 Salida → ordinarios → #7 Extra → … → #12 Entrada */
 export const DEMO_TURNOS = [
-  { id: 'turno-001', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 1, tipo_turno: 'Salida', precio: 400, total_brazos: 20, etiqueta: 'Salida' },
-  { id: 'turno-002', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 2, tipo_turno: 'Ordinario', precio: 150, total_brazos: 20, etiqueta: 'Ordinario 1' },
-  { id: 'turno-003', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 3, tipo_turno: 'Ordinario', precio: 150, total_brazos: 20, etiqueta: 'Ordinario 2' },
-  { id: 'turno-004', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 4, tipo_turno: 'Ordinario', precio: 150, total_brazos: 20, etiqueta: 'Ordinario 3' },
-  { id: 'turno-005', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 5, tipo_turno: 'Ordinario', precio: 150, total_brazos: 20, etiqueta: 'Ordinario 4' },
-  { id: 'turno-006', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 6, tipo_turno: 'Ordinario', precio: 150, total_brazos: 20, etiqueta: 'Ordinario 5' },
-  { id: 'turno-007', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 7, tipo_turno: 'Extraordinario', precio: 300, total_brazos: 12, etiqueta: 'Extraordinario · turno 7' },
-  { id: 'turno-008', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 8, tipo_turno: 'Ordinario', precio: 150, total_brazos: 20, etiqueta: 'Ordinario 6' },
-  { id: 'turno-009', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 9, tipo_turno: 'Ordinario', precio: 150, total_brazos: 20, etiqueta: 'Ordinario 7' },
-  { id: 'turno-010', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 10, tipo_turno: 'Ordinario', precio: 150, total_brazos: 20, etiqueta: 'Ordinario 8' },
-  { id: 'turno-011', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 11, tipo_turno: 'Ordinario', precio: 150, total_brazos: 20, etiqueta: 'Ordinario 9' },
-  { id: 'turno-012', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 12, tipo_turno: 'Entrada', precio: 400, total_brazos: 20, etiqueta: 'Entrada' },
+  { id: 'turno-001', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 1, tipo_turno: 'Salida', precio: 400, total_brazos: 20, etiqueta: 'Salida', son: 'Marcha fúnebre de salida', alabado: null },
+  { id: 'turno-002', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 2, tipo_turno: 'Ordinario', precio: 150, total_brazos: 20, etiqueta: 'Ordinario 1', son: 'El Retorno', alabado: null },
+  { id: 'turno-003', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 3, tipo_turno: 'Ordinario', precio: 150, total_brazos: 20, etiqueta: 'Ordinario 2', son: null, alabado: null },
+  { id: 'turno-004', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 4, tipo_turno: 'Ordinario', precio: 150, total_brazos: 20, etiqueta: 'Ordinario 3', son: null, alabado: null },
+  { id: 'turno-005', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 5, tipo_turno: 'Ordinario', precio: 150, total_brazos: 20, etiqueta: 'Ordinario 4', son: null, alabado: null },
+  { id: 'turno-006', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 6, tipo_turno: 'Ordinario', precio: 150, total_brazos: 20, etiqueta: 'Ordinario 5', son: null, alabado: null },
+  { id: 'turno-007', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 7, tipo_turno: 'Extraordinario', precio: 300, total_brazos: 12, etiqueta: 'Extraordinario · turno 7', son: null, alabado: 'Dulce nombre de Jesús' },
+  { id: 'turno-008', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 8, tipo_turno: 'Ordinario', precio: 150, total_brazos: 20, etiqueta: 'Ordinario 6', son: 'La Peregrina', alabado: null },
+  { id: 'turno-009', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 9, tipo_turno: 'Ordinario', precio: 150, total_brazos: 20, etiqueta: 'Ordinario 7', son: null, alabado: null },
+  { id: 'turno-010', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 10, tipo_turno: 'Ordinario', precio: 150, total_brazos: 20, etiqueta: 'Ordinario 8', son: null, alabado: null },
+  { id: 'turno-011', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 11, tipo_turno: 'Ordinario', precio: 150, total_brazos: 20, etiqueta: 'Ordinario 9', son: null, alabado: null },
+  { id: 'turno-012', organizacion_id: ORG_A, cortejo_id: 'cortejo-001', numero_turno: 12, tipo_turno: 'Entrada', precio: 400, total_brazos: 20, etiqueta: 'Entrada', son: 'Entrada solemne', alabado: 'Salve Regina' },
 ];
 
 export const DEMO_MESAS = [

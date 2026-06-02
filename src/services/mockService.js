@@ -291,6 +291,8 @@ export function generarProcesionMock(cortejo, configProcesion, organizacionId) {
       precio: cfg.precio,
       total_brazos: cfg.total_brazos,
       etiqueta: cfg.etiqueta || null,
+      son: cfg.son || null,
+      alabado: cfg.alabado || null,
     });
 
     const brazos = crearBrazosParaTurno({

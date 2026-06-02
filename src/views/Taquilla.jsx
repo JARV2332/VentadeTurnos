@@ -21,6 +21,7 @@ import {
   leerImagenComoDataUrl,
 } from '../utils/pagoUtils';
 import { formatPrecio } from '../utils/boletaUtils';
+import { repertorioTurnoLista } from '../utils/turnoUtils';
 
 export default function Taquilla() {
   const { organizacionId, organizacion, user } = useAuth();
@@ -233,6 +234,7 @@ export default function Taquilla() {
     : null;
 
   const precioTurno = turnoSel?.precio || 0;
+  const repertorioSel = turnoSel ? repertorioTurnoLista(turnoSel) : [];
   const necesitaComprobante = metodoRequiereComprobante(pago.metodo_pago);
 
   return (
@@ -312,6 +314,16 @@ export default function Taquilla() {
             <div className="venta-resumen">
               <p><strong>Turno #{selectedBrazo.numero_turno}</strong> · {formatPrecio(precioTurno)}</p>
               <p className="text-muted">{turnoSel?.etiqueta || turnoSel?.tipo_turno}</p>
+              {repertorioSel.length > 0 && (
+                <div className="venta-repertorio">
+                  <span className="venta-repertorio__titulo">Se toca en este turno</span>
+                  {repertorioSel.map((item) => (
+                    <p key={item.tipo} className="venta-repertorio__linea">
+                      <strong>{item.tipo}:</strong> {item.texto}
+                    </p>
+                  ))}
+                </div>
+              )}
             </div>
 
             {pasoVenta === 1 && (

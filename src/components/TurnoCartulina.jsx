@@ -1,5 +1,6 @@
 import React from 'react';
 import StatusBadge from './StatusBadge';
+import { repertorioTurnoLista } from '../utils/turnoUtils';
 
 const ESTADO_CLASS = {
   disponible: 'espacio--disponible',
@@ -28,6 +29,7 @@ export default function EspacioBrazo({ brazo, selected, onClick, readOnly = fals
 export function TurnoCartulina({ turno, selectedBrazo, onClickBrazo, readOnly = false }) {
   const formatQ = (n) =>
     new Intl.NumberFormat('es-GT', { style: 'currency', currency: 'GTQ' }).format(n);
+  const repertorio = repertorioTurnoLista(turno);
 
   return (
     <article className="turno-cartulina">
@@ -41,6 +43,17 @@ export function TurnoCartulina({ turno, selectedBrazo, onClickBrazo, readOnly = 
           <span className="turno-cartulina__precio">{formatQ(turno.precio)}</span>
         </div>
       </header>
+
+      {repertorio.length > 0 && (
+        <div className="turno-cartulina__repertorio" aria-label="Repertorio del turno">
+          {repertorio.map((item) => (
+            <span key={item.tipo} className="turno-repertorio-item">
+              <span className="turno-repertorio-item__tipo">{item.tipo}</span>
+              <span className="turno-repertorio-item__texto">{item.texto}</span>
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="turno-cartulina__cuerpo">
         <div className="turno-columna turno-columna--izq">

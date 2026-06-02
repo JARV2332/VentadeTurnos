@@ -18,6 +18,7 @@ import {
   brazosPorLado,
   construirTurnosConfig,
   turnosElegiblesExtraordinarios,
+  repertorioTurnoLista,
 } from '../utils/turnoUtils';
 
 const DEFAULT = {
@@ -29,6 +30,13 @@ const DEFAULT = {
   precioOrdinario: 150,
   precioExtraordinario: 300,
   turnosExtraordinarios: [7, 14, 16],
+  repertorioPorTurno: {
+    1: { son: 'Marcha fúnebre de salida', alabado: '' },
+    7: { son: '', alabado: 'Dulce nombre de Jesús' },
+    14: { son: 'La Peregrina', alabado: '' },
+    16: { son: '', alabado: 'Gloria a Dios en las alturas' },
+    20: { son: 'Entrada solemne', alabado: 'Salve Regina' },
+  },
 };
 
 const DEMO_FORM = {
@@ -118,8 +126,33 @@ export default function ConfigSaaS() {
     });
   }, [elegiblesExtra]);
 
+  useEffect(() => {
+    const max = config.totalTurnos;
+    setConfig((prev) => {
+      const rep = prev.repertorioPorTurno || {};
+      const limpio = Object.fromEntries(
+        Object.entries(rep).filter(([n]) => Number(n) >= 1 && Number(n) <= max)
+      );
+      if (Object.keys(limpio).length === Object.keys(rep).length) return prev;
+      return { ...prev, repertorioPorTurno: limpio };
+    });
+  }, [config.totalTurnos]);
+
   const setConfigField = (campo, valor) => {
     setConfig((prev) => ({ ...prev, [campo]: valor }));
+  };
+
+  const updateRepertorio = (numeroTurno, campo, valor) => {
+    setConfig((prev) => {
+      const actual = prev.repertorioPorTurno?.[numeroTurno] || { son: '', alabado: '' };
+      return {
+        ...prev,
+        repertorioPorTurno: {
+          ...prev.repertorioPorTurno,
+          [numeroTurno]: { ...actual, [campo]: valor },
+        },
+      };
+    });
   };
 
   const toggleExtraordinario = (numero) => {
@@ -488,6 +521,60 @@ export default function ConfigSaaS() {
             )}
           </SeccionTurno>
 
+          <SeccionTurno
+            titulo="Son y alabado por turno"
+            descripcion="Indica qué pieza musical o alabado corresponde a cada turno. La taquilla lo mostrará al vendedor."
+          >
+            <div className="repertorio-tabla-wrap">
+              <table className="repertorio-tabla">
+                <thead>
+                  <tr>
+                    <th>Turno</th>
+                    <th>Tipo</th>
+                    <th>Son (opcional)</th>
+                    <th>Alabado (opcional)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.map((t) => {
+                    const rep = config.repertorioPorTurno?.[t.numero_turno] || {
+                      son: '',
+                      alabado: '',
+                    };
+                    return (
+                      <tr key={t.numero_turno}>
+                        <td>
+                          <strong>#{t.numero_turno}</strong>
+                        </td>
+                        <td>
+                          <span className={`preview-tipo preview-tipo--${t.tipo_turno.toLowerCase()}`}>
+                            {t.etiqueta || t.tipo_turno}
+                          </span>
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            placeholder="Ej. La Peregrina"
+                            value={rep.son}
+                            onChange={(e) => updateRepertorio(t.numero_turno, 'son', e.target.value)}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            placeholder="Ej. Dulce nombre de Jesús"
+                            value={rep.alabado}
+                            onChange={(e) => updateRepertorio(t.numero_turno, 'alabado', e.target.value)}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </SeccionTurno>
+
           <button type="submit" className="btn btn--primary btn--block">
             Crear procesión
           </button>
@@ -515,6 +602,15 @@ export default function ConfigSaaS() {
                   <span className="preview-turno__centro">◆</span>
                   <span>{brazosPorLado(t.total_brazos)} Der</span>
                 </div>
+                {repertorioTurnoLista(t).length > 0 && (
+                  <div className="preview-turno__repertorio">
+                    {repertorioTurnoLista(t).map((r) => (
+                      <span key={r.tipo}>
+                        <strong>{r.tipo}:</strong> {r.texto}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>

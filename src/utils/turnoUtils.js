@@ -84,6 +84,25 @@ export function turnosElegiblesExtraordinarios(totalTurnos) {
  * Construye turnos: #1 = Salida, #N = Entrada, intermedios ordinarios salvo
  * los números listados en turnosExtraordinarios (ej. [7, 14, 16] de 20).
  */
+function repertorioDeTurno(repertorioPorTurno, numero) {
+  const raw = repertorioPorTurno?.[numero] || repertorioPorTurno?.[String(numero)] || {};
+  const son = (raw.son || '').trim() || null;
+  const alabado = (raw.alabado || '').trim() || null;
+  return { son, alabado };
+}
+
+/** Lista { tipo, texto } para mostrar en UI (son / alabado) */
+export function repertorioTurnoLista(turno) {
+  const items = [];
+  if (turno?.son?.trim()) items.push({ tipo: 'Son', texto: turno.son.trim() });
+  if (turno?.alabado?.trim()) items.push({ tipo: 'Alabado', texto: turno.alabado.trim() });
+  return items;
+}
+
+export function tieneRepertorio(turno) {
+  return repertorioTurnoLista(turno).length > 0;
+}
+
 export function construirTurnosConfig({
   totalTurnos = 2,
   brazosDefault = 20,
@@ -93,6 +112,7 @@ export function construirTurnosConfig({
   precioOrdinario = 0,
   precioExtraordinario = 0,
   turnosExtraordinarios = [],
+  repertorioPorTurno = {},
 }) {
   const total = Math.max(2, Number(totalTurnos) || 2);
   const elegibles = new Set(turnosElegiblesExtraordinarios(total));
@@ -108,6 +128,9 @@ export function construirTurnosConfig({
   let ordCount = 0;
 
   for (let n = 1; n <= total; n += 1) {
+    const { son, alabado } = repertorioDeTurno(repertorioPorTurno, n);
+    const baseRep = { son, alabado };
+
     if (n === 1) {
       turnos.push({
         numero_turno: n,
@@ -115,6 +138,7 @@ export function construirTurnosConfig({
         precio: precioSalida,
         total_brazos: brazosOrd,
         etiqueta: 'Salida',
+        ...baseRep,
       });
     } else if (n === total) {
       turnos.push({
@@ -123,6 +147,7 @@ export function construirTurnosConfig({
         precio: precioEntrada,
         total_brazos: brazosOrd,
         etiqueta: 'Entrada',
+        ...baseRep,
       });
     } else if (extras.has(n)) {
       turnos.push({
@@ -131,6 +156,7 @@ export function construirTurnosConfig({
         precio: precioExtraordinario,
         total_brazos: brazosExtra,
         etiqueta: `Extraordinario · turno ${n}`,
+        ...baseRep,
       });
     } else {
       ordCount += 1;
@@ -140,6 +166,7 @@ export function construirTurnosConfig({
         precio: precioOrdinario,
         total_brazos: brazosOrd,
         etiqueta: `Ordinario ${ordCount}`,
+        ...baseRep,
       });
     }
   }
