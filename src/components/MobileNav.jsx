@@ -38,6 +38,15 @@ export default function MobileNav() {
             </span>
           </NavLink>
         ))}
+        <NavLink
+          to="/perfil"
+          className={({ isActive }) =>
+            `mobile-nav__link ${isActive ? 'mobile-nav__link--active' : ''}`
+          }
+        >
+          <span className="mobile-nav__icon" aria-hidden>◉</span>
+          <span className="mobile-nav__label">Perfil</span>
+        </NavLink>
       </div>
     </nav>
   );

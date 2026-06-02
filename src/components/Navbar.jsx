@@ -1,9 +1,11 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { MOCK_MODE } from '../config/supabaseClient';
 
 export default function Navbar({ title, subtitle, onMenuToggle, menuOpen = false }) {
   const { user } = useAuth();
+  const iniciales = user?.nombre?.[0] || user?.email?.[0]?.toUpperCase();
 
   return (
     <header className="navbar">
@@ -24,13 +26,17 @@ export default function Navbar({ title, subtitle, onMenuToggle, menuOpen = false
       </div>
       <div className="navbar__actions">
         {MOCK_MODE && <span className="navbar__pill navbar__pill--mock">Modo demo</span>}
-        <div className="navbar__user">
-          <span className="navbar__avatar">{user?.nombre?.[0] || user?.email?.[0]?.toUpperCase()}</span>
-          <div>
+        <Link to="/perfil" className="navbar__user navbar__user-link" title="Mi perfil">
+          {user?.avatar_url ? (
+            <img src={user.avatar_url} alt="" className="navbar__avatar navbar__avatar--foto" />
+          ) : (
+            <span className="navbar__avatar">{iniciales}</span>
+          )}
+          <div className="navbar__user-text">
             <strong>{user?.nombre || user?.email}</strong>
-            <small>Sesión activa</small>
+            <small>{user?.cargo || 'Mi perfil'}</small>
           </div>
-        </div>
+        </Link>
       </div>
     </header>
   );

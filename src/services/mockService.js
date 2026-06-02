@@ -438,6 +438,45 @@ export function buscarUsuarioLogin(email, password) {
   return { usuario, rol };
 }
 
+export function updatePerfilMock(userId, organizacionId, datos) {
+  const idx = store.usuarios.findIndex(
+    (u) => u.id === userId && u.organizacion_id === organizacionId
+  );
+  if (idx < 0) return { error: 'Usuario no encontrado.' };
+
+  const actual = store.usuarios[idx];
+  const quiereCambiarPass = Boolean(
+    datos.passwordActual || datos.passwordNueva || datos.passwordConfirmar
+  );
+
+  if (quiereCambiarPass) {
+    if (!datos.passwordActual) {
+      return { error: 'Indique su contraseña actual.' };
+    }
+    if (actual.password !== datos.passwordActual) {
+      return { error: 'La contraseña actual no es correcta.' };
+    }
+    if (!datos.passwordNueva || datos.passwordNueva.length < 6) {
+      return { error: 'La nueva contraseña debe tener al menos 6 caracteres.' };
+    }
+    if (datos.passwordNueva !== datos.passwordConfirmar) {
+      return { error: 'La confirmación de contraseña no coincide.' };
+    }
+  }
+
+  store.usuarios[idx] = {
+    ...actual,
+    nombre: datos.nombre?.trim() || actual.nombre,
+    telefono: datos.telefono?.trim() || '',
+    cargo: datos.cargo?.trim() || '',
+    avatar_url: datos.avatar_url || null,
+    ...(quiereCambiarPass ? { password: datos.passwordNueva } : {}),
+  };
+
+  emit('usuarios', { eventType: 'UPDATE' });
+  return { data: store.usuarios[idx] };
+}
+
 export function saveRolMock(organizacionId, datos, rolId = null) {
   const permisos = [...new Set((datos.permisos || []).filter(Boolean))];
   if (permisos.length === 0) {

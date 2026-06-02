@@ -12,6 +12,7 @@ import Taquilla from './views/Taquilla';
 import CajaSaaS from './views/CajaSaaS';
 import Impresion from './views/Impresion';
 import EntregaTurno from './views/EntregaTurno';
+import PerfilUsuario from './views/PerfilUsuario';
 
 function App() {
   return (
@@ -88,6 +89,14 @@ function App() {
             element={
               <PrivateRoute permission="impresion">
                 <Impresion />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/perfil"
+            element={
+              <PrivateRoute>
+                <PerfilUsuario />
               </PrivateRoute>
             }
           />

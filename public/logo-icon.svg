@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 148" role="img" aria-label="Ventadeturnos">
+  <defs>
+    <linearGradient id="vtGrad" x1="60" y1="8" x2="60" y2="132" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4f7cff"/>
+      <stop offset="55%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#9333ea"/>
+    </linearGradient>
+  </defs>
+  <path
+    fill="url(#vtGrad)"
+    d="M24 8h72c8.8 0 16 7.2 16 16v88c0 8.8-7.2 16-16 16H24c-8.8 0-16-7.2-16-16V24c0-8.8 7.2-16 16-16z"
+  />
+  <path fill="#fff" d="M52 118h16a8 8 0 0 1 0 16H52a8 8 0 0 1 0-16z"/>
+  <g fill="#fff">
+    <rect x="56" y="22" width="8" height="22" rx="1"/>
+    <rect x="48" y="30" width="24" height="6" rx="1"/>
+  </g>
+  <g fill="#fff" opacity="0.95">
+    <ellipse cx="38" cy="78" rx="5" ry="7"/>
+    <ellipse cx="50" cy="76" rx="5" ry="7"/>
+    <ellipse cx="60" cy="74" rx="5" ry="7"/>
+    <ellipse cx="70" cy="76" rx="5" ry="7"/>
+    <ellipse cx="82" cy="78" rx="5" ry="7"/>
+    <rect x="34" y="66" width="52" height="4" rx="2"/>
+    <rect x="40" y="62" width="40" height="3" rx="1.5" opacity="0.85"/>
+  </g>
+  <g fill="#fff">
+    <rect x="36" y="96" width="3" height="12" rx="1"/>
+    <rect x="41" y="96" width="2" height="12" rx="1"/>
+    <rect x="45" y="96" width="4" height="12" rx="1"/>
+    <rect x="51" y="96" width="2" height="12" rx="1"/>
+    <rect x="55" y="96" width="3" height="12" rx="1"/>
+    <rect x="60" y="96" width="2" height="12" rx="1"/>
+    <rect x="64" y="96" width="4" height="12" rx="1"/>
+    <rect x="70" y="96" width="2" height="12" rx="1"/>
+    <rect x="74" y="96" width="3" height="12" rx="1"/>
+    <rect x="79" y="96" width="2" height="12" rx="1"/>
+    <rect x="83" y="96" width="4" height="12" rx="1"/>
+  </g>
+</svg>

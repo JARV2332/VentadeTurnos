@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { MOCK_MODE } from '../config/supabaseClient';
 import { rutaInicioPorPermisos } from '../config/permisos';
+import BrandLogo from '../components/BrandLogo';
 
 export default function Landing() {
   const { login, register, isAuthenticated, rutaInicio } = useAuth();
@@ -45,6 +46,7 @@ export default function Landing() {
   return (
     <div className="landing">
       <div className="landing__hero">
+        <BrandLogo variant="full" className="landing__logo" />
         <div className="landing__badge">Plataforma SaaS · Multi-tenant</div>
         <h1 className="landing__title">
           Gestión universal de
@@ -74,7 +76,7 @@ export default function Landing() {
 
       <div className="landing__auth">
         <div className="auth-card">
-          <div className="auth-card__logo">VT</div>
+          <BrandLogo variant="icon" className="auth-card__brand-icon" />
           <h2>ventadeturnos.com</h2>
           <p className="auth-card__sub">Accede a tu panel de organización</p>
 

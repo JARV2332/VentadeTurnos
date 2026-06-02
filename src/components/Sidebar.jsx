@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { PANTALLAS } from '../config/permisos';
+import BrandLogo from './BrandLogo';
 
 export default function Sidebar({ mobileOpen = false, onClose }) {
   const { organizacion, rolNombre, logout, hasPermiso } = useAuth();
@@ -22,11 +23,7 @@ export default function Sidebar({ mobileOpen = false, onClose }) {
   return (
     <aside className={`sidebar${mobileOpen ? ' sidebar--open' : ''}`}>
       <div className="sidebar__brand">
-        <div className="sidebar__logo">VT</div>
-        <div>
-          <strong>ventadeturnos</strong>
-          <small>SaaS Universal</small>
-        </div>
+        <BrandLogo variant="wordmark" className="sidebar__brand-logo" />
       </div>
 
       <div className="sidebar__org">
@@ -50,6 +47,17 @@ export default function Sidebar({ mobileOpen = false, onClose }) {
           </NavLink>
         ))}
       </nav>
+
+      <NavLink
+        to="/perfil"
+        onClick={handleNav}
+        className={({ isActive }) =>
+          `sidebar__link sidebar__link--perfil ${isActive ? 'sidebar__link--active' : ''}`
+        }
+      >
+        <span className="sidebar__icon">◉</span>
+        Mi perfil
+      </NavLink>
 
       <button type="button" className="sidebar__logout" onClick={handleLogout}>
         Cerrar sesión

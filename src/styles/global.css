@@ -127,6 +127,65 @@ body {
   font-size: 1.25rem;
 }
 
+.auth-card__brand-icon {
+  width: 72px;
+  height: auto;
+  margin: 0 auto 1rem;
+  display: block;
+}
+
+.landing__logo {
+  width: min(280px, 90%);
+  height: auto;
+  margin-bottom: 1.25rem;
+}
+
+/* ── Marca ── */
+.brand-logo--icon {
+  width: 40px;
+  height: auto;
+  display: block;
+}
+
+.brand-logo--full {
+  width: min(300px, 100%);
+  height: auto;
+  display: block;
+}
+
+.brand-logo--wordmark {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.brand-logo__icon {
+  width: 40px;
+  height: auto;
+  flex-shrink: 0;
+}
+
+.brand-logo__text strong {
+  display: block;
+  color: white;
+  font-size: 0.9rem;
+  line-height: 1.2;
+}
+
+.brand-logo__text small {
+  font-size: 0.7rem;
+  color: var(--sidebar-text);
+}
+
+.sidebar__brand-logo {
+  width: 100%;
+}
+
+.sidebar__link--perfil {
+  margin-top: 0.5rem;
+}
+
 .auth-card h2 { font-size: 1.35rem; margin-bottom: 0.25rem; }
 .auth-card__sub { color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.5rem; }
 
@@ -409,6 +468,27 @@ body {
 
 .navbar__user strong { display: block; font-size: 0.85rem; }
 .navbar__user small { font-size: 0.7rem; color: var(--text-muted); }
+
+.navbar__user-link {
+  text-decoration: none;
+  color: inherit;
+  border-radius: 10px;
+  padding: 0.25rem 0.35rem;
+  transition: background 0.2s;
+}
+
+.navbar__user-link:hover {
+  background: var(--bg);
+}
+
+.navbar__avatar--foto {
+  object-fit: cover;
+  background: var(--primary-light);
+}
+
+.navbar__user-text {
+  min-width: 0;
+}
 
 .app-content {
   flex: 1;
@@ -2072,6 +2152,120 @@ body {
   font-weight: 600;
 }
 
+/* ── Perfil de usuario ── */
+.perfil-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.perfil-resumen {
+  text-align: center;
+}
+
+.perfil-avatar-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.perfil-avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.perfil-avatar--foto {
+  object-fit: cover;
+  border: 3px solid var(--border);
+}
+
+.perfil-nombre {
+  font-size: 1.15rem;
+  margin-bottom: 0.25rem;
+}
+
+.perfil-meta {
+  margin-bottom: 0.75rem;
+}
+
+.perfil-org {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--border);
+  font-size: 0.85rem;
+}
+
+.perfil-org small {
+  display: block;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.perfil-form label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+
+.perfil-form input[type="text"],
+.perfil-form input[type="tel"],
+.perfil-form input[type="email"],
+.perfil-form input[type="password"],
+.perfil-form input[type="file"] {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.perfil-form input:disabled {
+  background: var(--bg);
+  color: var(--text-muted);
+}
+
+.perfil-foto-label input[type="file"] {
+  padding: 0.45rem;
+}
+
+.perfil-quitar-foto {
+  margin: -0.5rem 0 1rem;
+}
+
+.perfil-seccion-pass {
+  margin: 1.25rem 0;
+  padding: 1rem;
+  background: var(--bg);
+  border-radius: 10px;
+}
+
+.perfil-seccion-pass h4 {
+  margin-bottom: 0.35rem;
+  font-size: 0.95rem;
+}
+
+.hint {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.35rem;
+  font-weight: 400;
+}
+
 /* ── Navegación móvil (inferior) ── */
 .mobile-nav {
   display: none;
@@ -2153,7 +2347,7 @@ body {
   .landing { grid-template-columns: 1fr; }
   .landing__auth { border-left: none; border-top: 1px solid var(--border); }
   .metrics-grid { grid-template-columns: repeat(2, 1fr); }
-  .config-grid, .config-grid--wide, .caja-grid, .taquilla-layout, .entrega-grid {
+  .config-grid, .config-grid--wide, .caja-grid, .taquilla-layout, .entrega-grid, .perfil-grid {
     grid-template-columns: 1fr;
   }
   .venta-panel {
@@ -2284,7 +2478,7 @@ body {
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-  .navbar__user > div:last-child { display: none; }
+  .navbar__user-text { display: none; }
   .navbar__pill--mock { font-size: 0.62rem; padding: 0.25rem 0.5rem; }
   .navbar__actions { flex-shrink: 0; }
 

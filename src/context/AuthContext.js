@@ -6,13 +6,20 @@ import {
   rutaInicioPorPermisos,
   PERMISO_GESTION_USUARIOS,
 } from '../config/permisos';
-import { buscarUsuarioLogin } from '../services/mockService';
+import { buscarUsuarioLogin, updatePerfilMock, getStore } from '../services/mockService';
 
 const AuthContext = createContext(null);
 
 function buildSessionFromMock(usuario, rol) {
   return {
-    user: { id: usuario.id, email: usuario.email, nombre: usuario.nombre },
+    user: {
+      id: usuario.id,
+      email: usuario.email,
+      nombre: usuario.nombre,
+      telefono: usuario.telefono || '',
+      cargo: usuario.cargo || '',
+      avatar_url: usuario.avatar_url || null,
+    },
     organizacion_id: usuario.organizacion_id,
     rol_id: rol.id,
     rol_nombre: rol.nombre,
@@ -44,6 +51,13 @@ export function AuthProvider({ children }) {
     setPermisos(session.permisos || []);
   }, []);
 
+  const persistSession = useCallback((session) => {
+    if (MOCK_MODE && session) {
+      localStorage.setItem('vtd_session', JSON.stringify(session));
+    }
+    applySession(session);
+  }, [applySession]);
+
   const hydrateUser = useCallback(async (authUser) => {
     const { data: roleData } = await supabase
       .from('usuarios_roles')
@@ -65,7 +79,18 @@ export function AuthProvider({ children }) {
     const saved = localStorage.getItem('vtd_session');
     if (saved) {
       try {
-        applySession(JSON.parse(saved));
+        const session = JSON.parse(saved);
+        const storeUser = getStore().usuarios.find((u) => u.id === session.user?.id);
+        if (storeUser && session.user) {
+          session.user = {
+            ...session.user,
+            nombre: storeUser.nombre,
+            telefono: storeUser.telefono || '',
+            cargo: storeUser.cargo || '',
+            avatar_url: storeUser.avatar_url || null,
+          };
+        }
+        applySession(session);
       } catch {
         localStorage.removeItem('vtd_session');
       }
@@ -163,6 +188,37 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }
 
+  async function updateProfile(datos) {
+    if (!user?.id || !organizacion?.id) {
+      throw new Error('Sesión no válida');
+    }
+
+    if (MOCK_MODE) {
+      const result = updatePerfilMock(user.id, organizacion.id, datos);
+      if (result.error) throw new Error(result.error);
+
+      const saved = localStorage.getItem('vtd_session');
+      if (saved) {
+        try {
+          const session = JSON.parse(saved);
+          session.user = {
+            ...session.user,
+            nombre: result.data.nombre,
+            telefono: result.data.telefono || '',
+            cargo: result.data.cargo || '',
+            avatar_url: result.data.avatar_url || null,
+          };
+          persistSession(session);
+        } catch {
+          applySession(null);
+        }
+      }
+      return result.data;
+    }
+
+    throw new Error('Actualización de perfil disponible al conectar Supabase.');
+  }
+
   const value = {
     user,
     organizacion,
@@ -178,6 +234,7 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
+    updateProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
