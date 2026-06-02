@@ -125,23 +125,14 @@ export async function parseArchivoImport(file) {
   }
 
   if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
-    try {
-      const XLSX = await import('xlsx');
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: 'array' });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-      return parseFilasTabla(rows);
-    } catch {
-      return {
-        error:
-          'No se pudo leer el Excel. Guarde el archivo como CSV (UTF-8) o ejecute npm install en el proyecto.',
-        filas: [],
-      };
-    }
+    return {
+      error:
+        'Para subir desde Excel: Archivo → Guardar como → CSV UTF-8 (.csv) y súbalo aquí. También puede usar la plantilla CSV.',
+      filas: [],
+    };
   }
 
-  return { error: 'Formato no soportado. Use .xlsx, .xls o .csv', filas: [] };
+  return { error: 'Formato no soportado. Use .csv (desde Excel: Guardar como CSV)', filas: [] };
 }
 
 export function generarCSVPlantilla() {
@@ -162,19 +153,9 @@ export function descargarPlantilla() {
   URL.revokeObjectURL(url);
 }
 
-export async function descargarPlantillaExcel() {
-  try {
-    const XLSX = await import('xlsx');
-    const header = PLANTILLA_COLUMNAS.map((c) => c.label);
-    const fila1 = PLANTILLA_COLUMNAS.map((c) => c.ejemplo);
-    const fila2 = ['3', '5', 'Derecha', '', '', '', '', '', 'Apartado sin nombre'];
-    const ws = XLSX.utils.aoa_to_sheet([header, fila1, fila2]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Apartados');
-    XLSX.writeFile(wb, 'plantilla_apartados_turnos.xlsx');
-  } catch {
-    descargarPlantilla();
-  }
+/** Abre la plantilla CSV (Excel la abre sin problema) */
+export function descargarPlantillaExcel() {
+  descargarPlantilla();
 }
 
 export function etiquetaAsignado(brazo, cargador) {

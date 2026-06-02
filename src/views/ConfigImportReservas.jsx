@@ -123,13 +123,13 @@ export default function ConfigImportReservas() {
             Plantilla CSV
           </button>
           <button type="button" className="btn btn--ghost" onClick={descargarPlantillaExcel}>
-            Plantilla Excel
+            Plantilla (CSV / Excel)
           </button>
           <label className="btn btn--primary import-upload-btn">
-            {procesando ? 'Leyendo…' : 'Subir Excel o CSV'}
+            {procesando ? 'Leyendo…' : 'Subir CSV'}
             <input
               type="file"
-              accept=".xlsx,.xls,.csv"
+              accept=".csv,.txt"
               onChange={handleArchivo}
               disabled={procesando}
             />
