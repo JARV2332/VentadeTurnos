@@ -21,6 +21,7 @@ DATABASE_URL=postgresql://postgres:TU_PASSWORD@db.kolhnoectddjgfowyvux.supabase.
 La contraseña está en **Project Settings → Database → Database password**.
 
 ```bash
+npm install dotenv pg --no-save
 npm run db:apply
 ```
 
@@ -35,6 +36,7 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...   # Settings → API → service_role (solo ser
 ```
 
 ```bash
+npm install dotenv pg --no-save
 npm run db:seed
 ```
 

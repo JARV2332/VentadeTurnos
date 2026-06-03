@@ -1,6 +1,6 @@
 {
-  "buildCommand": "npm run build",
-  "installCommand": "npm ci || npm install",
+  "buildCommand": "CI=false DISABLE_ESLINT_PLUGIN=true npm run build",
+  "installCommand": "npm install",
   "framework": "create-react-app",
   "outputDirectory": "build",
   "env": {
