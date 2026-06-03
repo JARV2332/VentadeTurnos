@@ -4,7 +4,13 @@
  */
 import { createClient } from '@supabase/supabase-js';
 
-export const MOCK_MODE = process.env.REACT_APP_MOCK_MODE !== 'false';
+/**
+ * Modo demo local: mock por defecto en dev; en producción Supabase salvo REACT_APP_MOCK_MODE=true explícito.
+ */
+export const MOCK_MODE =
+  process.env.NODE_ENV === 'production'
+    ? process.env.REACT_APP_MOCK_MODE === 'true'
+    : process.env.REACT_APP_MOCK_MODE !== 'false';
 
 const supabaseUrl =
   process.env.REACT_APP_SUPABASE_URL || 'https://kolhnoectddjgfowyvux.supabase.co';
