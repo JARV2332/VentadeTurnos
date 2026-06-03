@@ -5,7 +5,7 @@ import { PANTALLAS } from '../config/permisos';
 import BrandLogo from './BrandLogo';
 
 export default function Sidebar({ mobileOpen = false, onClose }) {
-  const { organizacion, rolNombre, logout, hasPermiso } = useAuth();
+  const { organizacion, rolNombre, logout, hasPermiso, esSuperAdmin } = useAuth();
   const navigate = useNavigate();
 
   const navItems = PANTALLAS.filter((p) => hasPermiso(p.id));
@@ -27,8 +27,13 @@ export default function Sidebar({ mobileOpen = false, onClose }) {
       </div>
 
       <div className="sidebar__org">
-        <span className="sidebar__org-label">Organización activa</span>
-        <p className="sidebar__org-name">{organizacion?.nombre_oficial}</p>
+        <span className="sidebar__org-label">
+          {esSuperAdmin && !organizacion ? 'Plataforma' : 'Organización activa'}
+        </span>
+        <p className="sidebar__org-name">
+          {organizacion?.nombre_oficial ||
+            (esSuperAdmin ? 'ventadeturnos.com' : '—')}
+        </p>
         <span className="badge badge--info">{rolNombre}</span>
       </div>
 

@@ -27,6 +27,8 @@ export default function PlataformaAdmin() {
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
 
+  const setField = (campo, valor) => setForm((f) => ({ ...f, [campo]: valor }));
+
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
@@ -61,7 +63,9 @@ export default function PlataformaAdmin() {
         setError(res.error);
         return;
       }
-      setOkMsg(`Asociación "${res.data.organizacion.nombre_oficial}" creada. Admin: ${res.data.adminEmail}`);
+      setOkMsg(
+        `Asociación "${res.data.organizacion.nombre_oficial}" creada. Admin: ${res.data.adminEmail}`
+      );
       setForm(FORM_VACIO);
       refresh();
     } finally {
@@ -82,7 +86,7 @@ export default function PlataformaAdmin() {
   return (
     <Layout
       title="Administración de plataforma"
-      subtitle="Cree asociaciones y asigne un administrador; luego entre a cada una para crear usuarios y roles"
+      subtitle="Cree asociaciones, asigne un administrador y entre a cada una para gestionar usuarios y roles"
     >
       {okMsg && <div className="alert alert--success">{okMsg}</div>}
       {error && <div className="alert alert--error">{error}</div>}
@@ -94,106 +98,150 @@ export default function PlataformaAdmin() {
         </div>
       )}
 
-      <section className="card" style={{ marginBottom: '1.5rem' }}>
-        <h3>Nueva asociación</h3>
-        <p className="text-muted">
-          Se crea la organización, el rol Administrador y el primer usuario admin de esa
-          asociación.
-        </p>
-        <form onSubmit={handleCrear} className="form-grid">
-          <label>
-            Nombre oficial
-            <input
-              value={form.nombreOficial}
-              onChange={(e) => setForm((f) => ({ ...f, nombreOficial: e.target.value }))}
-              required
-            />
-          </label>
-          <label>
-            Parroquia / entidad
-            <input
-              value={form.entidad}
-              onChange={(e) => setForm((f) => ({ ...f, entidad: e.target.value }))}
-            />
-          </label>
-          <label>
-            Teléfono contacto
-            <input
-              value={form.telefono}
-              onChange={(e) => setForm((f) => ({ ...f, telefono: e.target.value }))}
-            />
-          </label>
-          <label>
-            Correo administrador
-            <input
-              type="email"
-              value={form.adminEmail}
-              onChange={(e) => setForm((f) => ({ ...f, adminEmail: e.target.value }))}
-              required
-            />
-          </label>
-          <label>
-            Contraseña administrador
-            <input
-              type="password"
-              value={form.adminPassword}
-              onChange={(e) => setForm((f) => ({ ...f, adminPassword: e.target.value }))}
-              required
-              minLength={6}
-            />
-          </label>
-          <label>
-            Nombre del administrador
-            <input
-              value={form.adminNombre}
-              onChange={(e) => setForm((f) => ({ ...f, adminNombre: e.target.value }))}
-            />
-          </label>
+      <div className="config-grid config-grid--wide plataforma-grid">
+        <form className="panel config-form plataforma-form" onSubmit={handleCrear}>
+          <h3 className="panel__title">Nueva asociación</h3>
+          <p className="panel__subtitle text-muted">
+            Se crea la organización, el rol Administrador y el primer usuario admin.
+          </p>
+
+          <fieldset className="config-seccion">
+            <legend>Datos de la asociación</legend>
+            <label>
+              Nombre oficial
+              <input
+                type="text"
+                placeholder="Ej. Pastoral de Religiosidad Popular…"
+                value={form.nombreOficial}
+                onChange={(e) => setField('nombreOficial', e.target.value)}
+                required
+              />
+            </label>
+            <div className="form-row form-row--2">
+              <label>
+                Parroquia / entidad
+                <input
+                  type="text"
+                  placeholder="Ej. Nuestra Señora de La Asunción"
+                  value={form.entidad}
+                  onChange={(e) => setField('entidad', e.target.value)}
+                />
+              </label>
+              <label>
+                Teléfono de contacto
+                <input
+                  type="tel"
+                  placeholder="50255551234"
+                  value={form.telefono}
+                  onChange={(e) => setField('telefono', e.target.value)}
+                />
+              </label>
+            </div>
+            <label>
+              Slug / subdominio (opcional)
+              <input
+                type="text"
+                placeholder="pastoral-asuncion"
+                value={form.subdominioSlug}
+                onChange={(e) => setField('subdominioSlug', e.target.value)}
+              />
+              <small className="text-muted">Solo letras, números y guiones. Si lo deja vacío, se genera automáticamente.</small>
+            </label>
+          </fieldset>
+
+          <fieldset className="config-seccion">
+            <legend>Administrador de la asociación</legend>
+            <p className="config-seccion__desc">
+              Esta persona podrá crear roles, usuarios de caja, vendedores, etc.
+            </p>
+            <label>
+              Nombre del administrador
+              <input
+                type="text"
+                placeholder="Ej. María García"
+                value={form.adminNombre}
+                onChange={(e) => setField('adminNombre', e.target.value)}
+              />
+            </label>
+            <div className="form-row form-row--2">
+              <label>
+                Correo electrónico
+                <input
+                  type="email"
+                  placeholder="admin@pastoral.org"
+                  value={form.adminEmail}
+                  onChange={(e) => setField('adminEmail', e.target.value)}
+                  required
+                  autoComplete="off"
+                />
+              </label>
+              <label>
+                Contraseña inicial
+                <input
+                  type="password"
+                  placeholder="Mínimo 6 caracteres"
+                  value={form.adminPassword}
+                  onChange={(e) => setField('adminPassword', e.target.value)}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                />
+              </label>
+            </div>
+          </fieldset>
+
           <div className="form-actions">
             <button type="submit" className="btn btn--primary" disabled={guardando}>
               {guardando ? 'Creando…' : 'Crear asociación'}
             </button>
           </div>
         </form>
-      </section>
 
-      <section className="card">
-        <h3>Asociaciones registradas</h3>
-        {loading ? (
-          <p>Cargando…</p>
-        ) : orgs.length === 0 ? (
-          <p>No hay asociaciones. Cree la primera arriba.</p>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Entidad</th>
-                <th>Slug</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {orgs.map((o) => (
-                <tr key={o.id}>
-                  <td>{o.nombre_oficial}</td>
-                  <td>{o.entidad_o_parroquia || '—'}</td>
-                  <td><code>{o.subdominio_slug}</code></td>
-                  <td>
-                    <button
-                      type="button"
-                      className="btn btn--secondary btn--sm"
-                      onClick={() => handleEntrar(o)}
-                    >
-                      Administrar usuarios
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+        <section className="panel plataforma-lista">
+          <h3 className="panel__title">Asociaciones registradas</h3>
+          {loading ? (
+            <p className="text-muted">Cargando…</p>
+          ) : orgs.length === 0 ? (
+            <div className="plataforma-empty">
+              <p className="plataforma-empty__icon">◇</p>
+              <p><strong>Sin asociaciones aún</strong></p>
+              <p className="text-muted">Complete el formulario para registrar la primera pastoral o hermandad.</p>
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Entidad</th>
+                    <th>Slug</th>
+                    <th aria-label="Acciones" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {orgs.map((o) => (
+                    <tr key={o.id}>
+                      <td><strong>{o.nombre_oficial}</strong></td>
+                      <td>{o.entidad_o_parroquia || '—'}</td>
+                      <td><code className="slug-code">{o.subdominio_slug}</code></td>
+                      <td className="td-actions">
+                        <button
+                          type="button"
+                          className="btn btn--secondary btn--sm"
+                          onClick={() => handleEntrar(o)}
+                        >
+                          Administrar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
     </Layout>
   );
 }
+
