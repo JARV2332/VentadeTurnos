@@ -5,11 +5,12 @@
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * Modo demo local: mock por defecto en dev; en producción Supabase salvo REACT_APP_MOCK_MODE=true explícito.
+ * Desarrollo: mock si REACT_APP_MOCK_MODE !== 'false'.
+ * Producción: SIEMPRE Supabase (ignora REACT_APP_MOCK_MODE=true en Vercel).
  */
 export const MOCK_MODE =
   process.env.NODE_ENV === 'production'
-    ? process.env.REACT_APP_MOCK_MODE === 'true'
+    ? false
     : process.env.REACT_APP_MOCK_MODE !== 'false';
 
 const supabaseUrl =
