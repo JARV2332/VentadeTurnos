@@ -13,6 +13,7 @@ import CajaSaaS from './views/CajaSaaS';
 import Impresion from './views/Impresion';
 import EntregaTurno from './views/EntregaTurno';
 import PerfilUsuario from './views/PerfilUsuario';
+import PlataformaAdmin from './views/PlataformaAdmin';
 
 function App() {
   return (
@@ -20,6 +21,14 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route
+            path="/plataforma"
+            element={
+              <PrivateRoute permission="plataforma">
+                <PlataformaAdmin />
+              </PrivateRoute>
+            }
+          />
           <Route
             path="/dashboard"
             element={

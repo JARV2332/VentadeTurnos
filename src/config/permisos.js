@@ -4,6 +4,13 @@
  */
 
 export const PANTALLAS = [
+  {
+    id: 'plataforma',
+    label: 'Asociaciones',
+    path: '/plataforma',
+    icon: '◇',
+    grupo: 'Plataforma',
+  },
   { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: '◫', grupo: 'Operación' },
   { id: 'taquilla', label: 'Taquilla', path: '/taquilla', icon: '▦', grupo: 'Operación' },
   { id: 'entrega', label: 'Entrega turnos', path: '/entrega', icon: '⎔', grupo: 'Operación' },
@@ -36,9 +43,14 @@ export function tienePermiso(permisos, permisoId) {
   return Array.isArray(permisos) && permisos.includes(permisoId);
 }
 
-export function rutaInicioPorPermisos(permisos) {
-  const pantalla = PANTALLAS.find((p) => tienePermiso(permisos, p.id));
-  return pantalla?.path || '/';
+export function rutaInicioPorPermisos(permisos, esSuperAdmin = false) {
+  if (esSuperAdmin && tienePermiso(permisos, 'plataforma') && !tienePermiso(permisos, 'dashboard')) {
+    return '/plataforma';
+  }
+  const pantalla = PANTALLAS.find((p) => tienePermiso(permisos, p.id) && p.id !== 'plataforma');
+  if (pantalla) return pantalla.path;
+  if (tienePermiso(permisos, 'plataforma')) return '/plataforma';
+  return '/';
 }
 
 export function pantallasPorGrupo() {

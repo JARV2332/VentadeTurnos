@@ -8,7 +8,11 @@ import {
   PERMISOS_ADMIN_COMPLETO,
 } from '../config/permisos';
 import { buscarUsuarioLogin } from '../services/mockService';
-import { fetchPerfilByAuthId, updatePerfil } from '../services/dataService';
+import {
+  fetchPerfilByAuthId,
+  updatePerfil,
+  setOrganizacionActiva as setOrganizacionActivaApi,
+} from '../services/dataService';
 import { getStore } from '../services/dataService';
 
 const AuthContext = createContext(null);
@@ -38,6 +42,7 @@ export function AuthProvider({ children }) {
   const [rolId, setRolId] = useState(null);
   const [rolNombre, setRolNombre] = useState(null);
   const [permisos, setPermisos] = useState([]);
+  const [esSuperAdmin, setEsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const applySession = useCallback((session) => {
@@ -47,9 +52,11 @@ export function AuthProvider({ children }) {
       setRolId(null);
       setRolNombre(null);
       setPermisos([]);
+      setEsSuperAdmin(false);
       return;
     }
     setUser(session.user);
+    setEsSuperAdmin(Boolean(session.esSuperAdmin));
     setOrganizacion(
       session.organizacion || DEMO_ORGANIZACIONES[session.organizacion_id] || null
     );
@@ -69,10 +76,13 @@ export function AuthProvider({ children }) {
     const perfil = await fetchPerfilByAuthId(authUser.id);
     if (perfil?.error || !perfil?.user) {
       setLoading(false);
-      throw new Error('Usuario sin perfil en la organización. Ejecute npm run db:seed.');
+      throw new Error(
+        'Usuario sin perfil. Ejecute en Supabase 007_super_admin.sql y npm run db:seed-super, o regístrese como nueva asociación.'
+      );
     }
     const session = {
       user: perfil.user,
+      esSuperAdmin: perfil.esSuperAdmin,
       organizacion: perfil.organizacion,
       organizacion_id: perfil.organizacion_id,
       rol_id: perfil.rol_id,
@@ -154,7 +164,26 @@ export function AuthProvider({ children }) {
     [permisos]
   );
 
-  const rutaInicio = rutaInicioPorPermisos(permisos);
+  const rutaInicio = rutaInicioPorPermisos(permisos, esSuperAdmin);
+
+  const entrarEnOrganizacion = useCallback(
+    async (orgId) => {
+      if (MOCK_MODE) return;
+      const res = await setOrganizacionActivaApi(orgId);
+      if (res?.error) throw new Error(res.error);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) await hydrateUser(session.user);
+    },
+    [hydrateUser]
+  );
+
+  const salirDeOrganizacion = useCallback(async () => {
+    if (MOCK_MODE) return;
+    const res = await setOrganizacionActivaApi(null);
+    if (res?.error) throw new Error(res.error);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) await hydrateUser(session.user);
+  }, [hydrateUser]);
 
   async function login(email, password) {
     if (MOCK_MODE) {
@@ -277,8 +306,11 @@ export function AuthProvider({ children }) {
     loading,
     isAuthenticated: !!user,
     isAdmin: hasPermiso(PERMISO_GESTION_USUARIOS),
+    esSuperAdmin,
     hasPermiso,
     rutaInicio,
+    entrarEnOrganizacion,
+    salirDeOrganizacion,
     login,
     register,
     logout,

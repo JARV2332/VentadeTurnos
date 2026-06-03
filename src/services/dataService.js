@@ -158,5 +158,18 @@ export const updatePerfil = (userId, orgId, datos, email) =>
 export const fetchPerfilByAuthId = (authUserId) =>
   useSb() ? sb.fetchPerfilByAuthId(authUserId) : Promise.resolve(null);
 
+export const listOrganizacionesPlataforma = () =>
+  useSb()
+    ? sb.listOrganizacionesPlataforma()
+    : Promise.resolve([]);
+
+export const setOrganizacionActiva = (orgId) =>
+  useSb() ? sb.setOrganizacionActiva(orgId) : Promise.resolve({ ok: true });
+
+export const crearOrganizacionPlataforma = (payload) =>
+  useSb()
+    ? sb.crearOrganizacionPlataforma(payload)
+    : Promise.resolve({ error: 'Solo con Supabase' });
+
 /** Solo modo mock */
 export const getStore = () => mock.getStore();

@@ -25,7 +25,8 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "db:apply": "node scripts/apply-schema.mjs",
-    "db:seed": "node scripts/seed-demo.mjs"
+    "db:seed": "node scripts/seed-demo.mjs",
+    "db:seed-super": "node scripts/seed-super.mjs"
   },
   "eslintConfig": {
     "extends": [

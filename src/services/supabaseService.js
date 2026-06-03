@@ -8,6 +8,7 @@ import {
   crearBrazosParaTurno,
 } from '../utils/turnoUtils';
 import { normalizarLado } from '../utils/importReservasUtils';
+import { PERMISOS_ADMIN_COMPLETO } from '../config/permisos';
 
 function err(error) {
   if (!error) return null;
@@ -17,29 +18,100 @@ function err(error) {
 export async function fetchPerfilByAuthId(authUserId) {
   const { data, error } = await supabase
     .from('usuarios_app')
-    .select('*, roles_organizacion(id, nombre, permisos), organizaciones(*)')
+    .select('*, roles_organizacion(id, nombre, permisos)')
     .eq('auth_user_id', authUserId)
     .eq('activo', true)
     .single();
 
   if (error) return err(error);
 
+  const user = {
+    id: data.id,
+    authUserId: data.auth_user_id,
+    email: data.email,
+    nombre: data.nombre,
+    telefono: data.telefono || '',
+    cargo: data.cargo || '',
+    avatar_url: data.avatar_url || null,
+    esSuperAdmin: Boolean(data.es_super_admin),
+  };
+
+  if (data.es_super_admin) {
+    const orgId = data.organizacion_activa_id;
+    let organizacion = null;
+    if (orgId) {
+      const { data: orgData } = await supabase
+        .from('organizaciones')
+        .select('*')
+        .eq('id', orgId)
+        .single();
+      organizacion = orgData;
+    }
+    return {
+      user,
+      esSuperAdmin: true,
+      organizacion,
+      organizacion_id: orgId,
+      rol_id: null,
+      rol_nombre: 'Super Administrador',
+      permisos: orgId ? [...PERMISOS_ADMIN_COMPLETO, 'plataforma'] : ['plataforma'],
+    };
+  }
+
+  const { data: orgData } = await supabase
+    .from('organizaciones')
+    .select('*')
+    .eq('id', data.organizacion_id)
+    .single();
+
   return {
-    user: {
-      id: data.id,
-      authUserId: data.auth_user_id,
-      email: data.email,
-      nombre: data.nombre,
-      telefono: data.telefono || '',
-      cargo: data.cargo || '',
-      avatar_url: data.avatar_url || null,
-    },
-    organizacion: data.organizaciones,
+    user,
+    esSuperAdmin: false,
+    organizacion: orgData,
     organizacion_id: data.organizacion_id,
     rol_id: data.rol_id,
     rol_nombre: data.roles_organizacion?.nombre,
     permisos: data.roles_organizacion?.permisos || [],
   };
+}
+
+export async function listOrganizacionesPlataforma() {
+  const { data, error } = await supabase
+    .from('organizaciones')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function setOrganizacionActiva(orgId) {
+  const { data, error } = await supabase.rpc('set_organizacion_activa', {
+    p_org_id: orgId,
+  });
+  if (error) return err(error);
+  return { data };
+}
+
+export async function crearOrganizacionPlataforma(payload) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    return { error: 'Sesión expirada' };
+  }
+  try {
+    const res = await fetch('/api/crear-organizacion-plataforma', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) return { error: json.error || 'Error al crear asociación' };
+    return { data: json };
+  } catch {
+    return { error: 'No se pudo crear la asociación (requiere Vercel + SERVICE_ROLE)' };
+  }
 }
 
 export async function updatePerfilSupabase(userId, organizacionId, datos, email) {

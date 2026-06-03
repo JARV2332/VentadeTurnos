@@ -25,7 +25,25 @@ npm install dotenv pg --no-save
 npm run db:apply
 ```
 
-## 2. Datos demo (organización, roles, usuarios, procesión)
+## 2. Super administrador de plataforma (recomendado)
+
+Ejecuta también `supabase/007_super_admin.sql` en el SQL Editor.
+
+Luego en tu PC:
+
+```bash
+npm install dotenv pg --no-save
+npm run db:seed-super
+```
+
+| Campo | Valor |
+|-------|--------|
+| Correo | `super@ventadeturnos.com` |
+| Contraseña | `SuperAdmin2026!` |
+
+En la app: **Asociaciones** (`/plataforma`) → crear asociación + admin → **Administrar usuarios** → Config → Usuarios y roles.
+
+## 3. Datos demo (organización, roles, usuarios, procesión)
 
 En `.env.local` añade:
 
