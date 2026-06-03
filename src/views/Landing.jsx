@@ -12,8 +12,8 @@ export default function Landing() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({
-    email: 'admin@demo.com',
-    password: 'demo123',
+    email: '',
+    password: '',
     orgName: '',
   });
 
@@ -135,6 +135,12 @@ export default function Landing() {
               {loading ? 'Procesando...' : tab === 'login' ? 'Entrar al panel' : 'Crear cuenta'}
             </button>
           </form>
+
+          {!MOCK_MODE && tab === 'login' && (
+            <p className="auth-demo" style={{ marginTop: '1rem', fontSize: '0.85rem', opacity: 0.85 }}>
+              Super administrador: <strong>super@ventadeturnos.com</strong>
+            </p>
+          )}
 
           {MOCK_MODE && (
             <div className="auth-demo">

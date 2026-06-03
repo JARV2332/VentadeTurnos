@@ -196,8 +196,18 @@ export function AuthProvider({ children }) {
       return session;
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw new Error(error.message);
+    const emailNorm = email.trim().toLowerCase();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: emailNorm,
+      password,
+    });
+    if (error) {
+      throw new Error(
+        error.message === 'Invalid login credentials'
+          ? 'Correo o contraseña incorrectos. Super admin: super@ventadeturnos.com'
+          : error.message
+      );
+    }
     return hydrateUser(data.user);
   }
 

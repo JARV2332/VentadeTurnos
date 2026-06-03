@@ -39,7 +39,7 @@ npm run db:seed-super
 | Campo | Valor |
 |-------|--------|
 | Correo | `super@ventadeturnos.com` |
-| Contraseña | `SuperAdmin2026!` |
+| Contraseña | `VentaTurnos2026` |
 
 En la app: **Asociaciones** (`/plataforma`) → crear asociación + admin → **Administrar usuarios** → Config → Usuarios y roles.
 

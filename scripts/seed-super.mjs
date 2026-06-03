@@ -17,7 +17,7 @@ const url = process.env.REACT_APP_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const SUPER_EMAIL = process.env.SUPER_ADMIN_EMAIL || 'super@ventadeturnos.com';
-const SUPER_PASSWORD = process.env.SUPER_ADMIN_PASSWORD || 'SuperAdmin2026!';
+const SUPER_PASSWORD = process.env.SUPER_ADMIN_PASSWORD || 'VentaTurnos2026';
 
 if (!url || !serviceKey) {
   console.error('Falta REACT_APP_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en .env.local');
