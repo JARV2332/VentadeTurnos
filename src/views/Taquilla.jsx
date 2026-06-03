@@ -7,12 +7,13 @@ import { MOCK_MODE, subscribeBrazos } from '../config/supabaseClient';
 import {
   getCortejosByOrg,
   getTurnosAgrupados,
-  getStore,
-  subscribeMock,
-  reservarBrazoMock,
-  confirmarVentaMock,
+  getMesasByOrg,
+  subscribeData,
+  reservarBrazo,
+  confirmarVenta,
   buscarCargadorPorWhatsapp,
-} from '../services/mockService';
+  getCargadorById,
+} from '../services/dataService';
 import { enviarBoletaPorCorreo } from '../services/emailService';
 import {
   METODOS_PAGO,
@@ -46,10 +47,9 @@ export default function Taquilla() {
   const [error, setError] = useState('');
   const [cortejos, setCortejos] = useState([]);
   const [finalizando, setFinalizando] = useState(false);
+  const [mesaActiva, setMesaActiva] = useState(null);
 
-  const mesaActiva = getStore().mesas.find(
-    (m) => m.organizacion_id === organizacionId && m.estado === 'activa'
-  );
+  const vendedorAuthId = user?.authUserId || user?.id;
 
   const resetVentaPanel = () => {
     setSelectedBrazo(null);
@@ -64,10 +64,12 @@ export default function Taquilla() {
     });
   };
 
-  const refreshCortejos = useCallback(() => {
+  const refreshCortejos = useCallback(async () => {
     if (!organizacionId) return;
-    const lista = getCortejosByOrg(organizacionId);
+    const lista = await getCortejosByOrg(organizacionId);
     setCortejos(lista);
+    const mesas = await getMesasByOrg(organizacionId);
+    setMesaActiva(mesas.find((m) => m.estado === 'activa') || mesas[0] || null);
     const ultimo = sessionStorage.getItem('vtd_ultimo_cortejo');
     if (ultimo && lista.some((c) => c.id === ultimo)) {
       setCortejoId(ultimo);
@@ -80,9 +82,9 @@ export default function Taquilla() {
     });
   }, [organizacionId]);
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback(async () => {
     if (!cortejoId) return;
-    let lista = getTurnosAgrupados(cortejoId, organizacionId);
+    let lista = await getTurnosAgrupados(cortejoId, organizacionId);
     if (filtroTipo !== 'all') {
       lista = lista.filter((t) => t.tipo_turno === filtroTipo);
     }
@@ -91,16 +93,16 @@ export default function Taquilla() {
 
   useEffect(() => {
     refreshCortejos();
-    return subscribeMock(refreshCortejos);
-  }, [refreshCortejos]);
+    return subscribeData(organizacionId, refreshCortejos);
+  }, [organizacionId, refreshCortejos]);
 
   useEffect(() => {
     refresh();
-    if (MOCK_MODE) return subscribeMock(refresh);
+    if (MOCK_MODE) return subscribeData(organizacionId, refresh);
     return subscribeBrazos(organizacionId, refresh);
   }, [organizacionId, refresh]);
 
-  const handleClickBrazo = (brazo) => {
+  const handleClickBrazo = async (brazo) => {
     if (brazo.estado === 'vendido') return;
     setError('');
     setVentaOk(null);
@@ -111,7 +113,7 @@ export default function Taquilla() {
       new Date(brazo.bloqueado_hasta) < new Date();
 
     if (brazo.estado === 'disponible' || expirado) {
-      const res = reservarBrazoMock(brazo.id, mesaActiva?.id, user?.id, organizacionId);
+      const res = await reservarBrazo(brazo.id, mesaActiva?.id, vendedorAuthId, organizacionId);
       if (res.error) {
         setError(res.error);
         return;
@@ -127,7 +129,7 @@ export default function Taquilla() {
         telefono_emergencia: '',
       });
     } else if (brazo.reserva_apartado && brazo.estado === 'reservado') {
-      const cargador = getStore().cargadores.find((c) => c.id === brazo.cargador_id);
+      const cargador = brazo.cargador_id ? await getCargadorById(brazo.cargador_id) : null;
       setSelectedBrazo(brazo);
       setPasoVenta(1);
       setPago({ metodo_pago: 'efectivo', comprobante_url: null, comprobante_nombre: '' });
@@ -138,7 +140,7 @@ export default function Taquilla() {
         cui_o_identificacion: cargador?.cui_o_identificacion || '',
         telefono_emergencia: cargador?.telefono_emergencia || '',
       });
-    } else if (brazo.vendedor_id === user?.id) {
+    } else if (brazo.vendedor_id === vendedorAuthId) {
       setSelectedBrazo(brazo);
       setPasoVenta(1);
     } else {
@@ -146,11 +148,11 @@ export default function Taquilla() {
     }
   };
 
-  const handleWhatsappChange = (value) => {
+  const handleWhatsappChange = async (value) => {
     const limpio = value.replace(/\D/g, '').slice(0, 11);
     setForm((f) => ({ ...f, whatsapp: limpio }));
     if (limpio.length >= 11) {
-      const existente = buscarCargadorPorWhatsapp(organizacionId, limpio);
+      const existente = await buscarCargadorPorWhatsapp(organizacionId, limpio);
       if (existente) {
         setForm({
           nombre_completo: existente.nombre_completo,
@@ -207,10 +209,10 @@ export default function Taquilla() {
     }
 
     setFinalizando(true);
-    const turno = getStore().turnos.find((t) => t.id === selectedBrazo.turno_id);
-    const cortejo = getCortejosByOrg(organizacionId).find((c) => c.id === cortejoId);
+    const turno = turnos.find((t) => t.id === selectedBrazo.turno_id);
+    const cortejo = cortejos.find((c) => c.id === cortejoId);
 
-    const res = confirmarVentaMock(
+    const res = await confirmarVenta(
       selectedBrazo.id,
       form,
       turno?.precio || 0,
@@ -242,7 +244,7 @@ export default function Taquilla() {
   };
 
   const turnoSel = selectedBrazo
-    ? getStore().turnos.find((t) => t.id === selectedBrazo.turno_id)
+    ? turnos.find((t) => t.id === selectedBrazo.turno_id)
     : null;
 
   const precioTurno = turnoSel?.precio || 0;

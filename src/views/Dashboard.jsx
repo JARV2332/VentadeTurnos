@@ -6,8 +6,8 @@ import { useAuth } from '../context/AuthContext';
 import {
   getDashboardMetrics,
   getCortejosByOrg,
-  subscribeMock,
-} from '../services/mockService';
+  subscribeData,
+} from '../services/dataService';
 
 export default function Dashboard() {
   const { organizacionId } = useAuth();
@@ -15,12 +15,12 @@ export default function Dashboard() {
   const [cortejos, setCortejos] = useState([]);
 
   useEffect(() => {
-    const refresh = () => {
-      setMetrics(getDashboardMetrics(organizacionId));
-      setCortejos(getCortejosByOrg(organizacionId));
+    const refresh = async () => {
+      setMetrics(await getDashboardMetrics(organizacionId));
+      setCortejos(await getCortejosByOrg(organizacionId));
     };
     refresh();
-    return subscribeMock(refresh);
+    return subscribeData(organizacionId, refresh);
   }, [organizacionId]);
 
   const formatQ = (n) =>

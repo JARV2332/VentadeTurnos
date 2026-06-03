@@ -6,24 +6,40 @@ import { useAuth } from '../context/AuthContext';
 import {
   getBrazosByOrg,
   getCortejosByOrg,
-  getStore,
-  subscribeMock,
-} from '../services/mockService';
+  getCargadorById,
+  getTurnoById,
+  subscribeData,
+} from '../services/dataService';
 
 export default function Impresion() {
   const { organizacion, organizacionId } = useAuth();
   const [ventas, setVentas] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [detalle, setDetalle] = useState({ cargador: null, turno: null, cortejo: null });
 
   useEffect(() => {
-    const refresh = () => {
-      const vendidos = getBrazosByOrg(organizacionId).filter((b) => b.estado === 'vendido');
+    const refresh = async () => {
+      const vendidos = (await getBrazosByOrg(organizacionId)).filter((b) => b.estado === 'vendido');
       setVentas(vendidos);
       setSelected((prev) => prev || vendidos[0] || null);
     };
     refresh();
-    return subscribeMock(refresh);
+    return subscribeData(organizacionId, refresh);
   }, [organizacionId]);
+
+  useEffect(() => {
+    (async () => {
+      if (!selected) {
+        setDetalle({ cargador: null, turno: null, cortejo: null });
+        return;
+      }
+      const cargador = await getCargadorById(selected.cargador_id);
+      const turno = await getTurnoById(selected.turno_id);
+      const cortejos = await getCortejosByOrg(organizacionId);
+      const cortejo = cortejos.find((c) => c.id === turno?.cortejo_id) || null;
+      setDetalle({ cargador, turno, cortejo });
+    })();
+  }, [selected, organizacionId]);
 
   if (!selected) {
     return (
@@ -33,9 +49,7 @@ export default function Impresion() {
     );
   }
 
-  const cargador = getStore().cargadores.find((c) => c.id === selected.cargador_id);
-  const turno = getStore().turnos.find((t) => t.id === selected.turno_id);
-  const cortejo = getCortejosByOrg(organizacionId).find((c) => c.id === turno?.cortejo_id);
+  const { cargador, turno, cortejo } = detalle;
 
   const handlePrint = () => window.print();
 
@@ -50,8 +64,7 @@ export default function Impresion() {
           >
             {ventas.map((v) => (
               <option key={v.id} value={v.id}>
-                Turno #{v.numero_turno} · {v.codigo_boleta_qr}
-                {v.estado_entrega === 'entregado' ? ' (entregado)' : ''}
+                {v.codigo_boleta_qr} — Turno {v.numero_turno} Brazo {v.numero_brazo}
               </option>
             ))}
           </select>
@@ -61,20 +74,17 @@ export default function Impresion() {
         </button>
       </div>
 
-      <div className="print-area">
-        {selected.estado_entrega === 'entregado' && (
-          <div className="no-print" style={{ marginBottom: '1rem' }}>
-            <StatusBadge status="entregado" />
-          </div>
-        )}
+      <div className="impresion-boleta">
         <BoletaCard
           organizacion={organizacion}
-          cortejo={cortejo}
-          turno={turno}
           cargador={cargador}
           brazo={selected}
-          showEntrega
+          turno={turno}
+          cortejo={cortejo}
         />
+        <p className="text-muted impresion-hint">
+          Estado entrega: <StatusBadge status={selected.estado_entrega} />
+        </p>
       </div>
     </Layout>
   );

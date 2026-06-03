@@ -16,11 +16,17 @@
     "react-scripts": "5.0.1",
     "web-vitals": "^2.1.4"
   },
+  "devDependencies": {
+    "dotenv": "^16.5.0",
+    "pg": "^8.16.0"
+  },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "db:apply": "node scripts/apply-schema.mjs",
+    "db:seed": "node scripts/seed-demo.mjs"
   },
   "eslintConfig": {
     "extends": [

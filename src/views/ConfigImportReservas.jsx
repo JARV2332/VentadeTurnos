@@ -4,9 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import {
   getCortejosByOrg,
   getResumenApartados,
-  aplicarImportApartadosMock,
-  subscribeMock,
-} from '../services/mockService';
+  aplicarImportApartados,
+  subscribeData,
+} from '../services/dataService';
 import {
   PLANTILLA_COLUMNAS,
   parseArchivoImport,
@@ -25,9 +25,9 @@ export default function ConfigImportReservas() {
   const [okMsg, setOkMsg] = useState('');
   const [procesando, setProcesando] = useState(false);
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback(async () => {
     if (!organizacionId) return;
-    const lista = getCortejosByOrg(organizacionId);
+    const lista = await getCortejosByOrg(organizacionId);
     setCortejos(lista);
     setCortejoId((prev) => {
       if (prev && lista.some((c) => c.id === prev)) return prev;
@@ -37,13 +37,12 @@ export default function ConfigImportReservas() {
 
   useEffect(() => {
     refresh();
-    return subscribeMock(refresh);
+    return subscribeData(organizacionId, refresh);
   }, [refresh]);
 
   useEffect(() => {
-    if (cortejoId && organizacionId) {
-      setResumen(getResumenApartados(cortejoId, organizacionId));
-    }
+    if (!cortejoId || !organizacionId) return;
+    getResumenApartados(cortejoId, organizacionId).then(setResumen);
   }, [cortejoId, organizacionId]);
 
   const handleArchivo = async (e) => {
@@ -75,7 +74,7 @@ export default function ConfigImportReservas() {
     }
   };
 
-  const handleAplicar = () => {
+  const handleAplicar = async () => {
     if (!cortejoId) {
       setError('Seleccione una procesión.');
       return;
@@ -85,7 +84,7 @@ export default function ConfigImportReservas() {
       return;
     }
     setError('');
-    const res = aplicarImportApartadosMock(cortejoId, organizacionId, preview, {
+    const res = await aplicarImportApartados(cortejoId, organizacionId, preview, {
       usuarioId: user?.id,
     });
     setResultadoImport(res);
@@ -93,7 +92,7 @@ export default function ConfigImportReservas() {
       `Importación lista: ${res.ok} apartado(s), ${res.omitidos} omitido(s) de ${res.total}.`
     );
     setPreview([]);
-    setResumen(getResumenApartados(cortejoId, organizacionId));
+    setResumen(await getResumenApartados(cortejoId, organizacionId));
     setTimeout(() => setOkMsg(''), 6000);
   };
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import Loader from '../components/Loader';
 import { useAuth } from '../context/AuthContext';
-import { getFinanzasByOrg, subscribeMock } from '../services/mockService';
+import { getFinanzasByOrg, subscribeData } from '../services/dataService';
 import { labelMetodoPago } from '../utils/pagoUtils';
 
 const VENDEDOR_NOMBRES = {
@@ -19,9 +19,9 @@ export default function CajaSaaS() {
   const [comprobanteVer, setComprobanteVer] = useState(null);
 
   useEffect(() => {
-    const refresh = () => setFinanzas(getFinanzasByOrg(organizacionId));
+    const refresh = async () => setFinanzas(await getFinanzasByOrg(organizacionId));
     refresh();
-    return subscribeMock(refresh);
+    return subscribeData(organizacionId, refresh);
   }, [organizacionId]);
 
   const formatQ = (n) =>

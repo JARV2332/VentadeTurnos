@@ -4,14 +4,14 @@ import Layout from '../components/Layout';
 import { TurnoCartulina } from '../components/TurnoCartulina';
 import { useAuth } from '../context/AuthContext';
 import {
-  generarProcesionMock,
+  generarProcesion,
   getCortejosByOrg,
   getTurnosAgrupados,
-  subscribeMock,
-  desactivarProcesionMock,
-  activarProcesionMock,
-  eliminarProcesionMock,
-} from '../services/mockService';
+  subscribeData,
+  desactivarProcesion,
+  activarProcesion,
+  eliminarProcesion,
+} from '../services/dataService';
 import StatusBadge from '../components/StatusBadge';
 import {
   validarBrazosPares,
@@ -93,23 +93,24 @@ export default function ConfigSaaS() {
     [config.totalTurnos]
   );
 
-  const refreshLista = useCallback(() => {
+  const refreshLista = useCallback(async () => {
     if (!organizacionId) return;
-    const lista = getCortejosByOrg(organizacionId, { incluirInactivas: true }).map((c) => {
-      const turnos = getTurnosAgrupados(c.id, organizacionId);
+    const cortejosRaw = await getCortejosByOrg(organizacionId, { incluirInactivas: true });
+    const lista = await Promise.all(cortejosRaw.map(async (c) => {
+      const turnos = await getTurnosAgrupados(c.id, organizacionId);
       const totalBrazos = turnos.reduce(
         (s, t) => s + t.izquierda.length + t.derecha.length,
         0
       );
       return { ...c, turnos, totalTurnos: turnos.length, totalBrazos };
-    });
+    }));
     setProcesiones(lista);
   }, [organizacionId]);
 
   useEffect(() => {
     refreshLista();
-    return subscribeMock(refreshLista);
-  }, [refreshLista]);
+    return subscribeData(organizacionId, refreshLista);
+  }, [organizacionId, refreshLista]);
 
   useEffect(() => {
     if (resultado?.cortejo?.id) {
@@ -166,7 +167,7 @@ export default function ConfigSaaS() {
     });
   };
 
-  const handleGenerar = (e) => {
+  const handleGenerar = async (e) => {
     e.preventDefault();
     setError('');
     setOkMsg('');
@@ -205,7 +206,11 @@ export default function ConfigSaaS() {
     }
 
     try {
-      const res = generarProcesionMock(cortejo, config, organizacionId);
+      const res = await generarProcesion(cortejo, config, organizacionId);
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
       setResultado(res);
       setOkMsg(
         `¡Procesión "${res.cortejo.nombre_evento}" creada con ${res.turnos.length} turnos y ${res.brazos.length} espacios!`
@@ -217,8 +222,8 @@ export default function ConfigSaaS() {
     }
   };
 
-  const handleDesactivar = (p) => {
-    const res = desactivarProcesionMock(p.id, organizacionId);
+  const handleDesactivar = async (p) => {
+    const res = await desactivarProcesion(p.id, organizacionId);
     if (res.error) {
       setError(res.error);
       return;
@@ -228,8 +233,8 @@ export default function ConfigSaaS() {
     refreshLista();
   };
 
-  const handleActivar = (p) => {
-    const res = activarProcesionMock(p.id, organizacionId);
+  const handleActivar = async (p) => {
+    const res = await activarProcesion(p.id, organizacionId);
     if (res.error) {
       setError(res.error);
       return;
@@ -238,13 +243,13 @@ export default function ConfigSaaS() {
     refreshLista();
   };
 
-  const handleEliminar = (p) => {
+  const handleEliminar = async (p) => {
     const confirmar = window.confirm(
       `¿Eliminar permanentemente "${p.nombre_evento}"?\n\nSe borrarán sus ${p.totalTurnos} turnos y ${p.totalBrazos} espacios. Esta acción no se puede deshacer.`
     );
     if (!confirmar) return;
 
-    const res = eliminarProcesionMock(p.id, organizacionId);
+    const res = await eliminarProcesion(p.id, organizacionId);
     if (res.error) {
       setError(res.error);
       return;

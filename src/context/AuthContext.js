@@ -5,8 +5,11 @@ import {
   tienePermiso,
   rutaInicioPorPermisos,
   PERMISO_GESTION_USUARIOS,
+  PERMISOS_ADMIN_COMPLETO,
 } from '../config/permisos';
-import { buscarUsuarioLogin, updatePerfilMock, getStore } from '../services/mockService';
+import { buscarUsuarioLogin } from '../services/mockService';
+import { fetchPerfilByAuthId, updatePerfil } from '../services/dataService';
+import { getStore } from '../services/dataService';
 
 const AuthContext = createContext(null);
 
@@ -14,6 +17,7 @@ function buildSessionFromMock(usuario, rol) {
   return {
     user: {
       id: usuario.id,
+      authUserId: usuario.id,
       email: usuario.email,
       nombre: usuario.nombre,
       telefono: usuario.telefono || '',
@@ -21,6 +25,7 @@ function buildSessionFromMock(usuario, rol) {
       avatar_url: usuario.avatar_url || null,
     },
     organizacion_id: usuario.organizacion_id,
+    organizacion: DEMO_ORGANIZACIONES[usuario.organizacion_id],
     rol_id: rol.id,
     rol_nombre: rol.nombre,
     permisos: [...rol.permisos],
@@ -45,7 +50,9 @@ export function AuthProvider({ children }) {
       return;
     }
     setUser(session.user);
-    setOrganizacion(DEMO_ORGANIZACIONES[session.organizacion_id] || null);
+    setOrganizacion(
+      session.organizacion || DEMO_ORGANIZACIONES[session.organizacion_id] || null
+    );
     setRolId(session.rol_id);
     setRolNombre(session.rol_nombre);
     setPermisos(session.permisos || []);
@@ -59,21 +66,23 @@ export function AuthProvider({ children }) {
   }, [applySession]);
 
   const hydrateUser = useCallback(async (authUser) => {
-    const { data: roleData } = await supabase
-      .from('usuarios_roles')
-      .select('rol, organizacion_id, organizaciones(*)')
-      .eq('usuario_id', authUser.id)
-      .single();
-
-    if (roleData) {
-      setUser(authUser);
-      setRolId(roleData.rol);
-      setRolNombre(roleData.rol);
-      setPermisos([]);
-      setOrganizacion(roleData.organizaciones);
+    const perfil = await fetchPerfilByAuthId(authUser.id);
+    if (perfil?.error || !perfil?.user) {
+      setLoading(false);
+      throw new Error('Usuario sin perfil en la organización. Ejecute npm run db:seed.');
     }
+    const session = {
+      user: perfil.user,
+      organizacion: perfil.organizacion,
+      organizacion_id: perfil.organizacion_id,
+      rol_id: perfil.rol_id,
+      rol_nombre: perfil.rol_nombre,
+      permisos: perfil.permisos,
+    };
+    applySession(session);
     setLoading(false);
-  }, []);
+    return session;
+  }, [applySession]);
 
   const loadMockSession = useCallback(() => {
     const saved = localStorage.getItem('vtd_session');
@@ -104,18 +113,37 @@ export function AuthProvider({ children }) {
       return undefined;
     }
 
+    if (!supabase) {
+      setLoading(false);
+      return undefined;
+    }
+
     async function initSupabaseAuth() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) await hydrateUser(session.user);
-      else setLoading(false);
+      if (session?.user) {
+        try {
+          await hydrateUser(session.user);
+        } catch {
+          applySession(null);
+        }
+      } else {
+        setLoading(false);
+      }
     }
 
     initSupabaseAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) await hydrateUser(session.user);
-      else applySession(null);
-      setLoading(false);
+      if (session?.user) {
+        try {
+          await hydrateUser(session.user);
+        } catch {
+          applySession(null);
+        }
+      } else {
+        applySession(null);
+        setLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -140,9 +168,8 @@ export function AuthProvider({ children }) {
     }
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    await hydrateUser(data.user);
-    return data;
+    if (error) throw new Error(error.message);
+    return hydrateUser(data.user);
   }
 
   async function register(email, password, nombreOrganizacion) {
@@ -158,7 +185,7 @@ export function AuthProvider({ children }) {
       .from('organizaciones')
       .insert({
         nombre_oficial: nombreOrganizacion,
-        subdominio_slug: slug,
+        subdominio_slug: `${slug}-${Date.now().toString(36).slice(-4)}`,
         creado_por: authData.user.id,
       })
       .select()
@@ -166,14 +193,32 @@ export function AuthProvider({ children }) {
 
     if (orgError) throw orgError;
 
-    await supabase.from('usuarios_roles').insert({
-      usuario_id: authData.user.id,
+    const { data: rol, error: rolError } = await supabase
+      .from('roles_organizacion')
+      .insert({
+        organizacion_id: org.id,
+        nombre: 'Administrador',
+        descripcion: 'Acceso total',
+        es_sistema: true,
+        permisos: PERMISOS_ADMIN_COMPLETO,
+      })
+      .select()
+      .single();
+
+    if (rolError) throw rolError;
+
+    const { error: userError } = await supabase.from('usuarios_app').insert({
       organizacion_id: org.id,
-      rol: 'administrador',
+      auth_user_id: authData.user.id,
+      nombre: nombreOrganizacion,
+      email: email.trim().toLowerCase(),
+      rol_id: rol.id,
+      activo: true,
     });
 
-    await hydrateUser(authData.user);
-    return authData;
+    if (userError) throw userError;
+
+    return hydrateUser(authData.user);
   }
 
   async function logout() {
@@ -193,30 +238,33 @@ export function AuthProvider({ children }) {
       throw new Error('Sesión no válida');
     }
 
-    if (MOCK_MODE) {
-      const result = updatePerfilMock(user.id, organizacion.id, datos);
-      if (result.error) throw new Error(result.error);
+    const result = await updatePerfil(user.id, organizacion.id, datos, user.email);
+    if (result.error) throw new Error(result.error);
 
+    if (MOCK_MODE) {
       const saved = localStorage.getItem('vtd_session');
       if (saved) {
-        try {
-          const session = JSON.parse(saved);
-          session.user = {
-            ...session.user,
-            nombre: result.data.nombre,
-            telefono: result.data.telefono || '',
-            cargo: result.data.cargo || '',
-            avatar_url: result.data.avatar_url || null,
-          };
-          persistSession(session);
-        } catch {
-          applySession(null);
-        }
+        const session = JSON.parse(saved);
+        session.user = {
+          ...session.user,
+          nombre: result.data.nombre,
+          telefono: result.data.telefono || '',
+          cargo: result.data.cargo || '',
+          avatar_url: result.data.avatar_url || null,
+        };
+        persistSession(session);
       }
-      return result.data;
+    } else {
+      setUser((u) => ({
+        ...u,
+        nombre: result.data.nombre,
+        telefono: result.data.telefono || '',
+        cargo: result.data.cargo || '',
+        avatar_url: result.data.avatar_url || null,
+      }));
     }
 
-    throw new Error('Actualización de perfil disponible al conectar Supabase.');
+    return result.data;
   }
 
   const value = {

@@ -6,8 +6,8 @@ import StatusBadge from '../components/StatusBadge';
 import { useAuth } from '../context/AuthContext';
 import {
   buscarBoletaPorCodigo,
-  marcarEntregadoMock,
-} from '../services/mockService';
+  marcarEntregado,
+} from '../services/dataService';
 import { extraerCodigoBoleta } from '../utils/boletaUtils';
 
 export default function EntregaTurno() {
@@ -18,7 +18,7 @@ export default function EntregaTurno() {
   const [okMsg, setOkMsg] = useState('');
   const [scannerOn, setScannerOn] = useState(true);
 
-  const buscar = useCallback((texto) => {
+  const buscar = useCallback(async (texto) => {
     setError('');
     setOkMsg('');
     const codigo = extraerCodigoBoleta(texto);
@@ -28,7 +28,7 @@ export default function EntregaTurno() {
       return;
     }
 
-    const res = buscarBoletaPorCodigo(organizacionId, codigo);
+    const res = await buscarBoletaPorCodigo(organizacionId, codigo);
     if (res.error) {
       setError(res.error);
       setResultado(null);
@@ -43,10 +43,10 @@ export default function EntregaTurno() {
     setScannerOn(false);
   }, [buscar]);
 
-  const handleEntregar = () => {
+  const handleEntregar = async () => {
     if (!resultado?.brazo) return;
     setError('');
-    const res = marcarEntregadoMock(resultado.brazo.id, organizacionId, user?.id);
+    const res = await marcarEntregado(resultado.brazo.id, organizacionId, user?.authUserId || user?.id);
     if (res.error) {
       setError(res.error);
       return;

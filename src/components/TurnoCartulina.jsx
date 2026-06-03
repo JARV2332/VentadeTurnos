@@ -2,7 +2,6 @@ import React from 'react';
 import StatusBadge from './StatusBadge';
 import { repertorioTurnoLista } from '../utils/turnoUtils';
 import { etiquetaAsignado } from '../utils/importReservasUtils';
-import { getStore } from '../services/mockService';
 
 const ESTADO_CLASS = {
   disponible: 'espacio--disponible',
@@ -12,10 +11,7 @@ const ESTADO_CLASS = {
 
 export default function EspacioBrazo({ brazo, selected, onClick, readOnly = false }) {
   const vendido = brazo.estado === 'vendido';
-  const cargador = brazo.cargador_id
-    ? getStore().cargadores.find((c) => c.id === brazo.cargador_id)
-    : null;
-  const asignado = etiquetaAsignado(brazo, cargador);
+  const asignado = etiquetaAsignado(brazo, null);
   const titleParts = [
     `Brazo ${brazo.numero_brazo} ${brazo.lado}`,
     brazo.estado,

@@ -1,0 +1,594 @@
+/**
+ * Capa de datos Supabase (async).
+ */
+import { supabase, subscribeBrazos } from '../config/supabaseClient';
+import {
+  agruparTurnosConBrazos,
+  construirTurnosConfig,
+  crearBrazosParaTurno,
+} from '../utils/turnoUtils';
+import { normalizarLado } from '../utils/importReservasUtils';
+
+function err(error) {
+  if (!error) return null;
+  return { error: error.message || String(error) };
+}
+
+export async function fetchPerfilByAuthId(authUserId) {
+  const { data, error } = await supabase
+    .from('usuarios_app')
+    .select('*, roles_organizacion(id, nombre, permisos), organizaciones(*)')
+    .eq('auth_user_id', authUserId)
+    .eq('activo', true)
+    .single();
+
+  if (error) return err(error);
+
+  return {
+    user: {
+      id: data.id,
+      authUserId: data.auth_user_id,
+      email: data.email,
+      nombre: data.nombre,
+      telefono: data.telefono || '',
+      cargo: data.cargo || '',
+      avatar_url: data.avatar_url || null,
+    },
+    organizacion: data.organizaciones,
+    organizacion_id: data.organizacion_id,
+    rol_id: data.rol_id,
+    rol_nombre: data.roles_organizacion?.nombre,
+    permisos: data.roles_organizacion?.permisos || [],
+  };
+}
+
+export async function updatePerfilSupabase(userId, organizacionId, datos, email) {
+  const quiereCambiarPass = Boolean(
+    datos.passwordActual || datos.passwordNueva || datos.passwordConfirmar
+  );
+
+  if (quiereCambiarPass) {
+    if (!datos.passwordActual) return { error: 'Indique su contraseña actual.' };
+    const { error: signErr } = await supabase.auth.signInWithPassword({
+      email,
+      password: datos.passwordActual,
+    });
+    if (signErr) return { error: 'La contraseña actual no es correcta.' };
+    if (!datos.passwordNueva || datos.passwordNueva.length < 6) {
+      return { error: 'La nueva contraseña debe tener al menos 6 caracteres.' };
+    }
+    if (datos.passwordNueva !== datos.passwordConfirmar) {
+      return { error: 'La confirmación de contraseña no coincide.' };
+    }
+    const { error: upErr } = await supabase.auth.updateUser({ password: datos.passwordNueva });
+    if (upErr) return err(upErr);
+  }
+
+  const { data, error } = await supabase
+    .from('usuarios_app')
+    .update({
+      nombre: datos.nombre?.trim(),
+      telefono: datos.telefono?.trim() || '',
+      cargo: datos.cargo?.trim() || '',
+      avatar_url: datos.avatar_url || null,
+    })
+    .eq('id', userId)
+    .eq('organizacion_id', organizacionId)
+    .select()
+    .single();
+
+  if (error) return err(error);
+  return { data };
+}
+
+export function subscribeSupabase(organizacionId, callback) {
+  return subscribeBrazos(organizacionId, () => callback());
+}
+
+export async function getCortejosByOrg(organizacionId, { incluirInactivas = false } = {}) {
+  let q = supabase.from('cortejos').select('*').eq('organizacion_id', organizacionId);
+  if (!incluirInactivas) q = q.eq('estado', 'activa');
+  const { data, error } = await q.order('fecha', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getTurnoById(turnoId) {
+  if (!turnoId) return null;
+  const { data } = await supabase.from('turnos').select('*').eq('id', turnoId).maybeSingle();
+  return data;
+}
+
+export async function getTurnosByCortejo(cortejoId) {
+  const { data, error } = await supabase
+    .from('turnos')
+    .select('*')
+    .eq('cortejo_id', cortejoId)
+    .order('numero_turno');
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getBrazosByOrg(organizacionId) {
+  const { data, error } = await supabase
+    .from('brazos')
+    .select('*')
+    .eq('organizacion_id', organizacionId);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getTurnosAgrupados(cortejoId, organizacionId) {
+  const turnos = await getTurnosByCortejo(cortejoId);
+  const brazos = (await getBrazosByOrg(organizacionId)).filter((b) =>
+    turnos.some((t) => t.id === b.turno_id)
+  );
+  return agruparTurnosConBrazos(turnos, brazos);
+}
+
+export async function getMesasByOrg(organizacionId) {
+  const { data, error } = await supabase
+    .from('mesas_vendedores')
+    .select('*')
+    .eq('organizacion_id', organizacionId);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getCargadorById(cargadorId) {
+  if (!cargadorId) return null;
+  const { data } = await supabase
+    .from('cargadores_organizacion')
+    .select('*')
+    .eq('id', cargadorId)
+    .maybeSingle();
+  return data;
+}
+
+export async function buscarCargadorPorWhatsapp(organizacionId, whatsapp) {
+  const limpio = whatsapp.replace(/\D/g, '');
+  const { data } = await supabase
+    .from('cargadores_organizacion')
+    .select('*')
+    .eq('organizacion_id', organizacionId)
+    .eq('whatsapp', limpio)
+    .maybeSingle();
+  return data;
+}
+
+export async function reservarBrazo(brazoId, mesaId, vendedorId) {
+  const { data, error } = await supabase.rpc('reservar_brazo', {
+    p_brazo_id: brazoId,
+    p_mesa_id: mesaId,
+    p_vendedor_id: vendedorId,
+  });
+  if (error) return err(error);
+  return { data };
+}
+
+export async function confirmarVenta(brazoId, cargadorData, precioPagado, pagoData = {}) {
+  const orgId = cargadorData.organizacion_id;
+  const whatsapp = cargadorData.whatsapp?.replace(/\D/g, '');
+  if (!whatsapp) return { error: 'WhatsApp obligatorio' };
+
+  let cargador = await buscarCargadorPorWhatsapp(orgId, whatsapp);
+  if (!cargador) {
+    const { data, error } = await supabase
+      .from('cargadores_organizacion')
+      .insert({
+        organizacion_id: orgId,
+        nombre_completo: cargadorData.nombre_completo,
+        whatsapp,
+        correo: cargadorData.correo?.trim() || '',
+        cui_o_identificacion: cargadorData.cui_o_identificacion || '',
+        telefono_emergencia: cargadorData.telefono_emergencia || '',
+      })
+      .select()
+      .single();
+    if (error) return err(error);
+    cargador = data;
+  } else {
+    const { data, error } = await supabase
+      .from('cargadores_organizacion')
+      .update({
+        nombre_completo: cargadorData.nombre_completo || cargador.nombre_completo,
+        correo: cargadorData.correo || cargador.correo,
+        cui_o_identificacion: cargadorData.cui_o_identificacion || cargador.cui_o_identificacion,
+        telefono_emergencia: cargadorData.telefono_emergencia || cargador.telefono_emergencia,
+      })
+      .eq('id', cargador.id)
+      .select()
+      .single();
+    if (error) return err(error);
+    cargador = data;
+  }
+
+  const { data: brazo, error } = await supabase.rpc('confirmar_venta_brazo', {
+    p_brazo_id: brazoId,
+    p_cargador_id: cargador.id,
+    p_precio_pagado: precioPagado,
+    p_metodo_pago: pagoData.metodo_pago || 'efectivo',
+    p_comprobante_url: pagoData.comprobante_url || null,
+  });
+  if (error) return err(error);
+  return { data: brazo, cargador, codigo: brazo.codigo_boleta_qr };
+}
+
+export async function buscarBoletaPorCodigo(organizacionId, codigo) {
+  const codigoLimpio = codigo.trim().toUpperCase();
+  const { data: brazo, error } = await supabase
+    .from('brazos')
+    .select('*')
+    .eq('organizacion_id', organizacionId)
+    .eq('codigo_boleta_qr', codigoLimpio)
+    .eq('estado', 'vendido')
+    .maybeSingle();
+
+  if (error) return err(error);
+  if (!brazo) return { error: 'Boleta no encontrada o no corresponde a esta organización.' };
+
+  const { data: turno } = await supabase.from('turnos').select('*').eq('id', brazo.turno_id).single();
+  const { data: cortejo } = await supabase.from('cortejos').select('*').eq('id', turno.cortejo_id).single();
+  if (cortejo?.estado === 'inactiva') {
+    return { error: 'La procesión de esta boleta está inactiva.' };
+  }
+  const cargador = brazo.cargador_id ? await getCargadorById(brazo.cargador_id) : null;
+  return { brazo, turno, cortejo, cargador };
+}
+
+export async function marcarEntregado(brazoId) {
+  const { data, error } = await supabase.rpc('marcar_entregado_brazo', { p_brazo_id: brazoId });
+  if (error) return err(error);
+  return { data };
+}
+
+export async function getFinanzasByOrg(organizacionId) {
+  const { data: brazos, error } = await supabase
+    .from('brazos')
+    .select('*')
+    .eq('organizacion_id', organizacionId)
+    .eq('estado', 'vendido');
+  if (error) throw error;
+
+  const { data: turnos } = await supabase
+    .from('turnos')
+    .select('id, precio, cortejo_id')
+    .eq('organizacion_id', organizacionId);
+
+  const presupuestoTotal = (turnos || []).reduce((s, t) => {
+    const delTurno = (brazos || []).filter((b) => b.turno_id === t.id);
+    return s + Number(t.precio) * (delTurno.length || 0);
+  }, 0);
+
+  const recaudado = (brazos || []).reduce((s, b) => s + Number(b.precio_pagado || 0), 0);
+
+  const ventas = (brazos || []).map((b) => ({
+    ...b,
+    vendedor_id: b.vendedor_id,
+    mesa_id: b.mesa_id,
+  }));
+
+  return { ventas, recaudado, presupuestoTotal, brazosVendidos: brazos?.length || 0 };
+}
+
+export async function getDashboardMetrics(organizacionId) {
+  const fin = await getFinanzasByOrg(organizacionId);
+  const cortejos = await getCortejosByOrg(organizacionId);
+  const totalBrazos = (await getBrazosByOrg(organizacionId)).length;
+  const vendidos = fin.brazosVendidos;
+  return {
+    ...fin,
+    cortejosActivos: cortejos.length,
+    ocupacion: totalBrazos ? Math.round((vendidos / totalBrazos) * 100) : 0,
+  };
+}
+
+export async function getEmailConfig(organizacionId) {
+  const { data } = await supabase
+    .from('configuracion_correo')
+    .select('*')
+    .eq('organizacion_id', organizacionId)
+    .maybeSingle();
+  return data;
+}
+
+export async function saveEmailConfig(organizacionId, config) {
+  const { data, error } = await supabase
+    .from('configuracion_correo')
+    .upsert({ organizacion_id: organizacionId, ...config }, { onConflict: 'organizacion_id' })
+    .select()
+    .single();
+  if (error) return err(error);
+  return data;
+}
+
+export async function getCorreosEnviados(organizacionId) {
+  const { data } = await supabase
+    .from('correos_enviados')
+    .select('*')
+    .eq('organizacion_id', organizacionId)
+    .order('created_at', { ascending: false });
+  return data || [];
+}
+
+export async function registrarCorreoEnviado(organizacionId, datos) {
+  const { data, error } = await supabase
+    .from('correos_enviados')
+    .insert({ organizacion_id: organizacionId, ...datos })
+    .select()
+    .single();
+  if (error) return err(error);
+  return data;
+}
+
+export async function getRolesByOrg(organizacionId) {
+  const { data, error } = await supabase
+    .from('roles_organizacion')
+    .select('*')
+    .eq('organizacion_id', organizacionId)
+    .order('es_sistema', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getUsuariosByOrg(organizacionId) {
+  const { data, error } = await supabase
+    .from('usuarios_app')
+    .select('*, roles_organizacion(nombre, permisos)')
+    .eq('organizacion_id', organizacionId);
+  if (error) throw error;
+  return (data || []).map((u) => ({
+    ...u,
+    rol_nombre: u.roles_organizacion?.nombre || '—',
+    permisos: u.roles_organizacion?.permisos || [],
+  }));
+}
+
+export async function saveRol(organizacionId, datos, rolId = null) {
+  const permisos = [...new Set((datos.permisos || []).filter(Boolean))];
+  if (!permisos.length) return { error: 'El rol debe tener al menos un permiso.' };
+
+  if (rolId) {
+    const { data, error } = await supabase
+      .from('roles_organizacion')
+      .update({ nombre: datos.nombre, descripcion: datos.descripcion, permisos })
+      .eq('id', rolId)
+      .eq('organizacion_id', organizacionId)
+      .select()
+      .single();
+    if (error) return err(error);
+    return { data };
+  }
+
+  const { data, error } = await supabase
+    .from('roles_organizacion')
+    .insert({
+      organizacion_id: organizacionId,
+      nombre: datos.nombre,
+      descripcion: datos.descripcion,
+      permisos,
+    })
+    .select()
+    .single();
+  if (error) return err(error);
+  return { data };
+}
+
+export async function saveUsuario(organizacionId, datos, usuarioId = null) {
+  const emailNorm = datos.email?.trim().toLowerCase();
+  if (!emailNorm) return { error: 'El correo es obligatorio.' };
+
+  const { data: rol, error: rolErr } = await supabase
+    .from('roles_organizacion')
+    .select('id')
+    .eq('id', datos.rol_id)
+    .eq('organizacion_id', organizacionId)
+    .maybeSingle();
+  if (rolErr) return err(rolErr);
+  if (!rol) return { error: 'Seleccione un rol válido.' };
+
+  if (usuarioId) {
+    const { data, error } = await supabase
+      .from('usuarios_app')
+      .update({
+        nombre: datos.nombre?.trim() || 'Usuario',
+        email: emailNorm,
+        rol_id: datos.rol_id,
+        activo: datos.activo !== false,
+      })
+      .eq('id', usuarioId)
+      .eq('organizacion_id', organizacionId)
+      .select('*, roles_organizacion(nombre, permisos)')
+      .single();
+    if (error) return err(error);
+    return {
+      data: {
+        ...data,
+        rol_nombre: data.roles_organizacion?.nombre || '—',
+        permisos: data.roles_organizacion?.permisos || [],
+      },
+    };
+  }
+
+  if (!datos.password?.trim()) {
+    return { error: 'La contraseña es obligatoria para usuarios nuevos.' };
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    return { error: 'Sesión expirada. Vuelva a iniciar sesión.' };
+  }
+
+  try {
+    const res = await fetch('/api/invite-app-user', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        organizacionId,
+        nombre: datos.nombre?.trim() || 'Usuario',
+        email: emailNorm,
+        password: datos.password,
+        rol_id: datos.rol_id,
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { error: json.error || 'No se pudo crear el usuario.' };
+    }
+    return { data: json.data };
+  } catch {
+    return {
+      error:
+        'Creación de usuarios requiere despliegue en Vercel con SUPABASE_SERVICE_ROLE_KEY. Alternativa: npm run db:seed o Dashboard → Authentication.',
+    };
+  }
+}
+
+export async function deleteRol(rolId, organizacionId) {
+  const { count } = await supabase
+    .from('usuarios_app')
+    .select('id', { count: 'exact', head: true })
+    .eq('rol_id', rolId);
+  if (count > 0) return { error: 'Hay usuarios con este rol.' };
+
+  const { error } = await supabase
+    .from('roles_organizacion')
+    .delete()
+    .eq('id', rolId)
+    .eq('organizacion_id', organizacionId);
+  if (error) return err(error);
+  return { ok: true };
+}
+
+export async function generarProcesion(cortejo, configProcesion, organizacionId) {
+  const turnosPlan = construirTurnosConfig(configProcesion);
+  const { data: nuevoCortejo, error: cErr } = await supabase
+    .from('cortejos')
+    .insert({
+      organizacion_id: organizacionId,
+      nombre_evento: cortejo.nombre_evento,
+      fecha: cortejo.fecha,
+      descripcion: cortejo.descripcion,
+      estado: 'activa',
+      config_procesion: configProcesion,
+    })
+    .select()
+    .single();
+  if (cErr) return err(cErr);
+
+  const turnosCreados = [];
+  const brazosCreados = [];
+
+  for (const cfg of turnosPlan) {
+    const { data: turno, error: tErr } = await supabase
+      .from('turnos')
+      .insert({
+        organizacion_id: organizacionId,
+        cortejo_id: nuevoCortejo.id,
+        numero_turno: cfg.numero_turno,
+        tipo_turno: cfg.tipo_turno,
+        etiqueta: cfg.etiqueta,
+        total_brazos: cfg.total_brazos,
+        precio: cfg.precio,
+        son: cfg.son,
+        alabado: cfg.alabado,
+      })
+      .select()
+      .single();
+    if (tErr) return err(tErr);
+
+    turnosCreados.push(turno);
+
+    const brazos = crearBrazosParaTurno({
+      turnoId: turno.id,
+      numeroTurno: turno.numero_turno,
+      totalBrazos: cfg.total_brazos,
+      organizacionId,
+      idPrefix: 'brazo',
+    }).map(({ id, ...b }) => b);
+
+    brazosCreados.push(...brazos);
+  }
+
+  for (let i = 0; i < brazosCreados.length; i += 80) {
+    const { error: bErr } = await supabase.from('brazos').insert(brazosCreados.slice(i, i + 80));
+    if (bErr) return err(bErr);
+  }
+
+  try {
+    sessionStorage.setItem('vtd_ultimo_cortejo', nuevoCortejo.id);
+  } catch (_) {
+    /* ignore */
+  }
+
+  return { cortejo: nuevoCortejo, turnos: turnosCreados, brazos: brazosCreados };
+}
+
+export async function desactivarProcesion(cortejoId, organizacionId) {
+  const { error } = await supabase
+    .from('cortejos')
+    .update({ estado: 'inactiva' })
+    .eq('id', cortejoId)
+    .eq('organizacion_id', organizacionId);
+  if (error) return err(error);
+  return { ok: true };
+}
+
+export async function activarProcesion(cortejoId, organizacionId) {
+  const { error } = await supabase
+    .from('cortejos')
+    .update({ estado: 'activa' })
+    .eq('id', cortejoId)
+    .eq('organizacion_id', organizacionId);
+  if (error) return err(error);
+  return { ok: true };
+}
+
+export async function eliminarProcesion(cortejoId, organizacionId) {
+  const { error } = await supabase
+    .from('cortejos')
+    .delete()
+    .eq('id', cortejoId)
+    .eq('organizacion_id', organizacionId);
+  if (error) return err(error);
+  return { ok: true };
+}
+
+export async function getResumenApartados(cortejoId, organizacionId) {
+  const turnos = await getTurnosAgrupados(cortejoId, organizacionId);
+  return turnos.map((turno) => {
+    const todos = [...turno.izquierda, ...turno.derecha];
+    const apartados = todos.filter((b) => b.reserva_apartado);
+    return { turno, apartados, total: todos.length, apartadosCount: apartados.length };
+  });
+}
+
+export async function aplicarImportApartados(cortejoId, organizacionId, filas) {
+  for (const fila of filas) {
+    const lado = normalizarLado(fila.lado);
+    const { data: turno } = await supabase
+      .from('turnos')
+      .select('id')
+      .eq('cortejo_id', cortejoId)
+      .eq('numero_turno', fila.numero_turno)
+      .maybeSingle();
+    if (!turno) continue;
+
+    await supabase
+      .from('brazos')
+      .update({
+        estado: 'reservado',
+        reserva_apartado: true,
+        asignado_nombre: fila.asignado_nombre || null,
+        apartado_notas: fila.apartado_notas || null,
+        bloqueado_hasta: null,
+      })
+      .eq('turno_id', turno.id)
+      .eq('numero_brazo', fila.numero_brazo)
+      .eq('lado', lado);
+  }
+  return { ok: true, aplicados: filas.length };
+}

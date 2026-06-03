@@ -4,7 +4,7 @@
  */
 
 import { MOCK_MODE } from '../config/supabaseClient';
-import { getEmailConfig, registrarCorreoEnviadoMock } from './mockService';
+import { getEmailConfig, registrarCorreoEnviado } from './dataService';
 
 const APP_URL = process.env.REACT_APP_APP_URL || 'https://ventadeturnos.com';
 const EMAIL_WEBHOOK_URL = process.env.REACT_APP_EMAIL_WEBHOOK_URL || '';
@@ -95,7 +95,7 @@ export async function enviarBoletaPorCorreo({
   turno,
   cortejo,
 }) {
-  const emailConfig = getEmailConfig(organizacionId);
+  const emailConfig = await getEmailConfig(organizacionId);
 
   if (!emailConfig?.notificaciones_activas) {
     return { ok: false, omitido: true, motivo: 'Notificaciones por correo desactivadas' };
@@ -119,7 +119,7 @@ export async function enviarBoletaPorCorreo({
   });
 
   if (MOCK_MODE || !EMAIL_WEBHOOK_URL) {
-    registrarCorreoEnviadoMock(organizacionId, {
+    await registrarCorreoEnviado(organizacionId, {
       ...datos,
       enviado_en: new Date().toISOString(),
       modo: 'demo',

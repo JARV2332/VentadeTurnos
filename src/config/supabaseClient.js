@@ -6,23 +6,21 @@ import { createClient } from '@supabase/supabase-js';
 
 export const MOCK_MODE = process.env.REACT_APP_MOCK_MODE !== 'false';
 
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'placeholder-key';
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://kolhnoectddjgfowyvux.supabase.co';
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
 
-export const supabase = MOCK_MODE
-  ? null
-  : createClient(supabaseUrl, supabaseAnonKey, {
-      realtime: {
-        params: { eventsPerSecond: 10 },
-      },
-    });
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  realtime: {
+    params: { eventsPerSecond: 10 },
+  },
+});
 
 /**
  * Suscripción Realtime filtrada por organización.
  * Canal: brazos:organizacion_id=eq.{organizacionId}
  */
 export function subscribeBrazos(organizacionId, onChange) {
-  if (MOCK_MODE || !supabase) return () => {};
+  if (MOCK_MODE) return () => {};
 
   const channel = supabase
     .channel(`brazos:org:${organizacionId}`)

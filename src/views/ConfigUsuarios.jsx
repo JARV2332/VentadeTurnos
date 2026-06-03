@@ -4,11 +4,11 @@ import { useAuth } from '../context/AuthContext';
 import {
   getRolesByOrg,
   getUsuariosByOrg,
-  saveRolMock,
-  deleteRolMock,
-  saveUsuarioMock,
-  subscribeMock,
-} from '../services/mockService';
+  saveRol,
+  deleteRol,
+  saveUsuario,
+  subscribeData,
+} from '../services/dataService';
 import { pantallasPorGrupo, labelPermiso } from '../config/permisos';
 
 const ROL_VACIO = {
@@ -37,16 +37,16 @@ export default function ConfigUsuarios() {
   const [error, setError] = useState('');
   const [okMsg, setOkMsg] = useState('');
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback(async () => {
     if (!organizacionId) return;
-    setRoles(getRolesByOrg(organizacionId));
-    setUsuarios(getUsuariosByOrg(organizacionId));
+    setRoles(await getRolesByOrg(organizacionId));
+    setUsuarios(await getUsuariosByOrg(organizacionId));
   }, [organizacionId]);
 
   useEffect(() => {
     refresh();
-    return subscribeMock(refresh);
-  }, [refresh]);
+    return subscribeData(organizacionId, refresh);
+  }, [organizacionId, refresh]);
 
   const gruposPantallas = pantallasPorGrupo();
 
@@ -78,10 +78,10 @@ export default function ConfigUsuarios() {
     setError('');
   };
 
-  const guardarRol = (e) => {
+  const guardarRol = async (e) => {
     e.preventDefault();
     setError('');
-    const res = saveRolMock(organizacionId, rolForm, rolEditId);
+    const res = await saveRol(organizacionId, rolForm, rolEditId);
     if (res.error) {
       setError(res.error);
       return;
@@ -93,9 +93,9 @@ export default function ConfigUsuarios() {
     setTimeout(() => setOkMsg(''), 4000);
   };
 
-  const eliminarRol = (rol) => {
+  const eliminarRol = async (rol) => {
     if (!window.confirm(`¿Eliminar el rol "${rol.nombre}"?`)) return;
-    const res = deleteRolMock(rol.id, organizacionId);
+    const res = await deleteRol(rol.id, organizacionId);
     if (res.error) {
       setError(res.error);
       return;
@@ -132,10 +132,10 @@ export default function ConfigUsuarios() {
     setError('');
   };
 
-  const guardarUsuario = (e) => {
+  const guardarUsuario = async (e) => {
     e.preventDefault();
     setError('');
-    const res = saveUsuarioMock(organizacionId, userForm, userEditId);
+    const res = await saveUsuario(organizacionId, userForm, userEditId);
     if (res.error) {
       setError(res.error);
       return;

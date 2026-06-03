@@ -72,23 +72,26 @@ Copia `.env.example` a `.env`:
 | `REACT_APP_APP_URL` | URL pública de la app (correos, enlaces) |
 | `REACT_APP_EMAIL_WEBHOOK_URL` | Webhook para envío real de boletas (opcional) |
 
-En **Vercel**, define las mismas variables en *Project → Settings → Environment Variables*. Para la demo pública usa al menos:
+En **Vercel**, las variables de build van en `vercel.json` (producción Supabase). Para desarrollo local con mock:
 
 ```
 REACT_APP_MOCK_MODE=true
 ```
 
+Detalle completo: `SETUP_SUPABASE.md`.
+
 ---
 
-## Despliegue en Vercel
+## Despliegue en Vercel (producción con Supabase)
 
-1. Importa el repo [JARV2332/VentadeTurnos](https://github.com/JARV2332/VentadeTurnos) en [vercel.com/new](https://vercel.com/new).
-2. Framework: **Create React App** (detección automática).
-3. Build: `npm run build` · Output: `build`
-4. Añade `REACT_APP_MOCK_MODE=true` en variables de entorno.
-5. Deploy.
+1. Aplica el esquema en Supabase: ejecuta `supabase/APLICAR_TODO.sql` (ver `SETUP_SUPABASE.md`).
+2. Semilla demo: `npm run db:seed` (requiere `SUPABASE_SERVICE_ROLE_KEY` en `.env.local`).
+3. Importa el repo en [vercel.com/new](https://vercel.com/new) o haz push a `main` (auto-deploy).
+4. `vercel.json` ya define `REACT_APP_MOCK_MODE=false` y las credenciales públicas de Supabase.
+5. En Vercel → **Settings → Environment Variables**, añade **solo en servidor** (Production):
+   - `SUPABASE_SERVICE_ROLE_KEY` = clave `service_role` (Settings → API en Supabase). Necesaria para crear usuarios (`/api/invite-app-user`).
 
-El archivo `vercel.json` ya incluye rewrites para que React Router funcione en rutas como `/taquilla` o `/config`.
+El archivo `vercel.json` incluye rewrites SPA y rutas `/api/*` para funciones serverless.
 
 **CLI (opcional):**
 

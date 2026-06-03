@@ -5,10 +5,10 @@ import { useAuth } from '../context/AuthContext';
 import {
   getEmailConfig,
   saveEmailConfig,
-  getCorreosEnviadosMock,
-  subscribeMock,
+  getCorreosEnviados,
+  subscribeData,
   getCortejosByOrg,
-} from '../services/mockService';
+} from '../services/dataService';
 import { construirDatosBoletaEmail } from '../services/emailService';
 import { DEMO_NOMBRE_ORGANIZACION } from '../data/mockData';
 
@@ -40,147 +40,121 @@ export default function ConfigCorreo() {
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [historial, setHistorial] = useState([]);
   const [okMsg, setOkMsg] = useState('');
+  const [cortejoDemo, setCortejoDemo] = useState(null);
 
-  const cortejoDemo = getCortejosByOrg(organizacionId)[0];
-
-  const refresh = useCallback(() => {
-    const saved = getEmailConfig(organizacionId);
+  const refresh = useCallback(async () => {
+    const saved = await getEmailConfig(organizacionId);
     if (saved) setConfig({ ...DEFAULT_CONFIG, ...saved });
-    setHistorial(getCorreosEnviadosMock(organizacionId));
+    setHistorial(await getCorreosEnviados(organizacionId));
+    const cortejos = await getCortejosByOrg(organizacionId);
+    setCortejoDemo(cortejos[0] || null);
   }, [organizacionId]);
 
   useEffect(() => {
     refresh();
-    return subscribeMock(refresh);
-  }, [refresh]);
+    return subscribeData(organizacionId, refresh);
+  }, [organizacionId, refresh]);
 
-  const previewDatos = construirDatosBoletaEmail({
-    ...DEMO_PREVIEW,
-    cortejo: cortejoDemo || { nombre_evento: 'Procesión Demo 2026' },
-    organizacion,
-    emailConfig: config,
-  });
-  previewDatos.destinatario = DEMO_PREVIEW.cargador.correo;
-
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-    saveEmailConfig(organizacionId, config);
+    await saveEmailConfig(organizacionId, config);
     setOkMsg('Configuración de correo guardada.');
-    setTimeout(() => setOkMsg(''), 4000);
   };
 
-  const update = (campo, valor) => {
-    setConfig((prev) => ({ ...prev, [campo]: valor }));
-  };
+  const previewData = construirDatosBoletaEmail({
+    organizacion,
+    cargador: DEMO_PREVIEW.cargador,
+    brazo: DEMO_PREVIEW.brazo,
+    turno: DEMO_PREVIEW.turno,
+    cortejo: cortejoDemo,
+  });
 
   return (
-    <Layout
-      title="Correo y boletas"
-      subtitle="Remitente, plantilla y envío automático al confirmar venta"
-    >
+    <Layout title="Correo y boletas" subtitle="Remitente, plantilla y historial de envíos">
       {okMsg && <div className="alert alert--success">{okMsg}</div>}
 
-      <div className="config-grid config-grid--wide">
-        <form className="panel config-form" onSubmit={handleSave}>
-          <h3 className="panel__title">Correo remitente de la organización</h3>
-          <p className="text-muted config-hint">
-            Al confirmar una venta en Taquilla, se envía automáticamente la boleta al correo
-            del cargador. También puede imprimirse desde el módulo <strong>Impresión</strong>.
-          </p>
+      <div className="config-grid">
+        <section className="card">
+          <h3 className="panel__title">Configuración SMTP / remitente</h3>
+          <form onSubmit={handleSave} className="auth-form">
+            <label>
+              Correo remitente
+              <input
+                type="email"
+                value={config.correo_remitente}
+                onChange={(e) => setConfig({ ...config, correo_remitente: e.target.value })}
+                required
+              />
+            </label>
+            <label>
+              Nombre remitente
+              <input
+                type="text"
+                value={config.nombre_remitente}
+                onChange={(e) => setConfig({ ...config, nombre_remitente: e.target.value })}
+                required
+              />
+            </label>
+            <label>
+              Correo de respuesta
+              <input
+                type="email"
+                value={config.correo_respuesta || ''}
+                onChange={(e) => setConfig({ ...config, correo_respuesta: e.target.value })}
+              />
+            </label>
+            <label>
+              Pie de correo
+              <textarea
+                rows={3}
+                value={config.pie_correo || ''}
+                onChange={(e) => setConfig({ ...config, pie_correo: e.target.value })}
+              />
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={config.notificaciones_activas}
+                onChange={(e) =>
+                  setConfig({ ...config, notificaciones_activas: e.target.checked })
+                }
+              />
+              Enviar boletas automáticamente al confirmar venta
+            </label>
+            <button type="submit" className="btn btn--primary">
+              Guardar configuración
+            </button>
+          </form>
+        </section>
 
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={config.notificaciones_activas}
-              onChange={(e) => update('notificaciones_activas', e.target.checked)}
-            />
-            Enviar boleta por correo al confirmar venta
-          </label>
-
-          <label>
-            Correo de salida (From)
-            <input
-              type="email"
-              placeholder="turnos@tuorganizacion.org"
-              value={config.correo_remitente}
-              onChange={(e) => update('correo_remitente', e.target.value)}
-            />
-            <small className="hint-ok">Este es el correo desde el cual salen las boletas</small>
-          </label>
-
-          <label>
-            Nombre del remitente
-            <input
-              type="text"
-              placeholder={DEMO_NOMBRE_ORGANIZACION}
-              value={config.nombre_remitente}
-              onChange={(e) => update('nombre_remitente', e.target.value)}
-            />
-          </label>
-
-          <label>
-            Correo de respuesta (Reply-To)
-            <input
-              type="email"
-              placeholder="contacto@tuorganizacion.org"
-              value={config.correo_respuesta}
-              onChange={(e) => update('correo_respuesta', e.target.value)}
-            />
-          </label>
-
-          <label>
-            Pie de correo (firma)
-            <textarea
-              rows={2}
-              value={config.pie_correo}
-              onChange={(e) => update('pie_correo', e.target.value)}
-            />
-          </label>
-
-          <div className="info-box">
-            <strong>Modo demo:</strong> los correos no salen a internet; se registran abajo
-            en el historial. Al conectar Supabase + Resend/SendGrid, configure{' '}
-            <code>REACT_APP_EMAIL_WEBHOOK_URL</code> en el archivo <code>.env</code>.
-          </div>
-
-          <button type="submit" className="btn btn--primary">
-            Guardar configuración
-          </button>
-        </form>
-
-        <div className="panel">
-          <h3 className="panel__title">Vista previa del correo</h3>
-          <p className="text-muted config-hint">
-            Así llegará la boleta al devoto/cargador tras cada venta confirmada.
-          </p>
-          <BoletaCorreoPreview datos={previewDatos} />
-        </div>
+        <section className="card">
+          <h3 className="panel__title">Vista previa de boleta por correo</h3>
+          <BoletaCorreoPreview data={previewData} />
+        </section>
       </div>
 
-      <section className="panel">
-        <h3 className="panel__title">Historial de envíos (demo) — {historial.length}</h3>
+      <section className="card" style={{ marginTop: '1.25rem' }}>
+        <h3 className="panel__title">Historial de envíos</h3>
         {historial.length === 0 ? (
-          <p className="text-muted">
-            Aún no se han enviado correos. Confirma una venta en Taquilla con correo del cargador.
-          </p>
+          <p className="text-muted">Aún no hay correos registrados.</p>
         ) : (
           <div className="table-wrap">
             <table className="data-table">
               <thead>
                 <tr>
                   <th>Fecha</th>
-                  <th>Para</th>
-                  <th>Asunto</th>
+                  <th>Destinatario</th>
                   <th>Boleta</th>
+                  <th>Estado</th>
                 </tr>
               </thead>
               <tbody>
-                {historial.slice().reverse().map((c) => (
-                  <tr key={c.id}>
-                    <td>{new Date(c.enviado_en).toLocaleString('es-GT')}</td>
-                    <td>{c.destinatario}</td>
-                    <td>{c.asunto}</td>
-                    <td><code>{c.brazo?.codigo_boleta_qr}</code></td>
+                {historial.map((row) => (
+                  <tr key={row.id}>
+                    <td>{new Date(row.created_at).toLocaleString('es-GT')}</td>
+                    <td>{row.destinatario}</td>
+                    <td>{row.codigo_boleta || '—'}</td>
+                    <td>{row.estado}</td>
                   </tr>
                 ))}
               </tbody>
