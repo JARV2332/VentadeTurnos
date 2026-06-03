@@ -18,12 +18,18 @@ function err(error) {
 export async function fetchPerfilByAuthId(authUserId) {
   const { data, error } = await supabase
     .from('usuarios_app')
-    .select('*, roles_organizacion(id, nombre, permisos)')
+    .select('*')
     .eq('auth_user_id', authUserId)
     .eq('activo', true)
-    .single();
+    .maybeSingle();
 
   if (error) return err(error);
+  if (!data) {
+    return {
+      error:
+        'Perfil no encontrado en usuarios_app. Ejecute 007_super_admin.sql y npm run db:seed-super.',
+    };
+  }
 
   const user = {
     id: data.id,
@@ -44,7 +50,7 @@ export async function fetchPerfilByAuthId(authUserId) {
         .from('organizaciones')
         .select('*')
         .eq('id', orgId)
-        .single();
+        .maybeSingle();
       organizacion = orgData;
     }
     return {
@@ -58,11 +64,17 @@ export async function fetchPerfilByAuthId(authUserId) {
     };
   }
 
+  const { data: rol } = await supabase
+    .from('roles_organizacion')
+    .select('id, nombre, permisos')
+    .eq('id', data.rol_id)
+    .maybeSingle();
+
   const { data: orgData } = await supabase
     .from('organizaciones')
     .select('*')
     .eq('id', data.organizacion_id)
-    .single();
+    .maybeSingle();
 
   return {
     user,
@@ -70,8 +82,8 @@ export async function fetchPerfilByAuthId(authUserId) {
     organizacion: orgData,
     organizacion_id: data.organizacion_id,
     rol_id: data.rol_id,
-    rol_nombre: data.roles_organizacion?.nombre,
-    permisos: data.roles_organizacion?.permisos || [],
+    rol_nombre: rol?.nombre,
+    permisos: rol?.permisos || [],
   };
 }
 

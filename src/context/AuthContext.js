@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { MOCK_MODE, supabase } from '../config/supabaseClient';
 import { DEMO_ORGANIZACIONES } from '../data/mockData';
 import {
@@ -44,6 +44,8 @@ export function AuthProvider({ children }) {
   const [permisos, setPermisos] = useState([]);
   const [esSuperAdmin, setEsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  /** Evita doble hydrate y deadlock de Supabase Auth al hacer login manual */
+  const skipAuthListenerRef = useRef(false);
 
   const applySession = useCallback((session) => {
     if (!session) {
@@ -135,6 +137,7 @@ export function AuthProvider({ children }) {
           await hydrateUser(session.user);
         } catch {
           applySession(null);
+          setLoading(false);
         }
       } else {
         setLoading(false);
@@ -143,17 +146,25 @@ export function AuthProvider({ children }) {
 
     initSupabaseAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        try {
-          await hydrateUser(session.user);
-        } catch {
-          applySession(null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Diferir: evita deadlock si signInWithPassword aún no terminó
+      setTimeout(async () => {
+        if (skipAuthListenerRef.current && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+          skipAuthListenerRef.current = false;
+          return;
         }
-      } else {
-        applySession(null);
-        setLoading(false);
-      }
+        if (session?.user) {
+          try {
+            await hydrateUser(session.user);
+          } catch {
+            applySession(null);
+            setLoading(false);
+          }
+        } else {
+          applySession(null);
+          setLoading(false);
+        }
+      }, 0);
     });
 
     return () => subscription.unsubscribe();
@@ -197,18 +208,25 @@ export function AuthProvider({ children }) {
     }
 
     const emailNorm = email.trim().toLowerCase();
+    skipAuthListenerRef.current = true;
     const { data, error } = await supabase.auth.signInWithPassword({
       email: emailNorm,
       password,
     });
     if (error) {
+      skipAuthListenerRef.current = false;
       throw new Error(
         error.message === 'Invalid login credentials'
           ? 'Correo o contraseña incorrectos. Super admin: super@ventadeturnos.com'
           : error.message
       );
     }
-    return hydrateUser(data.user);
+    try {
+      return await hydrateUser(data.user);
+    } catch (err) {
+      skipAuthListenerRef.current = false;
+      throw err;
+    }
   }
 
   async function register(email, password, nombreOrganizacion) {
@@ -218,6 +236,8 @@ export function AuthProvider({ children }) {
 
     const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
     if (authError) throw authError;
+
+    skipAuthListenerRef.current = true;
 
     const slug = nombreOrganizacion.toLowerCase().replace(/\s+/g, '-').slice(0, 30);
     const { data: org, error: orgError } = await supabase
@@ -255,9 +275,17 @@ export function AuthProvider({ children }) {
       activo: true,
     });
 
-    if (userError) throw userError;
+    if (userError) {
+      skipAuthListenerRef.current = false;
+      throw userError;
+    }
 
-    return hydrateUser(authData.user);
+    try {
+      return await hydrateUser(authData.user);
+    } catch (err) {
+      skipAuthListenerRef.current = false;
+      throw err;
+    }
   }
 
   async function logout() {

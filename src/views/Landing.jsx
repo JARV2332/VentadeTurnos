@@ -34,7 +34,9 @@ export default function Landing() {
         session = { permisos: ['dashboard', 'usuarios', 'config', 'config_correo', 'taquilla', 'entrega', 'caja', 'impresion'] };
       }
       navigate(
-        session?.permisos ? rutaInicioPorPermisos(session.permisos) : rutaInicio
+        session?.permisos
+          ? rutaInicioPorPermisos(session.permisos, session.esSuperAdmin)
+          : rutaInicio
       );
     } catch (err) {
       setError(err.message || 'Error al iniciar sesión');
