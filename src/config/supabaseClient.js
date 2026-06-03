@@ -6,8 +6,19 @@ import { createClient } from '@supabase/supabase-js';
 
 export const MOCK_MODE = process.env.REACT_APP_MOCK_MODE !== 'false';
 
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://kolhnoectddjgfowyvux.supabase.co';
-const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
+const supabaseUrl =
+  process.env.REACT_APP_SUPABASE_URL || 'https://kolhnoectddjgfowyvux.supabase.co';
+
+/** Clave pública (publishable/anon). Fallback si Vercel no inyecta env en el build. */
+const supabaseAnonKey =
+  process.env.REACT_APP_SUPABASE_ANON_KEY ||
+  'sb_publishable_5-iRvKIihqoUGQi2HsY28g_FME_RxTa';
+
+if (!MOCK_MODE && !supabaseAnonKey) {
+  throw new Error(
+    'Falta REACT_APP_SUPABASE_ANON_KEY. Configúrala en Vercel o .env.production'
+  );
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   realtime: {
