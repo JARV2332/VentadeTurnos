@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
-import BoletaCard from '../components/BoletaCard';
+import BoletaContraseñaTurno from '../components/BoletaContraseñaTurno';
 import StatusBadge from '../components/StatusBadge';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -81,7 +81,7 @@ export default function Impresion() {
       </div>
 
       <div className="impresion-boleta print-area">
-        <BoletaCard
+        <BoletaContraseñaTurno
           organizacion={organizacion}
           cargador={cargador}
           brazo={selected}

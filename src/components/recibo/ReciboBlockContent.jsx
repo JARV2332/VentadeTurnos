@@ -87,7 +87,8 @@ export default function ReciboBlockContent({
       if (cfg.mostrar_precio === false) return null;
       return (
         <div className="recibo-block__precio-wrap">
-          <span className="recibo-block__precio">{precio}</span>
+          <small className="recibo-block__precio-label">Ofrenda</small>
+          <span className="recibo-block__precio">{formatPrecio(brazo?.precio_pagado ?? turno?.precio)}</span>
           {showEntrega && brazo?.estado_entrega && (
             <StatusBadge
               status={brazo.estado_entrega === 'entregado' ? 'entregado' : 'pendiente_entrega'}

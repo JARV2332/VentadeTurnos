@@ -16,3 +16,8 @@ export function extraerCodigoBoleta(texto) {
 export function formatPrecio(valor) {
   return new Intl.NumberFormat('es-GT', { style: 'currency', currency: 'GTQ' }).format(valor || 0);
 }
+
+/** Etiqueta de pago en boletas: "Ofrenda Q 150.00" */
+export function formatOfrenda(valor) {
+  return `Ofrenda ${formatPrecio(valor)}`;
+}

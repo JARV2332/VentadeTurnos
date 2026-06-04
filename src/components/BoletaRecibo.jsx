@@ -80,7 +80,7 @@ export default function BoletaRecibo({
 
   const codigo = brazo?.codigo_boleta_qr;
 
-  const precio = formatPrecio(brazo?.precio_pagado ?? turno?.precio);
+  const precioValor = formatPrecio(brazo?.precio_pagado ?? turno?.precio);
 
   const titulo =
 
@@ -260,7 +260,12 @@ export default function BoletaRecibo({
 
     <footer className="boleta-recibo__footer">
 
-      {cfg.mostrar_precio !== false && <span className="boleta-recibo__precio">{precio}</span>}
+      {cfg.mostrar_precio !== false && (
+        <span className="boleta-recibo__precio">
+          <small className="boleta-recibo__precio-label">Ofrenda</small>
+          {precioValor}
+        </span>
+      )}
 
       {showEntrega && brazo?.estado_entrega && (
 

@@ -12,7 +12,7 @@ export const ELEMENTOS_RECIBO = [
   { id: 'turno', label: 'Turno' },
   { id: 'cargador', label: 'Devoto(a)' },
   { id: 'qr', label: 'Código QR' },
-  { id: 'precio', label: 'Precio' },
+  { id: 'precio', label: 'Ofrenda' },
   { id: 'pie', label: 'Pie de boleta' },
 ];
 

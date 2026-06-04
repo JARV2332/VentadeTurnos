@@ -235,7 +235,7 @@ export default function ConfigRecibo() {
                 ['mostrar_turno', 'Número de turno'],
                 ['mostrar_etiqueta_turno', 'Etiqueta del turno'],
                 ['mostrar_cargador', 'Nombre del devoto(a)'],
-                ['mostrar_precio', 'Precio pagado'],
+                ['mostrar_precio', 'Ofrenda pagada'],
                 ['mostrar_codigo_texto', 'Código alfanumérico bajo QR'],
               ].map(([key, label]) => (
                 <label key={key} className="checkbox-row">
