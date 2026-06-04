@@ -83,7 +83,7 @@ export default function CajaSaaS() {
           Filtrar por mesa
           <select value={filtroMesa} onChange={(e) => setFiltroMesa(e.target.value)}>
             <option value="all">Todas las mesas</option>
-            {finanzas.porMesa.map((m) => (
+            {(finanzas.porMesa || []).map((m) => (
               <option key={m.id} value={m.id}>{m.nombre_mesa}</option>
             ))}
           </select>
@@ -116,7 +116,7 @@ export default function CajaSaaS() {
                 </tr>
               </thead>
               <tbody>
-                {finanzas.porMesa.map((m) => (
+                {(finanzas.porMesa || []).map((m) => (
                   <tr key={m.id}>
                     <td><strong>{m.nombre_mesa}</strong></td>
                     <td>{m.estado}</td>

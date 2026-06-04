@@ -36,9 +36,13 @@ export function mergeReciboConfig(guardado) {
     };
   }
   const diseño =
-    guardado.diseño && typeof guardado.diseño === 'object'
+    guardado.diseño &&
+    typeof guardado.diseño === 'object' &&
+    !Array.isArray(guardado.diseño)
       ? guardado.diseño
-      : guardado;
+      : !Array.isArray(guardado)
+        ? guardado
+        : {};
   const formato = guardado.formato || diseño.formato || DEFAULT_RECIBO_CONFIG.formato;
   const merged = {
     ...DEFAULT_RECIBO_CONFIG,

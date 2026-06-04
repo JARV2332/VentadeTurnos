@@ -466,7 +466,23 @@ export async function getFinanzasByOrg(organizacionId) {
     mesa_id: b.mesa_id,
   }));
 
-  return { ventas, recaudado, presupuestoTotal, brazosVendidos: brazos?.length || 0 };
+  const mesas = await getMesasByOrg(organizacionId);
+  const porMesa = (mesas || []).map((mesa) => {
+    const ventasMesa = ventas.filter((b) => b.mesa_id === mesa.id);
+    return {
+      ...mesa,
+      ventas: ventasMesa.length,
+      total: ventasMesa.reduce((s, b) => s + Number(b.precio_pagado || 0), 0),
+    };
+  });
+
+  return {
+    ventas,
+    recaudado,
+    presupuestoTotal,
+    brazosVendidos: brazos?.length || 0,
+    porMesa,
+  };
 }
 
 export async function getDashboardMetrics(organizacionId) {
@@ -593,7 +609,10 @@ export async function getRolesByOrg(organizacionId) {
     .eq('organizacion_id', organizacionId)
     .order('es_sistema', { ascending: false });
   if (error) throw error;
-  return data || [];
+  return (data || []).map((rol) => ({
+    ...rol,
+    permisos: Array.isArray(rol.permisos) ? rol.permisos : [],
+  }));
 }
 
 export async function getUsuariosByOrg(organizacionId) {
@@ -828,7 +847,10 @@ export async function eliminarProcesion(cortejoId, organizacionId) {
 export async function getResumenApartados(cortejoId, organizacionId) {
   const turnos = await getTurnosAgrupados(cortejoId, organizacionId);
   return turnos.map((turno) => {
-    const todos = [...turno.izquierda, ...turno.derecha];
+    const todos = [
+      ...(Array.isArray(turno.izquierda) ? turno.izquierda : []),
+      ...(Array.isArray(turno.derecha) ? turno.derecha : []),
+    ];
     const apartados = todos.filter((b) => b.reserva_apartado);
     return { turno, apartados, total: todos.length, apartadosCount: apartados.length };
   });

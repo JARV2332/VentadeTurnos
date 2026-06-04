@@ -200,7 +200,7 @@ export default function ConfigUsuarios() {
                     <p className="rol-card__desc text-muted">{rol.descripcion}</p>
                   )}
                   <div className="rol-card__permisos">
-                    {rol.permisos.map((p) => (
+                    {(Array.isArray(rol.permisos) ? rol.permisos : []).map((p) => (
                       <span key={p} className="permiso-chip">
                         {labelPermiso(p)}
                       </span>
@@ -319,7 +319,7 @@ export default function ConfigUsuarios() {
                       <td>{u.rol_nombre}</td>
                       <td>
                         <span className="text-muted usuarios-permisos-mini">
-                          {u.permisos.map(labelPermiso).join(', ')}
+                          {(Array.isArray(u.permisos) ? u.permisos : []).map(labelPermiso).join(', ')}
                         </span>
                       </td>
                       <td>

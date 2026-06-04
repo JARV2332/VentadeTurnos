@@ -27,7 +27,7 @@ export default function VentaExitoModal({ venta, organizacion, onCerrar }) {
     };
   }, []);
 
-  if (!venta) return null;
+  if (!venta || typeof document === 'undefined') return null;
 
   const codigo = venta.codigo || venta.data?.codigo_boleta_qr;
 

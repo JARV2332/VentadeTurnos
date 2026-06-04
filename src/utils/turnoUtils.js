@@ -55,11 +55,13 @@ export function crearBrazosParaTurno({
 
 /** Agrupa brazos por turno con columnas izquierda/derecha ordenadas */
 export function agruparTurnosConBrazos(turnos, brazos) {
-  return turnos
+  const listaTurnos = Array.isArray(turnos) ? turnos : [];
+  const listaBrazos = Array.isArray(brazos) ? brazos : [];
+  return listaTurnos
     .slice()
     .sort((a, b) => a.numero_turno - b.numero_turno)
     .map((turno) => {
-      const delTurno = brazos.filter((b) => b.turno_id === turno.id);
+      const delTurno = listaBrazos.filter((b) => b.turno_id === turno.id);
       return {
         ...turno,
         izquierda: delTurno

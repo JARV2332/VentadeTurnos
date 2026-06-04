@@ -43,6 +43,8 @@ export function TurnoCartulina({ turno, selectedBrazo, onClickBrazo, readOnly = 
   const formatQ = (n) =>
     new Intl.NumberFormat('es-GT', { style: 'currency', currency: 'GTQ' }).format(n);
   const repertorio = repertorioTurnoLista(turno);
+  const izquierda = Array.isArray(turno?.izquierda) ? turno.izquierda : [];
+  const derecha = Array.isArray(turno?.derecha) ? turno.derecha : [];
 
   return (
     <article className="turno-cartulina">
@@ -72,7 +74,7 @@ export function TurnoCartulina({ turno, selectedBrazo, onClickBrazo, readOnly = 
         <div className="turno-columna turno-columna--izq">
           <span className="turno-columna__label">Izquierda</span>
           <div className="turno-columna__lista">
-            {turno.izquierda.map((b) => (
+            {izquierda.map((b) => (
               <EspacioBrazo
                 key={b.id}
                 brazo={b}
@@ -107,7 +109,7 @@ export function TurnoCartulina({ turno, selectedBrazo, onClickBrazo, readOnly = 
       </div>
 
       <footer className="turno-cartulina__footer">
-        {turno.izquierda.length} + {turno.derecha.length} brazos
+        {izquierda.length} + {derecha.length} brazos
         ({turno.izquierda.length} por lado)
       </footer>
     </article>

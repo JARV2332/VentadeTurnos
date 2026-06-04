@@ -68,7 +68,7 @@ export default function Taquilla() {
   const refreshCortejos = useCallback(async () => {
     if (!organizacionId) return;
     const lista = await getCortejosByOrg(organizacionId);
-    setCortejos(lista);
+    setCortejos(Array.isArray(lista) ? lista : []);
     const mesas = await getMesasByOrg(organizacionId);
     setMesaActiva(mesas.find((m) => m.estado === 'activa') || mesas[0] || null);
     const ultimo = sessionStorage.getItem('vtd_ultimo_cortejo');
@@ -85,11 +85,16 @@ export default function Taquilla() {
 
   const refresh = useCallback(async () => {
     if (!cortejoId) return;
-    let lista = await getTurnosAgrupados(cortejoId, organizacionId);
-    if (filtroTipo !== 'all') {
-      lista = lista.filter((t) => t.tipo_turno === filtroTipo);
+    try {
+      let lista = await getTurnosAgrupados(cortejoId, organizacionId);
+      if (!Array.isArray(lista)) lista = [];
+      if (filtroTipo !== 'all') {
+        lista = lista.filter((t) => t.tipo_turno === filtroTipo);
+      }
+      setTurnos(lista);
+    } catch (err) {
+      console.error('Error al actualizar turnos en taquilla:', err);
     }
-    setTurnos(lista);
   }, [cortejoId, organizacionId, filtroTipo]);
 
   useEffect(() => {
@@ -296,7 +301,7 @@ export default function Taquilla() {
         <label>
           Procesión
           <select value={cortejoId} onChange={(e) => setCortejoId(e.target.value)}>
-            {cortejos.map((c) => (
+            {(cortejos || []).map((c) => (
               <option key={c.id} value={c.id}>{c.nombre_evento}</option>
             ))}
           </select>
@@ -323,7 +328,7 @@ export default function Taquilla() {
           {turnos.length === 0 ? (
             <p className="text-muted">No hay turnos para esta procesión.</p>
           ) : (
-            turnos.map((turno) => (
+            (turnos || []).map((turno) => (
               <TurnoCartulina
                 key={turno.id}
                 turno={turno}
