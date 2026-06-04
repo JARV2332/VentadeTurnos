@@ -2,7 +2,7 @@
 export const FORMATOS_RECIBO = [
   { id: 'termico_58', label: 'Térmico 58 mm', descripcion: 'Impresoras POS pequeñas' },
   { id: 'termico_80', label: 'Térmico 80 mm', descripcion: 'Estándar en taquilla' },
-  { id: 'media_carta', label: 'Media carta', descripcion: '5.5" × 8.5" (vertical)' },
+  { id: 'media_carta', label: 'Media carta', descripcion: '8.5" × 5.5" (horizontal)' },
 ];
 
 export const DEFAULT_RECIBO_CONFIG = {

@@ -1681,10 +1681,53 @@ body {
 .boleta-recibo--termico_58 { max-width: 220px; font-size: 0.8rem; }
 .boleta-recibo--termico_80 { max-width: 302px; font-size: 0.85rem; }
 .boleta-recibo--media_carta {
-  max-width: 396px;
-  min-height: 280px;
-  padding: 1.5rem;
-  font-size: 0.95rem;
+  max-width: 520px;
+  width: 100%;
+  min-height: auto;
+  padding: 1rem 1.25rem;
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+.boleta-recibo--media_carta .boleta-recibo__horizontal {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.boleta-recibo--media_carta .boleta-recibo__horizontal-datos {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.boleta-recibo--media_carta .boleta-recibo__head {
+  text-align: left;
+  border-bottom: none;
+  padding-bottom: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.boleta-recibo--media_carta .boleta-recibo__turno strong {
+  font-size: 1.35em;
+}
+
+.boleta-recibo--media_carta .boleta-recibo__qr {
+  flex-shrink: 0;
+  margin-bottom: 0;
+  text-align: center;
+}
+
+.boleta-recibo--media_carta .boleta-recibo__footer {
+  justify-content: flex-start;
+  margin-top: 0.35rem;
+}
+
+.boleta-recibo--media_carta .boleta-recibo__pie {
+  text-align: center;
+  margin-top: 0.65rem;
 }
 
 .boleta-recibo--fuente-compacto { font-size: 0.78em; }
@@ -2138,7 +2181,15 @@ body {
   }
   .boleta-recibo--termico_58 { width: 58mm; max-width: 58mm; }
   .boleta-recibo--termico_80 { width: 80mm; max-width: 80mm; }
-  .boleta-recibo--media_carta { width: 5.5in; max-width: 5.5in; }
+  .boleta-recibo--media_carta {
+    width: 8.5in;
+    max-width: 8.5in;
+    min-height: 5.5in;
+  }
+  @page {
+    size: letter landscape;
+    margin: 0.4in;
+  }
 }
 
 /* ── Usuarios y roles (RBAC) ── */

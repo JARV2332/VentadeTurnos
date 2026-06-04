@@ -1,58 +1,11 @@
 /**
  * Crea usuario en Auth + usuarios_app (requiere SUPABASE_SERVICE_ROLE_KEY en Vercel).
  */
-import { createClient } from '@supabase/supabase-js';
+import { verifyCaller } from './verifyCaller.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido' });
-  }
-
-  const authHeader = req.headers.authorization || '';
-  if (!authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'No autorizado' });
-  }
-
-  const token = authHeader.slice(7);
-  const url =
-    process.env.REACT_APP_SUPABASE_URL ||
-    process.env.SUPABASE_URL ||
-    'https://kolhnoectddjgfowyvux.supabase.co';
-  const anonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!anonKey || !serviceKey) {
-    return res.status(500).json({
-      error: 'Configure SUPABASE_SERVICE_ROLE_KEY y REACT_APP_SUPABASE_ANON_KEY en Vercel.',
-    });
-  }
-
-  const userClient = createClient(url, anonKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-  const { data: authData, error: authErr } = await userClient.auth.getUser(token);
-  if (authErr || !authData?.user) {
-    return res.status(401).json({ error: 'Sesión inválida' });
-  }
-
-  const admin = createClient(url, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-
-  const { data: caller, error: callerErr } = await admin
-    .from('usuarios_app')
-    .select('organizacion_id, roles_organizacion(permisos)')
-    .eq('auth_user_id', authData.user.id)
-    .eq('activo', true)
-    .single();
-
-  if (callerErr || !caller) {
-    return res.status(403).json({ error: 'Perfil de administrador no encontrado' });
-  }
-
-  const permisos = caller.roles_organizacion?.permisos || [];
-  if (!permisos.includes('usuarios')) {
-    return res.status(403).json({ error: 'Sin permiso para crear usuarios' });
   }
 
   const { organizacionId, nombre, email, password, rol_id } = req.body || {};
@@ -60,13 +13,19 @@ export default async function handler(req, res) {
     .trim()
     .toLowerCase();
 
-  if (!organizacionId || organizacionId !== caller.organizacion_id) {
-    return res.status(403).json({ error: 'Organización no válida' });
+  const auth = await verifyCaller(req, organizacionId);
+  if (auth.error) {
+    return res.status(auth.status).json({ error: auth.error });
   }
+
+  const { admin } = auth;
+
   if (!emailNorm || !password || !rol_id) {
     return res.status(400).json({ error: 'Correo, contraseña y rol son obligatorios' });
   }
-
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+  }
   const { data: rol } = await admin
     .from('roles_organizacion')
     .select('id')

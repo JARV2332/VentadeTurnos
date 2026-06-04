@@ -375,7 +375,7 @@ export default function ConfigUsuarios() {
                 value={userForm.password}
                 onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
                 required={!userEditId}
-                minLength={4}
+                minLength={6}
               />
             </label>
 

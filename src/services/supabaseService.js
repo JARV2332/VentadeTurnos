@@ -483,6 +483,38 @@ export async function saveRol(organizacionId, datos, rolId = null) {
   return { data };
 }
 
+async function callUserApi(path, body) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    return { error: 'Sesión expirada. Vuelva a iniciar sesión.' };
+  }
+
+  try {
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { error: json.error || `Error del servidor (${res.status})` };
+    }
+    return { data: json.data };
+  } catch (e) {
+    const msg = e?.message || '';
+    if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+      return {
+        error:
+          'No se pudo conectar con el servidor. Verifique SUPABASE_SERVICE_ROLE_KEY en Vercel y que la API /api esté desplegada.',
+      };
+    }
+    return { error: msg || 'Error de red al guardar el usuario.' };
+  }
+}
+
 export async function saveUsuario(organizacionId, datos, usuarioId = null) {
   const emailNorm = datos.email?.trim().toLowerCase();
   if (!emailNorm) return { error: 'El correo es obligatorio.' };
@@ -497,63 +529,34 @@ export async function saveUsuario(organizacionId, datos, usuarioId = null) {
   if (!rol) return { error: 'Seleccione un rol válido.' };
 
   if (usuarioId) {
-    const { data, error } = await supabase
-      .from('usuarios_app')
-      .update({
-        nombre: datos.nombre?.trim() || 'Usuario',
-        email: emailNorm,
-        rol_id: datos.rol_id,
-        activo: datos.activo !== false,
-      })
-      .eq('id', usuarioId)
-      .eq('organizacion_id', organizacionId)
-      .select('*, roles_organizacion(nombre, permisos)')
-      .single();
-    if (error) return err(error);
-    return {
-      data: {
-        ...data,
-        rol_nombre: data.roles_organizacion?.nombre || '—',
-        permisos: data.roles_organizacion?.permisos || [],
-      },
-    };
+    if (datos.password?.trim() && datos.password.trim().length < 6) {
+      return { error: 'La nueva contraseña debe tener al menos 6 caracteres.' };
+    }
+    return callUserApi('/api/update-app-user', {
+      organizacionId,
+      usuarioId,
+      nombre: datos.nombre?.trim() || 'Usuario',
+      email: emailNorm,
+      password: datos.password?.trim() || undefined,
+      rol_id: datos.rol_id,
+      activo: datos.activo !== false,
+    });
   }
 
   if (!datos.password?.trim()) {
     return { error: 'La contraseña es obligatoria para usuarios nuevos.' };
   }
-
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) {
-    return { error: 'Sesión expirada. Vuelva a iniciar sesión.' };
+  if (datos.password.trim().length < 6) {
+    return { error: 'La contraseña debe tener al menos 6 caracteres.' };
   }
 
-  try {
-    const res = await fetch('/api/invite-app-user', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        organizacionId,
-        nombre: datos.nombre?.trim() || 'Usuario',
-        email: emailNorm,
-        password: datos.password,
-        rol_id: datos.rol_id,
-      }),
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      return { error: json.error || 'No se pudo crear el usuario.' };
-    }
-    return { data: json.data };
-  } catch {
-    return {
-      error:
-        'Creación de usuarios requiere despliegue en Vercel con SUPABASE_SERVICE_ROLE_KEY. Alternativa: npm run db:seed o Dashboard → Authentication.',
-    };
-  }
+  return callUserApi('/api/invite-app-user', {
+    organizacionId,
+    nombre: datos.nombre?.trim() || 'Usuario',
+    email: emailNorm,
+    password: datos.password,
+    rol_id: datos.rol_id,
+  });
 }
 
 export async function deleteRol(rolId, organizacionId) {
