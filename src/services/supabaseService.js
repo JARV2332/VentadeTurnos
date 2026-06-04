@@ -15,6 +15,94 @@ function err(error) {
   return { error: error.message || String(error) };
 }
 
+function isMissingRpc(error) {
+  if (!error) return false;
+  const msg = error.message || '';
+  const code = error.code || '';
+  return (
+    code === 'PGRST202' ||
+    code === '42883' ||
+    /Could not find the function/i.test(msg) ||
+    (/not find/i.test(msg) && /function/i.test(msg))
+  );
+}
+
+function generarCodigoBoletaCliente() {
+  const bytes = new Uint8Array(5);
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `VT-${hex.toUpperCase().slice(0, 10)}`;
+}
+
+async function reservarBrazoDirecto(brazoId, mesaId, vendedorId) {
+  const { data: actual, error: fetchErr } = await supabase
+    .from('brazos')
+    .select('*')
+    .eq('id', brazoId)
+    .single();
+  if (fetchErr) return err(fetchErr);
+
+  if (actual.reserva_apartado) {
+    return { error: 'Espacio apartado por importación' };
+  }
+
+  const expirado =
+    actual.estado === 'reservado' &&
+    actual.bloqueado_hasta &&
+    new Date(actual.bloqueado_hasta) < new Date();
+
+  if (actual.estado !== 'disponible' && !expirado) {
+    return { error: 'El espacio no está disponible o fue reservado por otra mesa' };
+  }
+
+  const bloqueadoHasta = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('brazos')
+    .update({
+      estado: 'reservado',
+      bloqueado_hasta: bloqueadoHasta,
+      mesa_id: mesaId || null,
+      vendedor_id: vendedorId || null,
+    })
+    .eq('id', brazoId)
+    .select()
+    .single();
+
+  if (error) return err(error);
+  return { data };
+}
+
+async function confirmarVentaDirecto(brazoId, cargador, precioPagado, pagoData = {}) {
+  const codigo = generarCodigoBoletaCliente();
+  const payload = {
+    estado: 'vendido',
+    cargador_id: cargador.id,
+    precio_pagado: precioPagado,
+    codigo_boleta_qr: codigo,
+    bloqueado_hasta: null,
+    metodo_pago: pagoData.metodo_pago || 'efectivo',
+    comprobante_url: pagoData.comprobante_url || null,
+    pago_confirmado_en: new Date().toISOString(),
+    estado_entrega: 'pendiente',
+    reserva_apartado: false,
+  };
+
+  const { data: brazo, error } = await supabase
+    .from('brazos')
+    .update(payload)
+    .eq('id', brazoId)
+    .eq('estado', 'reservado')
+    .select()
+    .single();
+
+  if (error) return err(error);
+  return { data: brazo, cargador, codigo: brazo.codigo_boleta_qr || codigo };
+}
+
 export async function fetchPerfilByAuthId(authUserId) {
   const { data, error } = await supabase
     .from('usuarios_app')
@@ -246,7 +334,12 @@ export async function reservarBrazo(brazoId, mesaId, vendedorId) {
     p_mesa_id: mesaId,
     p_vendedor_id: vendedorId,
   });
-  if (error) return err(error);
+  if (error) {
+    if (isMissingRpc(error)) {
+      return reservarBrazoDirecto(brazoId, mesaId, vendedorId);
+    }
+    return err(error);
+  }
   return { data };
 }
 
@@ -294,7 +387,12 @@ export async function confirmarVenta(brazoId, cargadorData, precioPagado, pagoDa
     p_metodo_pago: pagoData.metodo_pago || 'efectivo',
     p_comprobante_url: pagoData.comprobante_url || null,
   });
-  if (error) return err(error);
+  if (error) {
+    if (isMissingRpc(error)) {
+      return confirmarVentaDirecto(brazoId, cargador, precioPagado, pagoData);
+    }
+    return err(error);
+  }
   return { data: brazo, cargador, codigo: brazo.codigo_boleta_qr };
 }
 
@@ -322,7 +420,23 @@ export async function buscarBoletaPorCodigo(organizacionId, codigo) {
 
 export async function marcarEntregado(brazoId) {
   const { data, error } = await supabase.rpc('marcar_entregado_brazo', { p_brazo_id: brazoId });
-  if (error) return err(error);
+  if (error) {
+    if (isMissingRpc(error)) {
+      const { data: brazo, error: upErr } = await supabase
+        .from('brazos')
+        .update({
+          estado_entrega: 'entregado',
+          entregado_en: new Date().toISOString(),
+        })
+        .eq('id', brazoId)
+        .eq('estado', 'vendido')
+        .select()
+        .single();
+      if (upErr) return err(upErr);
+      return { data: brazo };
+    }
+    return err(error);
+  }
   return { data };
 }
 
