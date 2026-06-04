@@ -330,10 +330,17 @@ body {
 /* ── Layout ── */
 .app-layout {
   display: flex;
-  min-height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
   min-height: 100dvh;
   width: 100%;
   position: relative;
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+  min-height: 100dvh;
 }
 
 .sidebar {
@@ -980,28 +987,20 @@ body {
 .legend-dot--reservado { background: #fbbf24; }
 .legend-dot--vendido { background: #475569; }
 
-/* Taquilla: scroll en lista de turnos + panel (no bloquear toda la página) */
+/* Taquilla: mismo scroll que el resto de pantallas (área app-content) */
 .app-content--taquilla {
-  display: flex;
-  flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
   overflow-x: hidden;
-}
-
-.app-content--taquilla .taquilla-toolbar {
-  flex-shrink: 0;
+  -webkit-overflow-scrolling: touch;
 }
 
 .taquilla-layout {
   display: grid;
   grid-template-columns: 1fr 320px;
   gap: 1.25rem;
-  align-items: stretch;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
+  align-items: start;
 }
 
 .turnos-lista {
@@ -1009,34 +1008,15 @@ body {
   flex-direction: column;
   gap: 1rem;
   min-width: 0;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-  padding-right: 0.35rem;
-  padding-bottom: 0.5rem;
-  scrollbar-gutter: stable;
-}
-
-.turnos-lista::-webkit-scrollbar {
-  width: 8px;
-}
-
-.turnos-lista::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
 }
 
 .taquilla-layout .venta-panel {
-  min-height: 0;
-  height: 100%;
-  max-height: 100%;
+  position: sticky;
+  top: 0.5rem;
+  max-height: calc(100dvh - 8rem);
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  position: relative;
-  top: auto;
-  align-self: stretch;
   scrollbar-gutter: stable;
 }
 
@@ -3066,11 +3046,6 @@ body {
 
   .taquilla-layout {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) auto;
-  }
-
-  .turnos-lista {
-    max-height: min(55vh, calc(100dvh - 14rem));
   }
 }
 

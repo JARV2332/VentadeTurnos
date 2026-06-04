@@ -36,3 +36,19 @@ Prioridad: **primero** credenciales de la asociación en la base de datos, **des
 - No comparta contraseñas de aplicación en chats ni correos.
 - Si se filtró, revóquela en Google y cree otra.
 - Cada asociación debe usar su propia cuenta Gmail.
+
+## Si los correos caen en SPAM
+
+Es **muy común** con Gmail nuevo o con pocos envíos previos. No es un fallo de la app.
+
+| Causa | Qué hacer |
+|--------|-----------|
+| Cuenta Gmail recién creada | Enviar pocos correos los primeros días; pedir a cada cargador marcar **No es spam** y agregar el remitente a **Contactos**. |
+| Gmail personal (no Workspace) | Funciona, pero la reputación tarda. Para producción seria, use **Google Workspace** con dominio propio (`@suhermandad.org`). |
+| Nombre remitente distinto al correo | En **Correo y boletas**, el **nombre remitente** debe ser el de la pastoral/hermandad y el **Gmail** el mismo que envía. |
+| Muchos envíos de golpe | Espaciar ventas masivas; Gmail penaliza picos desde cuentas nuevas. |
+| Adjuntos / HTML | La boleta va con QR en el cuerpo del correo; si Gmail filtra, el cargador puede usar el **enlace** `/boleta/VT-…` o **WhatsApp** desde taquilla. |
+
+**Mejor solución a mediano plazo:** dominio propio + Google Workspace (o Resend/SendGrid con SPF y DKIM verificados). Así Gmail y Outlook confían más y casi no van a spam.
+
+**Mientras tanto:** cada persona que reciba boleta → abrir spam → **Reportar como correo deseado** / mover a Recibidos.

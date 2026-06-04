@@ -77,9 +77,10 @@ export async function buildBoletaEmailContent({ text, codigo_boleta, enlace_bole
 
   const attachments = [
     {
-      filename: `boleta-${codigo}.png`,
+      filename: `qr-${codigo}.png`,
       content: qrBuffer,
       cid: 'boleta-qr',
+      contentDisposition: 'inline',
     },
   ];
 
