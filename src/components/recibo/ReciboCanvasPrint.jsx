@@ -31,7 +31,7 @@ export default function ReciboCanvasPrint({
       style={{
         '--recibo-primary': cfg.color_primario || '#6366f1',
         width: canvas.width * scale,
-        height: canvas.height * scale,
+        minHeight: canvas.height * scale,
       }}
       data-formato={cfg.formato}
     >
@@ -40,8 +40,9 @@ export default function ReciboCanvasPrint({
         style={{
           width: canvas.width,
           height: canvas.height,
-          transform: scale !== 1 ? `scale(${scale})` : undefined,
-          transformOrigin: 'top center',
+          ...(scale !== 1 && typeof window !== 'undefined' && !window.matchMedia('print').matches
+            ? { transform: `scale(${scale})`, transformOrigin: 'top center' }
+            : {}),
         }}
       >
         {ELEMENTOS_RECIBO.map(({ id }) => {

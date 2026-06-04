@@ -80,7 +80,7 @@ export default function Impresion() {
         )}
       </div>
 
-      <div className="impresion-boleta">
+      <div className="impresion-boleta print-area">
         <BoletaCard
           organizacion={organizacion}
           cargador={cargador}
@@ -88,10 +88,15 @@ export default function Impresion() {
           turno={turno}
           cortejo={cortejo}
         />
-        <p className="text-muted impresion-hint">
+        <p className="text-muted impresion-hint no-print">
           Estado entrega: <StatusBadge status={selected.estado_entrega} />
         </p>
       </div>
+
+      <p className="impresion-print-tip no-print">
+        Al imprimir o guardar PDF: desactive <strong>Encabezados y pies de página</strong>, active{' '}
+        <strong>Gráficos en segundo plano</strong> y elija <strong>Guardar como PDF</strong>.
+      </p>
     </Layout>
   );
 }
