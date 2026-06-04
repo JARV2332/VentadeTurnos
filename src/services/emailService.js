@@ -60,6 +60,8 @@ export function construirDatosBoletaEmail(props) {
     destinatario: cargador?.correo || 'correo@ejemplo.com',
     remitente: emailConfig?.correo_remitente || 'turnos@organizacion.com',
     nombreRemitente: emailConfig?.nombre_remitente || organizacion?.nombre_oficial,
+    responderA:
+      emailConfig?.correo_respuesta?.trim() || emailConfig?.correo_remitente || 'turnos@organizacion.com',
     brazo,
     turno,
     cortejo,

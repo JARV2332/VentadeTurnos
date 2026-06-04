@@ -1354,6 +1354,24 @@ body {
 
 .info-box code { font-size: 0.75rem; background: rgba(255,255,255,0.6); padding: 0.1rem 0.3rem; border-radius: 4px; }
 
+/* ── Ayuda configuración correo ── */
+.correo-ayuda__lista {
+  margin: 0.5rem 0 0.75rem;
+  padding-left: 1.2rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+.correo-ayuda__lista li { margin-bottom: 0.5rem; }
+.correo-ayuda__nota { font-size: 0.85rem; margin: 0; }
+.correo-ayuda__estado { margin-top: 0.75rem; margin-bottom: 0; }
+.field-hint {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+  font-weight: normal;
+}
+
 /* ── Vista previa correo ── */
 .email-preview { margin-top: 0.5rem; }
 

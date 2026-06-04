@@ -10,6 +10,10 @@ export default function BoletaCorreoPreview({ datos }) {
       <div className="email-preview__envelope">
         <div className="email-preview__meta">
           <div><strong>De:</strong> {datos.nombreRemitente} &lt;{datos.remitente}&gt;</div>
+          <div>
+            <strong>Responder a:</strong>{' '}
+            {datos.responderA || datos.remitente}
+          </div>
           <div><strong>Para:</strong> {datos.destinatario}</div>
           <div><strong>Asunto:</strong> {datos.asunto}</div>
         </div>

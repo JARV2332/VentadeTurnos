@@ -11,7 +11,10 @@ import {
   getCortejosByOrg,
 } from '../services/dataService';
 import { construirDatosBoletaEmail } from '../services/emailService';
+import { MOCK_MODE } from '../config/supabaseClient';
 import { DEMO_NOMBRE_ORGANIZACION } from '../data/mockData';
+
+const EMAIL_WEBHOOK = process.env.REACT_APP_EMAIL_WEBHOOK_URL || '';
 
 const DEFAULT_CONFIG = {
   correo_remitente: 'turnos@pastoral-asuncion.org',
@@ -68,7 +71,10 @@ export default function ConfigCorreo() {
     brazo: DEMO_PREVIEW.brazo,
     turno: DEMO_PREVIEW.turno,
     cortejo: cortejoDemo,
+    emailConfig: config,
   });
+
+  const envioRealActivo = !MOCK_MODE && Boolean(EMAIL_WEBHOOK);
 
   return (
     <Layout title="Correo y boletas" subtitle="Remitente, plantilla y historial de envíos">
@@ -79,18 +85,57 @@ export default function ConfigCorreo() {
         <Link to="/config/recibo">Diseño de recibos</Link>.
       </p>
 
+      <section className="panel info-box correo-ayuda">
+        <h3 className="panel__title">¿Cómo funcionan estos correos?</h3>
+        <ul className="correo-ayuda__lista">
+          <li>
+            <strong>Correo remitente</strong> — Es el que aparece en <em>De:</em> cuando el cargador
+            recibe la boleta. Debe ser un correo <strong>real de su organización</strong> (ej.{' '}
+            <code>turnos@suasociacion.org</code>), autorizado en su proveedor de envío (Resend,
+            SendGrid, etc.).
+          </li>
+          <li>
+            <strong>Nombre remitente</strong> — El nombre visible junto al correo (ej.{' '}
+            <em>Pastoral La Asunción</em>). Puede ser el nombre de la asociación.
+          </li>
+          <li>
+            <strong>Correo de respuesta</strong> — Si el cargador pulsa <em>Responder</em>, el mensaje
+            va a este buzón (puede ser otro, ej. <code>contacto@suasociacion.org</code>). Si lo deja
+            vacío, se usa el mismo remitente.
+          </li>
+        </ul>
+        <p className="text-muted correo-ayuda__nota">
+          No conviene poner correos al azar (Gmail personal sin configurar, etc.): muchos servidores los
+          rechazan o caen en spam. Use un dominio verificado de la asociación.
+        </p>
+        {!envioRealActivo && (
+          <p className="alert alert--warning correo-ayuda__estado">
+            Modo actual: los correos se <strong>registran en el historial</strong> pero no salen a internet
+            hasta configurar <code>REACT_APP_EMAIL_WEBHOOK_URL</code> en Vercel (webhook de Resend,
+            SendGrid o similar).
+          </p>
+        )}
+        {envioRealActivo && (
+          <p className="alert alert--success correo-ayuda__estado">
+            Envío real activo: las boletas se envían al correo del cargador al confirmar la venta.
+          </p>
+        )}
+      </section>
+
       <div className="config-grid">
         <section className="card">
-          <h3 className="panel__title">Configuración SMTP / remitente</h3>
+          <h3 className="panel__title">Remitente y respuestas</h3>
           <form onSubmit={handleSave} className="auth-form">
             <label>
-              Correo remitente
+              Correo remitente (De:)
               <input
                 type="email"
                 value={config.correo_remitente}
                 onChange={(e) => setConfig({ ...config, correo_remitente: e.target.value })}
+                placeholder="turnos@suasociacion.org"
                 required
               />
+              <small className="field-hint">Debe estar verificado en su servicio de envío de correos</small>
             </label>
             <label>
               Nombre remitente
@@ -98,16 +143,20 @@ export default function ConfigCorreo() {
                 type="text"
                 value={config.nombre_remitente}
                 onChange={(e) => setConfig({ ...config, nombre_remitente: e.target.value })}
+                placeholder={organizacion?.nombre_oficial || 'Nombre de la asociación'}
                 required
               />
+              <small className="field-hint">Texto que ve el cargador junto al correo</small>
             </label>
             <label>
-              Correo de respuesta
+              Correo de respuesta (Responder a)
               <input
                 type="email"
                 value={config.correo_respuesta || ''}
                 onChange={(e) => setConfig({ ...config, correo_respuesta: e.target.value })}
+                placeholder="contacto@suasociacion.org"
               />
+              <small className="field-hint">Opcional. Buzón donde recibirán las respuestas</small>
             </label>
             <label>
               Pie de correo
