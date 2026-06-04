@@ -1845,6 +1845,146 @@ body {
   overflow: auto;
 }
 
+.recibo-preview-stage--editor {
+  min-height: 200px;
+  background: repeating-conic-gradient(#e2e8f0 0% 25%, #f8fafc 0% 50%) 50% / 16px 16px;
+}
+
+.recibo-editor-wrap { width: 100%; }
+.recibo-editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+  flex-wrap: wrap;
+}
+.recibo-editor-hint { font-size: 0.8rem; }
+
+.recibo-canvas {
+  position: relative;
+  margin: 0 auto;
+  background: #fff;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  color: #1e293b;
+}
+
+.recibo-canvas--print {
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.boleta-recibo--canvas {
+  border: none;
+  padding: 0;
+  max-width: none;
+  margin: 0 auto;
+}
+
+.recibo-block {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px dashed rgba(99, 102, 241, 0.45);
+  background: rgba(255, 255, 255, 0.92);
+  cursor: grab;
+  touch-action: none;
+  z-index: 1;
+}
+
+.recibo-block:active { cursor: grabbing; }
+.recibo-block--selected {
+  border: 2px solid var(--primary);
+  z-index: 10;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.recibo-block--print {
+  border: none;
+  background: transparent;
+  cursor: default;
+}
+
+.recibo-block__label {
+  position: absolute;
+  top: -1.35rem;
+  left: 0;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--primary);
+  background: #fff;
+  padding: 0 4px;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.recibo-block--print .recibo-block__label { display: none; }
+
+.recibo-block__content {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4px;
+  font-size: 0.85em;
+  color: var(--recibo-primary, var(--primary));
+}
+
+.recibo-block__resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  background: var(--primary);
+  border-radius: 3px 0 0 0;
+  cursor: nwse-resize;
+  z-index: 2;
+}
+
+.recibo-block__placeholder {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.recibo-block__titulo {
+  display: block;
+  width: 100%;
+  font-size: 1em;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.recibo-block__evento { font-size: 0.8em; color: var(--text-muted); }
+.recibo-block__turno small { font-size: 0.65em; color: var(--text-muted); text-transform: uppercase; }
+.recibo-block__turno strong { font-size: 1.4em; display: block; }
+.recibo-block__cargador small { font-size: 0.6em; color: var(--text-muted); }
+.recibo-block__qr-inner { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.recibo-block__codigo { font-size: 0.7em; font-weight: 600; }
+.recibo-block__qr-msg { font-size: 0.6em; color: var(--text-muted); line-height: 1.2; }
+.recibo-block__precio { font-weight: 700; font-size: 1.1em; }
+.recibo-block__pie { margin: 0; font-size: 0.65em; color: var(--text-muted); }
+
+.recibo-preview-print-hint {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+}
+.recibo-preview-print-hint summary {
+  cursor: pointer;
+  color: var(--primary);
+  font-weight: 600;
+}
+
 /* ── Entrega de turnos ── */
 .entrega-grid {
   display: grid;
@@ -2181,10 +2321,15 @@ body {
   }
   .boleta-recibo--termico_58 { width: 58mm; max-width: 58mm; }
   .boleta-recibo--termico_80 { width: 80mm; max-width: 80mm; }
-  .boleta-recibo--media_carta {
+  .boleta-recibo--media_carta,
+  .boleta-recibo--canvas.boleta-recibo--media_carta {
     width: 8.5in;
     max-width: 8.5in;
     min-height: 5.5in;
+  }
+  .recibo-canvas--print.recibo-canvas {
+    width: 100% !important;
+    height: auto !important;
   }
   @page {
     size: letter landscape;

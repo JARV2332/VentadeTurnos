@@ -2,9 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import BoletaRecibo from '../components/BoletaRecibo';
+import ReciboCanvasEditor from '../components/recibo/ReciboCanvasEditor';
 import { useAuth } from '../context/AuthContext';
 import { getReciboConfig, saveReciboConfig, getCortejosByOrg } from '../services/dataService';
 import { leerImagenComoDataUrl } from '../utils/pagoUtils';
+import { getDefaultLayout } from '../constants/reciboLayout';
 import {
   DEFAULT_RECIBO_CONFIG,
   FORMATOS_RECIBO,
@@ -31,6 +33,16 @@ export default function ConfigRecibo() {
   const [cortejoDemo, setCortejoDemo] = useState(null);
 
   const setCampo = (campo, valor) => setDiseño((d) => ({ ...d, [campo]: valor }));
+
+  const cambiarFormato = (nuevoFormato) => {
+    setDiseño((d) => {
+      if (d.formato === nuevoFormato) return d;
+      const layout = getDefaultLayout(nuevoFormato);
+      return { ...d, formato: nuevoFormato, layout };
+    });
+  };
+
+  const setLayout = (layout) => setDiseño((d) => ({ ...d, layout, editor_visual: true }));
 
   const refresh = useCallback(async () => {
     const saved = await getReciboConfig(organizacionId);
@@ -110,7 +122,7 @@ export default function ConfigRecibo() {
                     name="formato"
                     value={f.id}
                     checked={diseño.formato === f.id}
-                    onChange={() => setCampo('formato', f.id)}
+                    onChange={() => cambiarFormato(f.id)}
                   />
                   <span>
                     <strong>{f.label}</strong>
@@ -249,20 +261,35 @@ export default function ConfigRecibo() {
         </form>
 
         <section className="panel recibo-preview-panel">
-          <h3 className="panel__title">Vista previa</h3>
+          <h3 className="panel__title">Editor visual</h3>
           <p className="text-muted panel__subtitle">
-            Así se verá al imprimir ({FORMATOS_RECIBO.find((f) => f.id === diseño.formato)?.label})
+            {FORMATOS_RECIBO.find((f) => f.id === diseño.formato)?.label} — arrastre y ajuste tamaño
           </p>
-          <div className="recibo-preview-stage">
-            <BoletaRecibo
+          <div className="recibo-preview-stage recibo-preview-stage--editor">
+            <ReciboCanvasEditor
+              cfg={configPreview}
+              layout={configPreview.layout}
+              onLayoutChange={setLayout}
               organizacion={organizacion}
               cortejo={cortejoDemo}
               turno={DEMO_BOLETA.turno}
               cargador={DEMO_BOLETA.cargador}
               brazo={DEMO_BOLETA.brazo}
-              config={configPreview}
             />
           </div>
+          <details className="recibo-preview-print-hint">
+            <summary>Vista de impresión</summary>
+            <div className="recibo-preview-stage">
+              <BoletaRecibo
+                organizacion={organizacion}
+                cortejo={cortejoDemo}
+                turno={DEMO_BOLETA.turno}
+                cargador={DEMO_BOLETA.cargador}
+                brazo={DEMO_BOLETA.brazo}
+                config={configPreview}
+              />
+            </div>
+          </details>
         </section>
       </div>
     </Layout>

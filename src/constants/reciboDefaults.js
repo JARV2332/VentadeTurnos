@@ -1,3 +1,5 @@
+import { getDefaultLayout, mergeReciboLayout } from './reciboLayout';
+
 /** Formatos de impresión de boleta / recibo */
 export const FORMATOS_RECIBO = [
   { id: 'termico_58', label: 'Térmico 58 mm', descripcion: 'Impresoras POS pequeñas' },
@@ -22,17 +24,27 @@ export const DEFAULT_RECIBO_CONFIG = {
   pie_texto: '',
   color_primario: '#6366f1',
   tamano_fuente: 'normal',
+  editor_visual: true,
 };
 
 export function mergeReciboConfig(guardado) {
-  if (!guardado || typeof guardado !== 'object') return { ...DEFAULT_RECIBO_CONFIG };
+  if (!guardado || typeof guardado !== 'object') {
+    const formato = DEFAULT_RECIBO_CONFIG.formato;
+    return {
+      ...DEFAULT_RECIBO_CONFIG,
+      layout: getDefaultLayout(formato),
+    };
+  }
   const diseño =
     guardado.diseño && typeof guardado.diseño === 'object'
       ? guardado.diseño
       : guardado;
-  return {
+  const formato = guardado.formato || diseño.formato || DEFAULT_RECIBO_CONFIG.formato;
+  const merged = {
     ...DEFAULT_RECIBO_CONFIG,
     ...diseño,
-    formato: guardado.formato || diseño.formato || DEFAULT_RECIBO_CONFIG.formato,
+    formato,
   };
+  merged.layout = mergeReciboLayout(formato, diseño.layout || guardado.layout);
+  return merged;
 }
