@@ -3,11 +3,13 @@
  * MOCK: registra en memoria. PRODUCCIÓN: webhook / Resend / SendGrid / Edge Function.
  */
 
-import { MOCK_MODE } from '../config/supabaseClient';
+import { MOCK_MODE, supabase } from '../config/supabaseClient';
 import { getEmailConfig, registrarCorreoEnviado } from './dataService';
 
 const APP_URL = process.env.REACT_APP_APP_URL || 'https://ventadeturnos.com';
-const EMAIL_WEBHOOK_URL = process.env.REACT_APP_EMAIL_WEBHOOK_URL || '';
+const EMAIL_WEBHOOK_URL =
+  process.env.REACT_APP_EMAIL_WEBHOOK_URL ||
+  (process.env.NODE_ENV === 'production' ? '/api/send-email' : '');
 
 export function construirAsuntoBoleta({ turno, cortejo }) {
   const etiqueta = turno?.etiqueta || turno?.tipo_turno || 'Turno';
@@ -135,9 +137,15 @@ export async function enviarBoletaPorCorreo({
   }
 
   try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const headers = { 'Content-Type': 'application/json' };
+    if (session?.access_token) {
+      headers.Authorization = `Bearer ${session.access_token}`;
+    }
+
     const res = await fetch(EMAIL_WEBHOOK_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         from: `${emailConfig.nombre_remitente} <${emailConfig.correo_remitente}>`,
         reply_to: emailConfig.correo_respuesta || emailConfig.correo_remitente,
@@ -148,9 +156,29 @@ export async function enviarBoletaPorCorreo({
         enlace_boleta: datos.enlaceBoleta,
       }),
     });
-    if (!res.ok) throw new Error('Error al enviar correo');
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, error: json.error || 'Error al enviar correo' };
+    }
+
+    await registrarCorreoEnviado(organizacionId, {
+      ...datos,
+      destinatario: cargador.correo,
+      estado: 'enviado',
+      enviado_en: new Date().toISOString(),
+      modo: 'gmail',
+    });
+
     return { ok: true, destinatario: cargador.correo, asunto: datos.asunto };
   } catch (err) {
-    return { ok: false, error: err.message || 'No se pudo enviar el correo' };
+    const msg = err?.message || '';
+    if (msg.includes('Failed to fetch')) {
+      return {
+        ok: false,
+        error:
+          'No se pudo conectar con el servidor de correo. Verifique GMAIL_USER y GMAIL_APP_PASSWORD en Vercel.',
+      };
+    }
+    return { ok: false, error: msg || 'No se pudo enviar el correo' };
   }
 }

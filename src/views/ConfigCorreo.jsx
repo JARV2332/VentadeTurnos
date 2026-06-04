@@ -120,6 +120,11 @@ export default function ConfigCorreo() {
             Envío real activo: las boletas se envían al correo del cargador al confirmar la venta.
           </p>
         )}
+        <p className="text-muted correo-ayuda__nota" style={{ marginTop: '0.75rem' }}>
+          Con Gmail SMTP, el <strong>correo remitente</strong> debe coincidir con la cuenta configurada en
+          Vercel (<code>GMAIL_USER</code>). La contraseña de aplicación va solo en Vercel, nunca en esta
+          pantalla.
+        </p>
       </section>
 
       <div className="config-grid">
