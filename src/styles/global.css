@@ -980,6 +980,12 @@ body {
 .legend-dot--reservado { background: #fbbf24; }
 .legend-dot--vendido { background: #475569; }
 
+.app-content--taquilla {
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
 .taquilla-layout {
   display: grid;
   grid-template-columns: 1fr 300px;
@@ -991,6 +997,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  min-width: 0;
 }
 
 /* Cartulina de turno (como el turno físico) */
@@ -3191,11 +3198,21 @@ body {
     border-top: 1px dashed var(--border);
   }
 
+  .app-content--taquilla {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0));
+  }
+
   .taquilla-layout {
     gap: 0;
+    display: block;
+  }
+
+  .turnos-lista {
+    padding-bottom: 1.5rem;
   }
 
   .app-content--taquilla.taquilla--venta-abierta {
+    overflow: hidden;
     padding-bottom: 0;
   }
 

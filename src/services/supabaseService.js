@@ -331,8 +331,8 @@ export async function buscarCargadorPorWhatsapp(organizacionId, whatsapp) {
 export async function reservarBrazo(brazoId, mesaId, vendedorId) {
   const { data, error } = await supabase.rpc('reservar_brazo', {
     p_brazo_id: brazoId,
-    p_mesa_id: mesaId,
-    p_vendedor_id: vendedorId,
+    p_mesa_id: mesaId ?? null,
+    p_vendedor_id: vendedorId ?? null,
   });
   if (error) {
     if (isMissingRpc(error)) {
@@ -476,12 +476,27 @@ export async function getFinanzasByOrg(organizacionId) {
     };
   });
 
+  const porVendedor = {};
+  const porMetodo = { efectivo: 0, transferencia: 0, tarjeta: 0 };
+  ventas.forEach((b) => {
+    const vid = b.vendedor_id || 'sin-asignar';
+    if (!porVendedor[vid]) porVendedor[vid] = { ventas: 0, total: 0 };
+    porVendedor[vid].ventas += 1;
+    porVendedor[vid].total += Number(b.precio_pagado || 0);
+    const metodo = b.metodo_pago || 'efectivo';
+    if (porMetodo[metodo] !== undefined) {
+      porMetodo[metodo] += Number(b.precio_pagado || 0);
+    }
+  });
+
   return {
     ventas,
     recaudado,
     presupuestoTotal,
     brazosVendidos: brazos?.length || 0,
     porMesa,
+    porVendedor,
+    porMetodo,
   };
 }
 

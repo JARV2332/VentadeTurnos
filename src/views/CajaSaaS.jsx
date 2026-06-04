@@ -19,7 +19,34 @@ export default function CajaSaaS() {
   const [comprobanteVer, setComprobanteVer] = useState(null);
 
   useEffect(() => {
-    const refresh = async () => setFinanzas(await getFinanzasByOrg(organizacionId));
+    const refresh = async () => {
+      try {
+        const data = await getFinanzasByOrg(organizacionId);
+        setFinanzas({
+          ventas: [],
+          recaudado: 0,
+          presupuestoTotal: 0,
+          porMesa: [],
+          porVendedor: {},
+          porMetodo: { efectivo: 0, transferencia: 0, tarjeta: 0 },
+          ...data,
+          ventas: Array.isArray(data?.ventas) ? data.ventas : [],
+          porMesa: Array.isArray(data?.porMesa) ? data.porMesa : [],
+          porVendedor: data?.porVendedor && typeof data.porVendedor === 'object' ? data.porVendedor : {},
+          porMetodo: data?.porMetodo || { efectivo: 0, transferencia: 0, tarjeta: 0 },
+        });
+      } catch (err) {
+        console.error('Error al cargar finanzas:', err);
+        setFinanzas({
+          ventas: [],
+          recaudado: 0,
+          presupuestoTotal: 0,
+          porMesa: [],
+          porVendedor: {},
+          porMetodo: { efectivo: 0, transferencia: 0, tarjeta: 0 },
+        });
+      }
+    };
     refresh();
     return subscribeData(organizacionId, refresh);
   }, [organizacionId]);
@@ -35,7 +62,7 @@ export default function CajaSaaS() {
     );
   }
 
-  let ventasFiltradas = finanzas.ventas;
+  let ventasFiltradas = finanzas.ventas || [];
   if (filtroMesa !== 'all') {
     ventasFiltradas = ventasFiltradas.filter((v) => v.mesa_id === filtroMesa);
   }
@@ -92,7 +119,7 @@ export default function CajaSaaS() {
           Filtrar por vendedor
           <select value={filtroVendedor} onChange={(e) => setFiltroVendedor(e.target.value)}>
             <option value="all">Todos los vendedores</option>
-            {Object.keys(finanzas.porVendedor).map((vid) => (
+            {Object.keys(finanzas.porVendedor || {}).map((vid) => (
               <option key={vid} value={vid}>{VENDEDOR_NOMBRES[vid] || vid}</option>
             ))}
           </select>
@@ -141,7 +168,7 @@ export default function CajaSaaS() {
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(finanzas.porVendedor).map(([vid, data]) => (
+                {Object.entries(finanzas.porVendedor || {}).map(([vid, data]) => (
                   <tr key={vid}>
                     <td><strong>{VENDEDOR_NOMBRES[vid] || vid}</strong></td>
                     <td>{data.ventas}</td>
