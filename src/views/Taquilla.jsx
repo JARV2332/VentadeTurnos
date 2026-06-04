@@ -22,6 +22,9 @@ import {
 } from '../utils/pagoUtils';
 import { formatPrecio } from '../utils/boletaUtils';
 import { repertorioTurnoLista } from '../utils/turnoUtils';
+import { isValidGtWhatsapp } from '../utils/phoneGtUtils';
+import PhoneInput502 from '../components/PhoneInput502';
+import { construirEnlaceBoletaWhatsapp } from '../utils/whatsappUtils';
 
 export default function Taquilla() {
   const { organizacionId, organizacion, user } = useAuth();
@@ -170,8 +173,8 @@ export default function Taquilla() {
       setError('Ingrese el nombre del cargador.');
       return;
     }
-    if (!form.whatsapp || form.whatsapp.length < 11) {
-      setError('WhatsApp debe tener formato 502XXXXXXXX.');
+    if (!isValidGtWhatsapp(form.whatsapp)) {
+      setError('Ingrese los 8 dígitos del WhatsApp (después de +502).');
       return;
     }
     if (!form.correo?.trim()) {
@@ -236,7 +239,14 @@ export default function Taquilla() {
       cortejo,
     });
 
-    setVentaOk({ ...res, email: emailRes, metodo_pago: pago.metodo_pago });
+    setVentaOk({
+      ...res,
+      email: emailRes,
+      metodo_pago: pago.metodo_pago,
+      turno,
+      cortejo,
+      whatsappVenta: form.whatsapp,
+    });
     resetVentaPanel();
     setFinalizando(false);
   };
@@ -249,6 +259,16 @@ export default function Taquilla() {
   const repertorioSel = turnoSel ? repertorioTurnoLista(turnoSel) : [];
   const necesitaComprobante = metodoRequiereComprobante(pago.metodo_pago);
 
+  const enlaceWhatsappBoleta =
+    ventaOk &&
+    construirEnlaceBoletaWhatsapp({
+      cargador: ventaOk.cargador,
+      brazo: ventaOk.data,
+      turno: ventaOk.turno,
+      cortejo: ventaOk.cortejo,
+      organizacion,
+    });
+
   return (
     <Layout
       title="Taquilla"
@@ -256,25 +276,56 @@ export default function Taquilla() {
       className={`app-content--taquilla${selectedBrazo ? ' taquilla--venta-abierta' : ''}`}
     >
       {ventaOk && (
-        <div className="alert alert--success">
-          <div>
-            <strong>Venta completada</strong> · Boleta {ventaOk.codigo}
-            <span className="alert__sub">
-              {' '}· Pago: {labelMetodoPago(ventaOk.metodo_pago)}
-            </span>
-            {ventaOk.email?.ok && (
-              <span className="alert__sub">
-                {' '}· Boleta enviada a <strong>{ventaOk.email.destinatario}</strong>
-                {ventaOk.email.demo && ' (demo)'}
-              </span>
-            )}
+        <>
+          <div className="venta-exito-overlay" role="dialog" aria-modal="true" aria-labelledby="venta-exito-titulo">
+            <div className="venta-exito-card">
+              <h2 id="venta-exito-titulo" className="venta-exito-card__titulo">Venta completada</h2>
+              <p className="venta-exito-card__codigo">
+                Boleta <strong>{ventaOk.codigo}</strong>
+                {' · '}
+                {labelMetodoPago(ventaOk.metodo_pago)}
+              </p>
+              {ventaOk.email?.ok && (
+                <p className="venta-exito-card__email">
+                  Correo enviado a <strong>{ventaOk.email.destinatario}</strong>
+                  {ventaOk.email.demo && ' (demo)'}
+                </p>
+              )}
+              {enlaceWhatsappBoleta ? (
+                <>
+                  <p className="venta-exito-card__hint">
+                    Toque el botón para abrir WhatsApp con el mensaje y el enlace de la boleta (QR en el link).
+                  </p>
+                  <a
+                    href={enlaceWhatsappBoleta}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn--whatsapp btn--block"
+                  >
+                    Enviar boleta por WhatsApp
+                  </a>
+                </>
+              ) : (
+                <p className="venta-exito-card__hint venta-exito-card__hint--warn">
+                  No se pudo armar el enlace de WhatsApp (revise que el número tenga 8 dígitos después de +502).
+                </p>
+              )}
+              <div className="venta-exito-card__links">
+                <Link to="/impresion" className="btn btn--ghost btn--sm">Imprimir boleta</Link>
+                <Link to="/entrega" className="btn btn--ghost btn--sm">Entrega</Link>
+              </div>
+              <button type="button" className="btn btn--primary btn--block venta-exito-card__cerrar" onClick={() => setVentaOk(null)}>
+                Cerrar y seguir vendiendo
+              </button>
+            </div>
           </div>
-          <div className="alert__actions">
-            <Link to="/entrega" className="alert__link">Entrega →</Link>
-            <Link to="/impresion" className="alert__link">Imprimir →</Link>
-            <button type="button" className="alert__close" onClick={() => setVentaOk(null)}>×</button>
+          <div className="alert alert--success">
+            <div>
+              <strong>Venta completada</strong> · Boleta {ventaOk.codigo}
+            </div>
+            <button type="button" className="alert__close" onClick={() => setVentaOk(null)} aria-label="Cerrar">×</button>
           </div>
-        </div>
+        </>
       )}
       {error && <div className="alert alert--error">{error}</div>}
 
@@ -365,16 +416,13 @@ export default function Taquilla() {
                 <h3>Datos del cargador</h3>
                 <p className="venta-panel__timer">Reserva activa · 5 min</p>
                 <form onSubmit={handleContinuarAPago}>
-                  <label>
-                    WhatsApp (502XXXXXXXX)
-                    <input
-                      type="tel"
-                      placeholder="50212345678"
-                      value={form.whatsapp}
-                      onChange={(e) => handleWhatsappChange(e.target.value)}
-                      required
-                    />
-                  </label>
+                  <PhoneInput502
+                    label="WhatsApp"
+                    value={form.whatsapp}
+                    onChange={handleWhatsappChange}
+                    required
+                    hint="Solo los 8 números; el +502 ya está incluido"
+                  />
                   <label>
                     Correo electrónico (boleta)
                     <input
@@ -402,14 +450,12 @@ export default function Taquilla() {
                       onChange={(e) => setForm({ ...form, cui_o_identificacion: e.target.value })}
                     />
                   </label>
-                  <label>
-                    Teléfono emergencia
-                    <input
-                      type="tel"
-                      value={form.telefono_emergencia}
-                      onChange={(e) => setForm({ ...form, telefono_emergencia: e.target.value })}
-                    />
-                  </label>
+                  <PhoneInput502
+                    label="Teléfono emergencia (opcional)"
+                    value={form.telefono_emergencia}
+                    onChange={(val) => setForm({ ...form, telefono_emergencia: val })}
+                    hint="Opcional"
+                  />
                   <div className="venta-panel__actions">
                     <button type="button" className="btn btn--ghost" onClick={resetVentaPanel}>
                       Cancelar

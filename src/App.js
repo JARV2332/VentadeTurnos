@@ -15,6 +15,7 @@ import Impresion from './views/Impresion';
 import EntregaTurno from './views/EntregaTurno';
 import PerfilUsuario from './views/PerfilUsuario';
 import PlataformaAdmin from './views/PlataformaAdmin';
+import BoletaPublica from './views/BoletaPublica';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/boleta/:codigo" element={<BoletaPublica />} />
           <Route
             path="/plataforma"
             element={
