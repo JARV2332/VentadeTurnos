@@ -10,7 +10,7 @@ export const ELEMENTOS_RECIBO = [
   { id: 'titulo', label: 'Título' },
   { id: 'evento', label: 'Evento' },
   { id: 'turno', label: 'Turno' },
-  { id: 'cargador', label: 'Cargador' },
+  { id: 'cargador', label: 'Devoto(a)' },
   { id: 'qr', label: 'Código QR' },
   { id: 'precio', label: 'Precio' },
   { id: 'pie', label: 'Pie de boleta' },

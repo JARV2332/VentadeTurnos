@@ -58,7 +58,7 @@ export default function ReciboBlockContent({
       if (cfg.mostrar_cargador === false) return null;
       return (
         <div className="recibo-block__cargador">
-          <small>Cargador</small>
+          <small>Devoto(a)</small>
           <strong>{cargador?.nombre_completo || '—'}</strong>
         </div>
       );

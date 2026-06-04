@@ -109,7 +109,7 @@ export async function enviarBoletaPorCorreo({
   }
 
   if (!cargador?.correo?.trim()) {
-    return { ok: false, error: 'El cargador no tiene correo electrónico' };
+    return { ok: false, error: 'El devoto(a) no tiene correo electrónico' };
   }
 
   if (!emailConfig?.correo_remitente?.trim()) {

@@ -10,6 +10,7 @@ import {
   reservarBrazo,
   confirmarVenta,
   buscarCargadorPorWhatsapp,
+  buscarCargadorPorCui,
   getCargadorById,
 } from '../services/dataService';
 import { enviarBoletaPorCorreo } from '../services/emailService';
@@ -22,6 +23,8 @@ import {
 import { formatPrecio } from '../utils/boletaUtils';
 import { repertorioTurnoLista } from '../utils/turnoUtils';
 import { isValidGtWhatsapp, fullGtPhoneFromLocal } from '../utils/phoneGtUtils';
+import { normalizarCui, isValidCui, CUI_DIGITS } from '../utils/cuiUtils';
+import { TERMINO_DEVOTO, TERMINO_DEVOTO_ARTICULO } from '../constants/terminologia';
 import PhoneInput502 from '../components/PhoneInput502';
 import VentaExitoModal from '../components/VentaExitoModal';
 
@@ -51,6 +54,14 @@ export default function Taquilla() {
   const [mesaActiva, setMesaActiva] = useState(null);
 
   const vendedorAuthId = user?.authUserId || user?.id;
+
+  const devotoToForm = (devoto) => ({
+    nombre_completo: devoto?.nombre_completo || '',
+    whatsapp: devoto?.whatsapp || '',
+    correo: devoto?.correo || '',
+    cui_o_identificacion: normalizarCui(devoto?.cui_o_identificacion || ''),
+    telefono_emergencia: devoto?.telefono_emergencia || '',
+  });
 
   const resetVentaPanel = () => {
     setSelectedBrazo(null);
@@ -153,19 +164,24 @@ export default function Taquilla() {
     }
   };
 
+  const handleCuiChange = async (value) => {
+    const cui = normalizarCui(value);
+    setForm((f) => ({ ...f, cui_o_identificacion: cui }));
+    if (isValidCui(cui)) {
+      const existente = await buscarCargadorPorCui(organizacionId, cui);
+      if (existente) {
+        setForm(devotoToForm(existente));
+      }
+    }
+  };
+
   const handleWhatsappChange = async (value) => {
     const limpio = value.replace(/\D/g, '').slice(0, 11);
     setForm((f) => ({ ...f, whatsapp: limpio }));
     if (limpio.length >= 11) {
       const existente = await buscarCargadorPorWhatsapp(organizacionId, limpio);
       if (existente) {
-        setForm({
-          nombre_completo: existente.nombre_completo,
-          whatsapp: existente.whatsapp,
-          correo: existente.correo || '',
-          cui_o_identificacion: existente.cui_o_identificacion || '',
-          telefono_emergencia: existente.telefono_emergencia || '',
-        });
+        setForm(devotoToForm(existente));
       }
     }
   };
@@ -173,8 +189,12 @@ export default function Taquilla() {
   const handleContinuarAPago = (e) => {
     e.preventDefault();
     setError('');
+    if (!isValidCui(form.cui_o_identificacion)) {
+      setError('Ingrese un CUI válido (13 dígitos).');
+      return;
+    }
     if (!form.nombre_completo?.trim()) {
-      setError('Ingrese el nombre del cargador.');
+      setError(`Ingrese el nombre ${TERMINO_DEVOTO_ARTICULO}.`);
       return;
     }
     if (!isValidGtWhatsapp(form.whatsapp)) {
@@ -362,7 +382,7 @@ export default function Taquilla() {
                 </button>
               </div>
             <div className="venta-pasos">
-              <span className={pasoVenta === 1 ? 'venta-paso--active' : 'venta-paso--done'}>1. Cargador</span>
+              <span className={pasoVenta === 1 ? 'venta-paso--active' : 'venta-paso--done'}>1. {TERMINO_DEVOTO}</span>
               <span className={pasoVenta === 2 ? 'venta-paso--active' : ''}>2. Pago</span>
             </div>
 
@@ -383,9 +403,33 @@ export default function Taquilla() {
 
             {pasoVenta === 1 && (
               <>
-                <h3>Datos del cargador</h3>
+                <h3>Datos {TERMINO_DEVOTO_ARTICULO}</h3>
                 <p className="venta-panel__timer">Reserva activa · 5 min</p>
                 <form onSubmit={handleContinuarAPago}>
+                  <label>
+                    CUI / DPI
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="2998722460101"
+                      value={form.cui_o_identificacion}
+                      onChange={(e) => handleCuiChange(e.target.value)}
+                      maxLength={CUI_DIGITS}
+                      required
+                    />
+                    <small className="field-hint">
+                      13 dígitos. Si ya está registrado, se cargan sus datos automáticamente.
+                    </small>
+                  </label>
+                  <label>
+                    Nombre {TERMINO_DEVOTO_ARTICULO}
+                    <input
+                      type="text"
+                      value={form.nombre_completo}
+                      onChange={(e) => setForm({ ...form, nombre_completo: e.target.value })}
+                      required
+                    />
+                  </label>
                   <PhoneInput502
                     label="WhatsApp"
                     value={form.whatsapp}
@@ -401,23 +445,6 @@ export default function Taquilla() {
                       value={form.correo}
                       onChange={(e) => setForm({ ...form, correo: e.target.value })}
                       required
-                    />
-                  </label>
-                  <label>
-                    Nombre del cargador
-                    <input
-                      type="text"
-                      value={form.nombre_completo}
-                      onChange={(e) => setForm({ ...form, nombre_completo: e.target.value })}
-                      required
-                    />
-                  </label>
-                  <label>
-                    CUI / Identificación
-                    <input
-                      type="text"
-                      value={form.cui_o_identificacion}
-                      onChange={(e) => setForm({ ...form, cui_o_identificacion: e.target.value })}
                     />
                   </label>
                   <PhoneInput502

@@ -192,6 +192,10 @@ CREATE INDEX IF NOT EXISTS idx_brazos_turno ON public.brazos(turno_id);
 CREATE INDEX IF NOT EXISTS idx_brazos_qr ON public.brazos(codigo_boleta_qr);
 CREATE INDEX IF NOT EXISTS idx_cargadores_whatsapp ON public.cargadores_organizacion(organizacion_id, whatsapp);
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cargadores_cui_org
+  ON public.cargadores_organizacion (organizacion_id, cui_o_identificacion)
+  WHERE cui_o_identificacion IS NOT NULL AND trim(cui_o_identificacion) <> '';
+
 -- ── Helpers sesión (después de crear usuarios_app y roles_organizacion) ──
 CREATE OR REPLACE FUNCTION public.get_user_organizacion_id()
 RETURNS UUID

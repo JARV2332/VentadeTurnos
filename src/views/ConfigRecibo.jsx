@@ -234,7 +234,7 @@ export default function ConfigRecibo() {
                 ['mostrar_evento', 'Nombre del evento / procesión'],
                 ['mostrar_turno', 'Número de turno'],
                 ['mostrar_etiqueta_turno', 'Etiqueta del turno'],
-                ['mostrar_cargador', 'Nombre del cargador'],
+                ['mostrar_cargador', 'Nombre del devoto(a)'],
                 ['mostrar_precio', 'Precio pagado'],
                 ['mostrar_codigo_texto', 'Código alfanumérico bajo QR'],
               ].map(([key, label]) => (

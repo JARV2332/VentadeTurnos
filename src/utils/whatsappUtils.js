@@ -49,7 +49,7 @@ export function construirMensajeBoletaWhatsapp({
   ].join('\n');
 }
 
-/** URL wa.me al WhatsApp del cargador (502XXXXXXXX). */
+/** URL wa.me al WhatsApp del devoto(a) (502XXXXXXXX). */
 export function construirEnlaceWhatsApp(telefono502, mensaje) {
   const digits = String(telefono502 || '').replace(/\D/g, '');
   if (!isValidGtWhatsapp(digits)) return null;

@@ -231,7 +231,7 @@ export default function ConfigImportReservas() {
         </h3>
         <p className="text-muted config-hint">
           Los espacios importados aparecen en <strong>amarillo (reservado)</strong> en Taquilla.
-          Puede completar la venta desde taquilla con los datos del cargador.
+          Puede completar la venta desde taquilla con los datos del devoto(a).
         </p>
         {resumen.length === 0 ? (
           <p className="text-muted">Seleccione una procesión.</p>

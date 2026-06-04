@@ -212,6 +212,16 @@ export function marcarEntregadoMock(brazoId, organizacionId, usuarioId) {
   return { data: actualizado };
 }
 
+export function buscarCargadorPorCui(organizacionId, cui) {
+  const limpio = String(cui || '').replace(/\D/g, '');
+  if (!limpio) return null;
+  return store.cargadores.find(
+    (c) =>
+      c.organizacion_id === organizacionId &&
+      String(c.cui_o_identificacion || '').replace(/\D/g, '') === limpio
+  );
+}
+
 export function buscarCargadorPorWhatsapp(organizacionId, whatsapp) {
   const limpio = whatsapp.replace(/\D/g, '');
   return store.cargadores.find(
@@ -260,17 +270,31 @@ export function confirmarVentaMock(brazoId, cargadorData, precioPagado, organiza
   }
 
   const whatsappReq = cargadorData.whatsapp?.replace(/\D/g, '');
-  if (!whatsappReq || whatsappReq.length < 8) {
+  const cuiNorm = String(cargadorData.cui_o_identificacion || '').replace(/\D/g, '');
+  if (!whatsappReq || whatsappReq.length < 11) {
     return { error: 'WhatsApp obligatorio para confirmar la venta' };
   }
+  if (cuiNorm.length !== 13) {
+    return { error: 'Ingrese un CUI válido (13 dígitos).' };
+  }
 
-  let cargador = buscarCargadorPorWhatsapp(organizacionId, cargadorData.whatsapp);
+  let cargador = buscarCargadorPorCui(organizacionId, cuiNorm);
+  const porWhatsapp = buscarCargadorPorWhatsapp(organizacionId, cargadorData.whatsapp);
+  if (cargador && porWhatsapp && cargador.id !== porWhatsapp.id) {
+    return {
+      error:
+        'Este CUI y este WhatsApp están registrados en devotos distintos. Verifique los datos.',
+    };
+  }
+  if (!cargador) cargador = porWhatsapp;
+
   if (!cargador) {
     cargador = {
       id: `carg-${Date.now()}`,
       organizacion_id: organizacionId,
       ...cargadorData,
-      whatsapp: cargadorData.whatsapp.replace(/\D/g, ''),
+      whatsapp: whatsappReq,
+      cui_o_identificacion: cuiNorm,
       correo: cargadorData.correo?.trim() || '',
     };
     store.cargadores.push(cargador);
@@ -278,8 +302,9 @@ export function confirmarVentaMock(brazoId, cargadorData, precioPagado, organiza
     cargador = {
       ...cargador,
       nombre_completo: cargadorData.nombre_completo || cargador.nombre_completo,
+      whatsapp: whatsappReq,
       correo: cargadorData.correo || cargador.correo,
-      cui_o_identificacion: cargadorData.cui_o_identificacion || cargador.cui_o_identificacion,
+      cui_o_identificacion: cuiNorm,
       telefono_emergencia: cargadorData.telefono_emergencia || cargador.telefono_emergencia,
     };
     store.cargadores = store.cargadores.map((c) =>
@@ -626,9 +651,15 @@ function buscarBrazoPorCoordenadas(cortejoId, organizacionId, numeroTurno, numer
 }
 
 function upsertCargadorParcial(organizacionId, datos) {
+  const cui = String(datos.cui || '').replace(/\D/g, '');
   const whatsapp = datos.whatsapp?.replace(/\D/g, '');
-  if (whatsapp && whatsapp.length >= 8) {
-    let cargador = buscarCargadorPorWhatsapp(organizacionId, whatsapp);
+
+  let cargador = cui.length === 13 ? buscarCargadorPorCui(organizacionId, cui) : null;
+  if (!cargador && whatsapp && whatsapp.length >= 11) {
+    cargador = buscarCargadorPorWhatsapp(organizacionId, whatsapp);
+  }
+
+  if (whatsapp && whatsapp.length >= 11) {
     if (!cargador) {
       cargador = {
         id: `carg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -636,7 +667,7 @@ function upsertCargadorParcial(organizacionId, datos) {
         nombre_completo: datos.nombre?.trim() || 'Sin nombre',
         whatsapp,
         correo: datos.correo?.trim() || '',
-        cui_o_identificacion: datos.cui?.trim() || '',
+        cui_o_identificacion: cui || '',
         telefono_emergencia: datos.telefono_emergencia?.trim() || '',
       };
       store.cargadores.push(cargador);
@@ -645,9 +676,10 @@ function upsertCargadorParcial(organizacionId, datos) {
         ...cargador,
         nombre_completo: datos.nombre?.trim() || cargador.nombre_completo,
         correo: datos.correo?.trim() || cargador.correo,
-        cui_o_identificacion: datos.cui?.trim() || cargador.cui_o_identificacion,
+        cui_o_identificacion: cui || cargador.cui_o_identificacion,
         telefono_emergencia:
           datos.telefono_emergencia?.trim() || cargador.telefono_emergencia,
+        whatsapp: whatsapp || cargador.whatsapp,
       };
       store.cargadores = store.cargadores.map((c) =>
         c.id === cargador.id ? cargador : c
@@ -655,6 +687,8 @@ function upsertCargadorParcial(organizacionId, datos) {
     }
     return cargador;
   }
+
+  if (cargador) return cargador;
   return null;
 }
 

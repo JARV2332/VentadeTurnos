@@ -45,6 +45,11 @@ export const buscarCargadorPorWhatsapp = (organizacionId, whatsapp) =>
     ? sb.buscarCargadorPorWhatsapp(organizacionId, whatsapp)
     : Promise.resolve(mock.buscarCargadorPorWhatsapp(organizacionId, whatsapp));
 
+export const buscarCargadorPorCui = (organizacionId, cui) =>
+  useSb()
+    ? sb.buscarCargadorPorCui(organizacionId, cui)
+    : Promise.resolve(mock.buscarCargadorPorCui(organizacionId, cui));
+
 export const reservarBrazo = (brazoId, mesaId, vendedorId, organizacionId) =>
   useSb()
     ? sb.reservarBrazo(brazoId, mesaId, vendedorId)

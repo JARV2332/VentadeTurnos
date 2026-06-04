@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { labelMetodoPago } from '../utils/pagoUtils';
 import { construirEnlaceBoletaWhatsapp } from '../utils/whatsappUtils';
+import { TERMINO_DEVOTO_A } from '../constants/terminologia';
 
 /**
  * Modal de venta completada (portal en body para no quedar detrás del panel móvil).
@@ -73,7 +74,7 @@ export default function VentaExitoModal({ venta, organizacion, onCerrar }) {
         {enlaceWhatsapp ? (
           <>
             <p className="venta-exito-card__hint">
-              Abra WhatsApp al cargador con el mensaje y el enlace de la boleta (QR en el link).
+              Abra WhatsApp {TERMINO_DEVOTO_A} con el mensaje y el enlace de la boleta (QR en el link).
             </p>
             <a
               href={enlaceWhatsapp}

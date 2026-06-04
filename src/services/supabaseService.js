@@ -317,6 +317,20 @@ export async function getCargadorById(cargadorId) {
   return data;
 }
 
+import { normalizarCui, isValidCui } from '../utils/cuiUtils';
+
+export async function buscarCargadorPorCui(organizacionId, cui) {
+  const limpio = normalizarCui(cui);
+  if (!limpio) return null;
+  const { data } = await supabase
+    .from('cargadores_organizacion')
+    .select('*')
+    .eq('organizacion_id', organizacionId)
+    .eq('cui_o_identificacion', limpio)
+    .maybeSingle();
+  return data;
+}
+
 export async function buscarCargadorPorWhatsapp(organizacionId, whatsapp) {
   const limpio = whatsapp.replace(/\D/g, '');
   const { data } = await supabase
@@ -343,42 +357,61 @@ export async function reservarBrazo(brazoId, mesaId, vendedorId) {
   return { data };
 }
 
+async function upsertDevotoVenta(orgId, cargadorData) {
+  const whatsapp = cargadorData.whatsapp?.replace(/\D/g, '');
+  const cuiNorm = normalizarCui(cargadorData.cui_o_identificacion);
+  if (!whatsapp) return { error: 'WhatsApp obligatorio' };
+  if (!isValidCui(cuiNorm)) {
+    return { error: 'Ingrese un CUI válido (13 dígitos).' };
+  }
+  if (!cargadorData.nombre_completo?.trim()) {
+    return { error: 'Nombre del devoto(a) obligatorio.' };
+  }
+
+  let devoto = await buscarCargadorPorCui(orgId, cuiNorm);
+  const porWhatsapp = await buscarCargadorPorWhatsapp(orgId, whatsapp);
+
+  if (devoto && porWhatsapp && devoto.id !== porWhatsapp.id) {
+    return {
+      error:
+        'Este CUI y este WhatsApp están registrados en devotos distintos. Verifique los datos.',
+    };
+  }
+  if (!devoto) devoto = porWhatsapp;
+
+  const campos = {
+    nombre_completo: cargadorData.nombre_completo.trim(),
+    whatsapp,
+    correo: cargadorData.correo?.trim() || '',
+    cui_o_identificacion: cuiNorm,
+    telefono_emergencia: cargadorData.telefono_emergencia || '',
+  };
+
+  if (!devoto) {
+    const { data, error } = await supabase
+      .from('cargadores_organizacion')
+      .insert({ organizacion_id: orgId, ...campos })
+      .select()
+      .single();
+    if (error) return err(error);
+    return { cargador: data };
+  }
+
+  const { data, error } = await supabase
+    .from('cargadores_organizacion')
+    .update(campos)
+    .eq('id', devoto.id)
+    .select()
+    .single();
+  if (error) return err(error);
+  return { cargador: data };
+}
+
 export async function confirmarVenta(brazoId, cargadorData, precioPagado, pagoData = {}) {
   const orgId = cargadorData.organizacion_id;
-  const whatsapp = cargadorData.whatsapp?.replace(/\D/g, '');
-  if (!whatsapp) return { error: 'WhatsApp obligatorio' };
-
-  let cargador = await buscarCargadorPorWhatsapp(orgId, whatsapp);
-  if (!cargador) {
-    const { data, error } = await supabase
-      .from('cargadores_organizacion')
-      .insert({
-        organizacion_id: orgId,
-        nombre_completo: cargadorData.nombre_completo,
-        whatsapp,
-        correo: cargadorData.correo?.trim() || '',
-        cui_o_identificacion: cargadorData.cui_o_identificacion || '',
-        telefono_emergencia: cargadorData.telefono_emergencia || '',
-      })
-      .select()
-      .single();
-    if (error) return err(error);
-    cargador = data;
-  } else {
-    const { data, error } = await supabase
-      .from('cargadores_organizacion')
-      .update({
-        nombre_completo: cargadorData.nombre_completo || cargador.nombre_completo,
-        correo: cargadorData.correo || cargador.correo,
-        cui_o_identificacion: cargadorData.cui_o_identificacion || cargador.cui_o_identificacion,
-        telefono_emergencia: cargadorData.telefono_emergencia || cargador.telefono_emergencia,
-      })
-      .eq('id', cargador.id)
-      .select()
-      .single();
-    if (error) return err(error);
-    cargador = data;
-  }
+  const upsert = await upsertDevotoVenta(orgId, cargadorData);
+  if (upsert.error) return upsert;
+  const cargador = upsert.cargador;
 
   const { data: brazo, error } = await supabase.rpc('confirmar_venta_brazo', {
     p_brazo_id: brazoId,

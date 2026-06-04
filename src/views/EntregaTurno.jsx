@@ -51,7 +51,7 @@ export default function EntregaTurno() {
       setError(res.error);
       return;
     }
-    setOkMsg(`Turno entregado correctamente a ${resultado.cargador?.nombre_completo}.`);
+    setOkMsg(`Turno entregado correctamente a ${resultado.cargador?.nombre_completo} (devoto(a)).`);
     setResultado({
       ...resultado,
       brazo: res.data,

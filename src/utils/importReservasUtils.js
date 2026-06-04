@@ -7,7 +7,7 @@ export const PLANTILLA_COLUMNAS = [
   { key: 'turno', label: 'Turno', obligatorio: true, ejemplo: '7' },
   { key: 'brazo', label: 'Brazo', obligatorio: true, ejemplo: '3' },
   { key: 'lado', label: 'Lado', obligatorio: true, ejemplo: 'Izquierda' },
-  { key: 'nombre', label: 'Nombre cargador', obligatorio: false, ejemplo: 'Juan Pérez' },
+  { key: 'nombre', label: 'Nombre devoto(a)', obligatorio: false, ejemplo: 'Juan Pérez' },
   { key: 'whatsapp', label: 'WhatsApp', obligatorio: false, ejemplo: '50212345678' },
   { key: 'correo', label: 'Correo', obligatorio: false, ejemplo: 'juan@correo.com' },
   { key: 'cui', label: 'CUI / ID', obligatorio: false, ejemplo: '' },
