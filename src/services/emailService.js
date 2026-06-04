@@ -40,8 +40,11 @@ Su turno #${brazo.numero_turno} (${etiqueta}) para la procesión "${cortejo?.nom
   • Código de boleta: ${brazo.codigo_boleta_qr}
   • Monto pagado: ${precio}
 
-Para la entrega del turno físico, presente la boleta adjunta con su código QR.
-En taquilla escanearán el QR para validar su compra y entregarle el turno de cartulina.
+En este correo encontrará su código QR (imagen adjunta y en el cuerpo del mensaje).
+También puede abrir su boleta digital aquí: ${enlaceBoleta}
+
+Para la entrega del turno físico, presente ese QR en taquilla.
+En taquilla escanearán el código para validar su compra y entregarle el turno de cartulina.
 
 Organización: ${organizacion?.nombre_oficial}
 ${emailConfig?.pie_correo || ''}

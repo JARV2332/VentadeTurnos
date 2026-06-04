@@ -3,6 +3,7 @@
  */
 import nodemailer from 'nodemailer';
 import { verifyOrgMember } from './verifyOrgMember.js';
+import { buildBoletaEmailContent } from './emailBoletaContent.js';
 
 function createTransporter(user, pass) {
   return nodemailer.createTransport({
@@ -46,7 +47,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Método no permitido' });
   }
 
-  const { organizacionId, from, reply_to, to, subject, text, html } = req.body || {};
+  const { organizacionId, from, reply_to, to, subject, text, html, codigo_boleta, enlace_boleta } =
+    req.body || {};
 
   if (!organizacionId) {
     return res.status(400).json({ error: 'organizacionId es obligatorio' });
@@ -88,6 +90,19 @@ export default async function handler(req, res) {
   const replyTo = String(reply_to || creds.user).trim() || creds.user;
 
   try {
+    let mailHtml = html;
+    let attachments = [];
+
+    if (!mailHtml && codigo_boleta) {
+      const built = await buildBoletaEmailContent({
+        text: text || '',
+        codigo_boleta,
+        enlace_boleta,
+      });
+      mailHtml = built.html;
+      attachments = built.attachments;
+    }
+
     const transporter = createTransporter(creds.user, creds.pass);
     const info = await transporter.sendMail({
       from: `"${nombreVisible.replace(/"/g, '')}" <${creds.user}>`,
@@ -95,7 +110,8 @@ export default async function handler(req, res) {
       to: destinatario,
       subject: subject.trim(),
       text: text || '',
-      html: html || undefined,
+      html: mailHtml || undefined,
+      attachments: attachments.length ? attachments : undefined,
     });
 
     return res.status(200).json({

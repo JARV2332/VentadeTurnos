@@ -608,9 +608,35 @@ export async function getCorreosEnviados(organizacionId) {
 }
 
 export async function registrarCorreoEnviado(organizacionId, datos) {
+  const row = {
+    organizacion_id: organizacionId,
+    destinatario:
+      datos.destinatario?.trim() ||
+      datos.cargador?.correo?.trim() ||
+      '',
+    asunto: datos.asunto || null,
+    codigo_boleta:
+      datos.codigo_boleta ||
+      datos.brazo?.codigo_boleta_qr ||
+      null,
+    estado: datos.estado || 'enviado',
+    metadata: {
+      modo: datos.modo || null,
+      enviado_en: datos.enviado_en || new Date().toISOString(),
+      enlace_boleta: datos.enlaceBoleta || null,
+      remitente: datos.remitente || null,
+      nombre_remitente: datos.nombreRemitente || null,
+      responder_a: datos.responderA || null,
+      brazo_id: datos.brazo?.id || null,
+      turno_id: datos.turno?.id || null,
+      cortejo_id: datos.cortejo?.id || null,
+      cargador_id: datos.cargador?.id || null,
+    },
+  };
+
   const { data, error } = await supabase
     .from('correos_enviados')
-    .insert({ organizacion_id: organizacionId, ...datos })
+    .insert(row)
     .select()
     .single();
   if (error) return err(error);
