@@ -367,9 +367,12 @@ export async function getDashboardMetrics(organizacionId) {
   };
 }
 
+const EMAIL_CONFIG_PUBLIC =
+  'id, organizacion_id, correo_remitente, nombre_remitente, correo_respuesta, notificaciones_activas, pie_correo, gmail_smtp_user, gmail_password_configurada, created_at, updated_at';
+
 export async function getEmailConfig(organizacionId) {
   const { data } = await supabase
-    .from('configuracion_correo')
+    .from('configuracion_correo_safe')
     .select('*')
     .eq('organizacion_id', organizacionId)
     .maybeSingle();
@@ -377,13 +380,52 @@ export async function getEmailConfig(organizacionId) {
 }
 
 export async function saveEmailConfig(organizacionId, config) {
-  const { data, error } = await supabase
+  const payload = {
+    organizacion_id: organizacionId,
+    correo_remitente: config.correo_remitente,
+    nombre_remitente: config.nombre_remitente,
+    correo_respuesta: config.correo_respuesta || null,
+    notificaciones_activas: config.notificaciones_activas !== false,
+    pie_correo: config.pie_correo || null,
+    gmail_smtp_user: config.gmail_smtp_user?.trim() || config.correo_remitente?.trim() || null,
+  };
+
+  const nuevaPass = config.gmail_app_password?.replace(/\s/g, '');
+  if (nuevaPass) {
+    payload.gmail_app_password = nuevaPass;
+    payload.gmail_password_configurada = true;
+  }
+
+  const { data: existente } = await supabase
     .from('configuracion_correo')
-    .upsert({ organizacion_id: organizacionId, ...config }, { onConflict: 'organizacion_id' })
-    .select()
-    .single();
-  if (error) return err(error);
-  return data;
+    .select('id')
+    .eq('organizacion_id', organizacionId)
+    .maybeSingle();
+
+  let result;
+  if (existente?.id) {
+    result = await supabase
+      .from('configuracion_correo')
+      .update(payload)
+      .eq('organizacion_id', organizacionId)
+      .select(EMAIL_CONFIG_PUBLIC)
+      .single();
+  } else {
+    if (!nuevaPass) {
+      return {
+        error:
+          'La primera vez debe guardar la contraseña de aplicación de Gmail en la sección Cuenta Gmail.',
+      };
+    }
+    result = await supabase
+      .from('configuracion_correo')
+      .insert({ ...payload, gmail_password_configurada: true })
+      .select(EMAIL_CONFIG_PUBLIC)
+      .single();
+  }
+
+  if (result.error) return err(result.error);
+  return result.data;
 }
 
 export async function getReciboConfig(organizacionId) {

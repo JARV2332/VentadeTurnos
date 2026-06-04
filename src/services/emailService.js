@@ -147,6 +147,7 @@ export async function enviarBoletaPorCorreo({
       method: 'POST',
       headers,
       body: JSON.stringify({
+        organizacionId,
         from: `${emailConfig.nombre_remitente} <${emailConfig.correo_remitente}>`,
         reply_to: emailConfig.correo_respuesta || emailConfig.correo_remitente,
         to: cargador.correo,

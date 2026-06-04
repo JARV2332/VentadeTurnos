@@ -1,16 +1,10 @@
 /**
- * Envío de correos vía Gmail SMTP (contraseña de aplicación en variables de servidor).
- * Variables en Vercel: GMAIL_USER, GMAIL_APP_PASSWORD
+ * Envío de boletas por Gmail SMTP — credenciales por organización o fallback en Vercel.
  */
 import nodemailer from 'nodemailer';
-import { verifyAuth } from './verifyAuth.js';
+import { verifyOrgMember } from './verifyOrgMember.js';
 
-function getTransporter() {
-  const user = process.env.GMAIL_USER?.trim();
-  const pass = process.env.GMAIL_APP_PASSWORD?.replace(/\s/g, '');
-  if (!user || !pass) {
-    return null;
-  }
+function createTransporter(user, pass) {
   return nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 587,
@@ -19,26 +13,59 @@ function getTransporter() {
   });
 }
 
+async function credencialesDeOrganizacion(admin, organizacionId) {
+  const { data } = await admin
+    .from('configuracion_correo')
+    .select(
+      'gmail_smtp_user, gmail_app_password, correo_remitente, gmail_password_configurada'
+    )
+    .eq('organizacion_id', organizacionId)
+    .maybeSingle();
+
+  if (!data) return null;
+
+  const user = (data.gmail_smtp_user || data.correo_remitente || '').trim().toLowerCase();
+  const pass = data.gmail_app_password?.replace(/\s/g, '');
+  if (user && pass) {
+    return { user, pass, origen: 'organizacion' };
+  }
+  return null;
+}
+
+function credencialesGlobales() {
+  const user = process.env.GMAIL_USER?.trim();
+  const pass = process.env.GMAIL_APP_PASSWORD?.replace(/\s/g, '');
+  if (user && pass) {
+    return { user, pass, origen: 'vercel' };
+  }
+  return null;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido' });
   }
 
-  const auth = await verifyAuth(req);
-  if (auth.error) {
-    return res.status(auth.status).json({ error: auth.error });
+  const { organizacionId, from, reply_to, to, subject, text, html } = req.body || {};
+
+  if (!organizacionId) {
+    return res.status(400).json({ error: 'organizacionId es obligatorio' });
   }
 
-  const transporter = getTransporter();
-  if (!transporter) {
+  const member = await verifyOrgMember(req, organizacionId);
+  if (member.error) {
+    return res.status(member.status).json({ error: member.error });
+  }
+
+  const creds =
+    (await credencialesDeOrganizacion(member.admin, organizacionId)) || credencialesGlobales();
+
+  if (!creds) {
     return res.status(500).json({
       error:
-        'Configure GMAIL_USER y GMAIL_APP_PASSWORD en Vercel (Settings → Environment Variables).',
+        'Configure Gmail en Correo y boletas (cuenta + contraseña de aplicación) o GMAIL_USER/GMAIL_APP_PASSWORD en Vercel.',
     });
   }
-
-  const gmailUser = process.env.GMAIL_USER.trim();
-  const { from, reply_to, to, subject, text, html } = req.body || {};
 
   const destinatario = String(to || '')
     .trim()
@@ -50,7 +77,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Asunto requerido' });
   }
 
-  // Gmail SMTP exige enviar desde la cuenta autenticada; el nombre visible sí puede personalizarse.
   let nombreVisible = 'Venta de turnos';
   const matchFrom = String(from || '').match(/^(.+?)\s*<([^>]+)>$/);
   if (matchFrom) {
@@ -59,11 +85,12 @@ export default async function handler(req, res) {
     nombreVisible = from.trim();
   }
 
-  const replyTo = String(reply_to || gmailUser).trim() || gmailUser;
+  const replyTo = String(reply_to || creds.user).trim() || creds.user;
 
   try {
+    const transporter = createTransporter(creds.user, creds.pass);
     const info = await transporter.sendMail({
-      from: `"${nombreVisible.replace(/"/g, '')}" <${gmailUser}>`,
+      from: `"${nombreVisible.replace(/"/g, '')}" <${creds.user}>`,
       replyTo,
       to: destinatario,
       subject: subject.trim(),
@@ -75,6 +102,7 @@ export default async function handler(req, res) {
       ok: true,
       messageId: info.messageId,
       destinatario,
+      origen: creds.origen,
     });
   } catch (err) {
     console.error('send-email:', err);
@@ -82,7 +110,7 @@ export default async function handler(req, res) {
     if (msg.includes('Invalid login') || msg.includes('535')) {
       return res.status(500).json({
         error:
-          'Gmail rechazó la contraseña. Use una contraseña de aplicación (16 caracteres) con 2FA activo.',
+          'Gmail rechazó la contraseña. Revise la contraseña de aplicación en Correo y boletas (16 caracteres, 2FA activo).',
       });
     }
     return res.status(500).json({ error: msg });

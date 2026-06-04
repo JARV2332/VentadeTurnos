@@ -106,14 +106,33 @@ export function getCargadoresByOrg(organizacionId) {
 }
 
 export function getEmailConfig(organizacionId) {
-  return store.emailConfig?.[organizacionId] || null;
+  const raw = store.emailConfig?.[organizacionId];
+  if (!raw) return null;
+  const { gmail_app_password, ...pub } = raw;
+  return pub;
 }
 
 export function saveEmailConfig(organizacionId, config) {
   if (!store.emailConfig) store.emailConfig = { ...DEMO_EMAIL_CONFIG };
-  store.emailConfig[organizacionId] = { ...config };
+  const prev = store.emailConfig[organizacionId] || {};
+  const nuevaPass = config.gmail_app_password?.replace(/\s/g, '');
+  const next = {
+    ...prev,
+    correo_remitente: config.correo_remitente,
+    nombre_remitente: config.nombre_remitente,
+    correo_respuesta: config.correo_respuesta,
+    notificaciones_activas: config.notificaciones_activas !== false,
+    pie_correo: config.pie_correo,
+    gmail_smtp_user: config.gmail_smtp_user?.trim() || config.correo_remitente?.trim(),
+  };
+  if (nuevaPass) {
+    next.gmail_app_password = nuevaPass;
+    next.gmail_password_configurada = true;
+  }
+  store.emailConfig[organizacionId] = next;
   emit('email:config', { organizacionId });
-  return store.emailConfig[organizacionId];
+  const { gmail_app_password, ...pub } = next;
+  return pub;
 }
 
 export function getReciboConfig(organizacionId) {

@@ -1,38 +1,38 @@
-# Envío de correos con Gmail
+# Gmail por asociación (hermandad / cofradía)
 
-## 1. Variables en Vercel (obligatorio)
+Cada organización configura **su propio Gmail** en la app: **Correo y boletas** (`/config/correo`).
 
-En **Vercel → proyecto VentadeTurnos → Settings → Environment Variables**:
+## En la aplicación
 
-| Variable | Valor | Entornos |
-|----------|--------|----------|
-| `GMAIL_USER` | Tu Gmail completo, ej. `turnos.hermandad@gmail.com` | Production, Preview |
-| `GMAIL_APP_PASSWORD` | Contraseña de aplicación de 16 caracteres **sin espacios** | Production, Preview |
+1. **Gmail de la asociación** — ej. `turnos.hermandad@gmail.com`
+2. **Contraseña de aplicación** — 16 caracteres (Google, con 2FA activo)
+3. **Nombre remitente**, pie de correo, etc.
+4. Pulsar **Guardar configuración**
 
-La contraseña de aplicación se crea en Google: Cuenta → Seguridad → Verificación en 2 pasos → Contraseñas de aplicaciones.
+La contraseña **no se vuelve a mostrar** al recargar (por seguridad). Para cambiarla, escriba la nueva y guarde.
 
-**No subas estas claves a GitHub.** Si se filtraron, revócalas en Google y crea una nueva.
+## En Google (por cada asociación)
 
-## 2. Configuración en la app
+1. Cuenta Google de la hermandad → **Seguridad**
+2. Activar **verificación en 2 pasos**
+3. **Contraseñas de aplicaciones** → crear una para “Correo”
+4. Copiar los 16 caracteres (con o sin espacios; la app los quita)
 
-En **Correo y boletas** (`/config/correo`):
+## SQL en Supabase (una vez)
 
-- **Correo remitente:** debe ser el **mismo** que `GMAIL_USER` (Gmail no permite otro remitente con SMTP básico).
-- **Nombre remitente:** el nombre visible (ej. nombre de la asociación).
-- **Correo de respuesta:** puede ser el mismo Gmail u otro buzón.
-- Activar **Enviar boletas automáticamente al confirmar venta**.
+Ejecutar `supabase/010_correo_gmail_por_org.sql` en el SQL Editor.
 
-## 3. Redesplegar
+## Fallback global (opcional)
 
-Tras agregar las variables en Vercel, haga **Redeploy** del último deployment para que la API `/api/send-email` las use.
+Si una asociación **no** configuró Gmail, Vercel puede usar variables globales:
 
-## 4. Probar
+- `GMAIL_USER`
+- `GMAIL_APP_PASSWORD`
 
-1. En taquilla, venda un turno con un cargador que tenga correo real.
-2. Revise la bandeja del cargador (y spam).
-3. En **Correo y boletas → Historial** debe aparecer el envío.
+Prioridad: **primero** credenciales de la asociación en la base de datos, **después** las de Vercel.
 
-## Límites Gmail
+## Seguridad
 
-- Cuenta personal: ~500 correos/día.
-- Para alto volumen use Google Workspace o Resend con dominio propio.
+- No comparta contraseñas de aplicación en chats ni correos.
+- Si se filtró, revóquela en Google y cree otra.
+- Cada asociación debe usar su propia cuenta Gmail.
