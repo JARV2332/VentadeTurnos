@@ -50,7 +50,7 @@ export default function Impresion() {
     );
   }
 
-  const { cargador, turno, cortejo } = detalle;
+  const { turno, cortejo } = detalle;
 
   const handlePrint = () => window.print();
 
@@ -83,7 +83,6 @@ export default function Impresion() {
       <div className="impresion-boleta print-area">
         <BoletaContraseñaTurno
           organizacion={organizacion}
-          cargador={cargador}
           brazo={selected}
           turno={turno}
           cortejo={cortejo}

@@ -4,17 +4,15 @@ import { useAuth } from '../context/AuthContext';
 import { getReciboConfig } from '../services/dataService';
 import { mergeReciboConfig } from '../constants/reciboDefaults';
 import { getQrPayload, formatPrecio } from '../utils/boletaUtils';
-import { formatCuiDisplay } from '../utils/cuiUtils';
-import { localDigitsFromGtPhone } from '../utils/phoneGtUtils';
+import { etiquetaHonorTurno, repertorioTurnoLista } from '../utils/turnoUtils';
 
 /**
- * Boleta / contraseña de turno con diseño formal (bordes, secciones) para impresión y PDF.
+ * Contraseña de turno — media carta horizontal (8.5" × 5.5").
  */
 export default function BoletaContraseñaTurno({
   organizacion,
   cortejo,
   turno,
-  cargador,
   brazo,
   config: configProp,
 }) {
@@ -41,16 +39,12 @@ export default function BoletaContraseñaTurno({
     (cfg.mostrar_nombre_org !== false ? organizacion?.nombre_oficial : '') ||
     'Contraseña de turno';
   const primary = cfg.color_primario || '#4f46e5';
-  const cui = cargador?.cui_o_identificacion
-    ? formatCuiDisplay(cargador.cui_o_identificacion)
-    : '—';
-  const whatsapp = cargador?.whatsapp
-    ? `+502 ${localDigitsFromGtPhone(cargador.whatsapp)}`
-    : '—';
+  const honorTurno = etiquetaHonorTurno(turno);
+  const repertorio = repertorioTurnoLista(turno);
 
   return (
     <article
-      className="boleta-contraseña"
+      className="boleta-contraseña boleta-contraseña--media-carta"
       style={{ '--boleta-primary': primary }}
     >
       <header className="boleta-contraseña__head">
@@ -60,7 +54,7 @@ export default function BoletaContraseñaTurno({
               src={cfg.logo_url}
               alt=""
               className="boleta-contraseña__logo"
-              style={{ maxWidth: cfg.logo_ancho_px || 88 }}
+              style={{ maxWidth: cfg.logo_ancho_px || 72 }}
             />
           )}
           {cfg.mostrar_nombre_org !== false && (
@@ -76,53 +70,24 @@ export default function BoletaContraseñaTurno({
       </header>
 
       <section className="boleta-contraseña__seccion">
-        <h2 className="boleta-contraseña__seccion-titulo">Datos del devoto(a)</h2>
-        <div className="boleta-contraseña__caja">
-          <div className="boleta-contraseña__cui-box">
-            <span className="boleta-contraseña__label">CUI / DPI</span>
-            <strong className="boleta-contraseña__cui-valor">{cui}</strong>
-          </div>
-          <div className="boleta-contraseña__datos-grid">
-            {cfg.mostrar_cargador !== false && (
-              <p>
-                <span>Nombre</span>
-                <strong>{cargador?.nombre_completo || '—'}</strong>
-              </p>
-            )}
-            <p>
-              <span>Correo</span>
-              <strong>{cargador?.correo?.trim() || '—'}</strong>
-            </p>
-            <p>
-              <span>WhatsApp</span>
-              <strong>{whatsapp}</strong>
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="boleta-contraseña__seccion">
         <h2 className="boleta-contraseña__seccion-titulo">Datos del turno</h2>
         <div className="boleta-contraseña__caja boleta-contraseña__caja--turno">
           <div className="boleta-contraseña__turno-datos">
             {cfg.mostrar_turno !== false && (
               <>
-                <p>
+                <p className="boleta-contraseña__turno-num">
                   <span>Turno</span>
-                  <strong>#{brazo?.numero_turno}</strong>
+                  <strong>#{brazo?.numero_turno ?? turno?.numero_turno ?? '—'}</strong>
                 </p>
-                {cfg.mostrar_etiqueta_turno !== false && (
-                  <p>
-                    <span>Tipo</span>
-                    <strong>{turno?.etiqueta || turno?.tipo_turno || '—'}</strong>
+                <p className="boleta-contraseña__turno-tipo">
+                  <strong>{honorTurno}</strong>
+                </p>
+                {repertorio.map((item) => (
+                  <p key={item.tipo} className="boleta-contraseña__melodia">
+                    <span>{item.tipo}</span>
+                    <strong>{item.texto}</strong>
                   </p>
-                )}
-                <p>
-                  <span>Brazo</span>
-                  <strong>
-                    {brazo?.numero_brazo} · {brazo?.lado || '—'}
-                  </strong>
-                </p>
+                ))}
               </>
             )}
             {cfg.mostrar_precio !== false && (
@@ -142,7 +107,7 @@ export default function BoletaContraseñaTurno({
             <div className="boleta-contraseña__qr-box">
               <QRCodeSVG
                 value={getQrPayload(codigo)}
-                size={112}
+                size={96}
                 level="M"
                 includeMargin
                 bgColor="#ffffff"

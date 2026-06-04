@@ -180,3 +180,15 @@ export function etiquetaTurno(turno) {
   if (turno.etiqueta) return turno.etiqueta;
   return turno.tipo_turno;
 }
+
+/** Etiqueta de honor/tipo para boleta impresa (Salida → Honor Salida, etc.) */
+export function etiquetaHonorTurno(turno) {
+  const tipo = turno?.tipo_turno || '';
+  if (tipo === 'Salida') return 'Honor Salida';
+  if (tipo === 'Entrada') return 'Honor Entrada';
+  if (tipo === 'Extraordinario') return 'Extraordinario';
+  if (tipo === 'Ordinario') {
+    return turno?.etiqueta?.trim() || 'Ordinario';
+  }
+  return turno?.etiqueta?.trim() || tipo || 'Turno';
+}
