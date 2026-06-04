@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import BoletaCorreoPreview from '../components/BoletaCorreoPreview';
 import { useAuth } from '../context/AuthContext';
@@ -72,6 +73,11 @@ export default function ConfigCorreo() {
   return (
     <Layout title="Correo y boletas" subtitle="Remitente, plantilla y historial de envíos">
       {okMsg && <div className="alert alert--success">{okMsg}</div>}
+
+      <p className="recibo-config-intro">
+        Personalice logo, formato térmico o media carta y textos en{' '}
+        <Link to="/config/recibo">Diseño de recibos</Link>.
+      </p>
 
       <div className="config-grid">
         <section className="card">

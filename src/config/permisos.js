@@ -19,6 +19,13 @@ export const PANTALLAS = [
   { id: 'config', label: 'Procesiones', path: '/config', icon: '⚙', grupo: 'Administración' },
   { id: 'config_correo', label: 'Correo y boletas', path: '/config/correo', icon: '✉', grupo: 'Administración' },
   {
+    id: 'config_recibo',
+    label: 'Diseño de recibos',
+    path: '/config/recibo',
+    icon: '🧾',
+    grupo: 'Administración',
+  },
+  {
     id: 'usuarios',
     label: 'Usuarios y roles',
     path: '/config/usuarios',

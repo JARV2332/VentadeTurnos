@@ -8,7 +8,12 @@ export default function Sidebar({ mobileOpen = false, onClose }) {
   const { organizacion, rolNombre, logout, hasPermiso, esSuperAdmin } = useAuth();
   const navigate = useNavigate();
 
-  const navItems = PANTALLAS.filter((p) => hasPermiso(p.id));
+  const navItems = PANTALLAS.filter((p) => {
+    if (p.id === 'config_recibo') {
+      return hasPermiso('config_recibo') || hasPermiso('config_correo');
+    }
+    return hasPermiso(p.id);
+  });
 
   const handleLogout = async () => {
     onClose?.();

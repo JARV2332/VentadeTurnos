@@ -1666,6 +1666,142 @@ body {
   color: var(--primary);
 }
 
+/* Boleta configurable (térmico / media carta) */
+.boleta-recibo {
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  margin: 0 auto;
+  background: #fff;
+  text-align: center;
+  color: #1e293b;
+  box-sizing: border-box;
+}
+
+.boleta-recibo--termico_58 { max-width: 220px; font-size: 0.8rem; }
+.boleta-recibo--termico_80 { max-width: 302px; font-size: 0.85rem; }
+.boleta-recibo--media_carta {
+  max-width: 396px;
+  min-height: 280px;
+  padding: 1.5rem;
+  font-size: 0.95rem;
+}
+
+.boleta-recibo--fuente-compacto { font-size: 0.78em; }
+.boleta-recibo--fuente-grande { font-size: 1.08em; }
+
+.boleta-recibo--logo-centro .boleta-recibo__logo-wrap { text-align: center; }
+.boleta-recibo--logo-izquierda .boleta-recibo__logo-wrap { text-align: left; }
+
+.boleta-recibo__logo { height: auto; display: inline-block; margin-bottom: 0.5rem; }
+
+.boleta-recibo__head {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.65rem;
+  margin-bottom: 0.65rem;
+}
+
+.boleta-recibo__titulo {
+  display: block;
+  font-size: 1em;
+  color: var(--recibo-primary, var(--primary));
+}
+
+.boleta-recibo__evento {
+  display: block;
+  font-size: 0.75em;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+.boleta-recibo__turno { margin-bottom: 0.6rem; }
+.boleta-recibo__turno small {
+  display: block;
+  font-size: 0.65em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+.boleta-recibo__turno strong { font-size: 1.6em; display: block; line-height: 1.2; }
+.boleta-recibo__tipo { font-size: 0.75em; color: var(--recibo-primary, var(--primary)); font-weight: 600; }
+
+.boleta-recibo__cargador {
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 0.45rem;
+  margin-bottom: 0.65rem;
+}
+.boleta-recibo__cargador small { display: block; font-size: 0.6em; color: var(--text-muted); }
+.boleta-recibo__cargador strong { font-size: 0.9em; }
+
+.boleta-recibo__qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.6rem;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  margin-bottom: 0.6rem;
+}
+.boleta-recibo__codigo { font-size: 0.75em; font-weight: 600; }
+.boleta-recibo__qr-msg { font-size: 0.65em; color: var(--text-muted); max-width: 90%; }
+
+.boleta-recibo__footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  font-weight: 700;
+  font-size: 1.05em;
+  color: var(--recibo-primary, var(--primary));
+}
+
+.boleta-recibo__pie {
+  margin: 0.5rem 0 0;
+  font-size: 0.65em;
+  color: var(--text-muted);
+  border-top: 1px dashed var(--border);
+  padding-top: 0.5rem;
+}
+
+/* Editor diseño recibo */
+.recibo-config-intro { margin-bottom: 1rem; font-size: 0.9rem; }
+.recibo-config-grid { align-items: start; }
+
+.formato-recibo-opciones { display: flex; flex-direction: column; gap: 0.5rem; }
+.formato-recibo-opcion {
+  display: flex;
+  gap: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.formato-recibo-opcion:has(input:checked) {
+  border-color: var(--primary);
+  background: rgba(99, 102, 241, 0.06);
+}
+.formato-recibo-opcion span { display: flex; flex-direction: column; gap: 0.15rem; }
+.formato-recibo-opcion small { color: var(--text-muted); font-size: 0.75rem; }
+
+.recibo-logo-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.recibo-toggles { display: flex; flex-direction: column; gap: 0.35rem; }
+.recibo-preview-panel { position: sticky; top: 1rem; }
+.recibo-preview-stage {
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+  background: var(--bg);
+  border-radius: 10px;
+  overflow: auto;
+}
+
 /* ── Entrega de turnos ── */
 .entrega-grid {
   display: grid;
@@ -1995,7 +2131,14 @@ body {
   .app-main { overflow: visible; }
   .app-content { padding: 0; }
   .print-area { padding: 0; }
-  .boleta-card { border: 1px solid #000; box-shadow: none; max-width: 100%; }
+  .boleta-card, .boleta-recibo {
+    border: 1px solid #000;
+    box-shadow: none;
+    page-break-inside: avoid;
+  }
+  .boleta-recibo--termico_58 { width: 58mm; max-width: 58mm; }
+  .boleta-recibo--termico_80 { width: 80mm; max-width: 80mm; }
+  .boleta-recibo--media_carta { width: 5.5in; max-width: 5.5in; }
 }
 
 /* ── Usuarios y roles (RBAC) ── */

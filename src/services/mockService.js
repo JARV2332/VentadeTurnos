@@ -116,6 +116,21 @@ export function saveEmailConfig(organizacionId, config) {
   return store.emailConfig[organizacionId];
 }
 
+export function getReciboConfig(organizacionId) {
+  return store.reciboConfig?.[organizacionId] || null;
+}
+
+export function saveReciboConfig(organizacionId, { formato, diseño }) {
+  if (!store.reciboConfig) store.reciboConfig = {};
+  store.reciboConfig[organizacionId] = {
+    organizacion_id: organizacionId,
+    formato: formato || 'termico_80',
+    diseño: diseño || {},
+  };
+  emit('recibo:config', { organizacionId });
+  return { data: store.reciboConfig[organizacionId] };
+}
+
 export function registrarCorreoEnviadoMock(organizacionId, datos) {
   if (!store.correosEnviados) store.correosEnviados = {};
   if (!store.correosEnviados[organizacionId]) store.correosEnviados[organizacionId] = [];

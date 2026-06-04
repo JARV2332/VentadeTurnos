@@ -6,6 +6,7 @@ import Landing from './views/Landing';
 import Dashboard from './views/Dashboard';
 import ConfigSaaS from './views/ConfigSaaS';
 import ConfigCorreo from './views/ConfigCorreo';
+import ConfigRecibo from './views/ConfigRecibo';
 import ConfigUsuarios from './views/ConfigUsuarios';
 import ConfigImportReservas from './views/ConfigImportReservas';
 import Taquilla from './views/Taquilla';
@@ -58,6 +59,14 @@ function App() {
             element={
               <PrivateRoute permission="config_correo">
                 <ConfigCorreo />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/config/recibo"
+            element={
+              <PrivateRoute permission="config_correo">
+                <ConfigRecibo />
               </PrivateRoute>
             }
           />

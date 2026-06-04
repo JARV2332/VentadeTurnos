@@ -386,6 +386,31 @@ export async function saveEmailConfig(organizacionId, config) {
   return data;
 }
 
+export async function getReciboConfig(organizacionId) {
+  const { data, error } = await supabase
+    .from('configuracion_recibo')
+    .select('*')
+    .eq('organizacion_id', organizacionId)
+    .maybeSingle();
+  if (error) return err(error);
+  return data;
+}
+
+export async function saveReciboConfig(organizacionId, { formato, diseño }) {
+  const payload = {
+    organizacion_id: organizacionId,
+    formato: formato || 'termico_80',
+    diseño: diseño || {},
+  };
+  const { data, error } = await supabase
+    .from('configuracion_recibo')
+    .upsert(payload, { onConflict: 'organizacion_id' })
+    .select()
+    .single();
+  if (error) return err(error);
+  return { data };
+}
+
 export async function getCorreosEnviados(organizacionId) {
   const { data } = await supabase
     .from('correos_enviados')

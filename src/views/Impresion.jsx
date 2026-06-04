@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import BoletaCard from '../components/BoletaCard';
 import StatusBadge from '../components/StatusBadge';
@@ -12,7 +13,7 @@ import {
 } from '../services/dataService';
 
 export default function Impresion() {
-  const { organizacion, organizacionId } = useAuth();
+  const { organizacion, organizacionId, hasPermiso } = useAuth();
   const [ventas, setVentas] = useState([]);
   const [selected, setSelected] = useState(null);
   const [detalle, setDetalle] = useState({ cargador: null, turno: null, cortejo: null });
@@ -72,6 +73,11 @@ export default function Impresion() {
         <button type="button" className="btn btn--primary" onClick={handlePrint}>
           Imprimir boleta
         </button>
+        {(hasPermiso('config_recibo') || hasPermiso('config_correo')) && (
+          <Link to="/config/recibo" className="btn btn--ghost">
+            Diseño del recibo
+          </Link>
+        )}
       </div>
 
       <div className="impresion-boleta">

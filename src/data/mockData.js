@@ -61,6 +61,7 @@ export const DEMO_ROLES = [
       'impresion',
       'config',
       'config_correo',
+      'config_recibo',
       'usuarios',
       'import_reservas',
     ],

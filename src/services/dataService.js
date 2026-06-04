@@ -85,6 +85,16 @@ export const saveEmailConfig = (organizacionId, config) =>
     ? sb.saveEmailConfig(organizacionId, config)
     : Promise.resolve(mock.saveEmailConfig(organizacionId, config));
 
+export const getReciboConfig = (organizacionId) =>
+  useSb()
+    ? sb.getReciboConfig(organizacionId)
+    : Promise.resolve(mock.getReciboConfig(organizacionId));
+
+export const saveReciboConfig = (organizacionId, payload) =>
+  useSb()
+    ? sb.saveReciboConfig(organizacionId, payload)
+    : Promise.resolve(mock.saveReciboConfig(organizacionId, payload));
+
 export const getCorreosEnviados = (organizacionId) =>
   useSb()
     ? sb.getCorreosEnviados(organizacionId)

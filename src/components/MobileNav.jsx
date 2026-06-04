@@ -11,13 +11,19 @@ const LABEL_CORTO = {
   impresion: 'Imprimir',
   config: 'Procesiones',
   config_correo: 'Correo',
+  config_recibo: 'Recibos',
   usuarios: 'Usuarios',
   import_reservas: 'Apartados',
 };
 
 export default function MobileNav() {
   const { hasPermiso } = useAuth();
-  const navItems = PANTALLAS.filter((p) => hasPermiso(p.id));
+  const navItems = PANTALLAS.filter((p) => {
+    if (p.id === 'config_recibo') {
+      return hasPermiso('config_recibo') || hasPermiso('config_correo');
+    }
+    return hasPermiso(p.id);
+  });
 
   if (navItems.length === 0) return null;
 
