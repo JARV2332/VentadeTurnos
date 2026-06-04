@@ -340,7 +340,7 @@ DECLARE
   v_brazo public.brazos;
   v_codigo TEXT;
 BEGIN
-  v_codigo := 'VT-' || UPPER(SUBSTRING(encode(gen_random_bytes(5), 'hex'), 1, 10));
+  v_codigo := 'VT-' || UPPER(SUBSTRING(REPLACE(gen_random_uuid()::text, '-', ''), 1, 10));
 
   UPDATE public.brazos
   SET
