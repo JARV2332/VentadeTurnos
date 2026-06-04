@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { TurnoCartulina } from '../components/TurnoCartulina';
 import { useAuth } from '../context/AuthContext';
@@ -24,7 +23,7 @@ import { formatPrecio } from '../utils/boletaUtils';
 import { repertorioTurnoLista } from '../utils/turnoUtils';
 import { isValidGtWhatsapp } from '../utils/phoneGtUtils';
 import PhoneInput502 from '../components/PhoneInput502';
-import { construirEnlaceBoletaWhatsapp } from '../utils/whatsappUtils';
+import VentaExitoModal from '../components/VentaExitoModal';
 
 export default function Taquilla() {
   const { organizacionId, organizacion, user } = useAuth();
@@ -212,43 +211,64 @@ export default function Taquilla() {
     setFinalizando(true);
     const turno = turnos.find((t) => t.id === selectedBrazo.turno_id);
     const cortejo = cortejos.find((c) => c.id === cortejoId);
+    const whatsappVenta = form.whatsapp;
+    const metodoPago = pago.metodo_pago;
 
-    const res = await confirmarVenta(
-      selectedBrazo.id,
-      form,
-      turno?.precio || 0,
-      organizacionId,
-      {
-        metodo_pago: pago.metodo_pago,
-        comprobante_url: pago.comprobante_url,
+    try {
+      const res = await confirmarVenta(
+        selectedBrazo.id,
+        form,
+        turno?.precio || 0,
+        organizacionId,
+        {
+          metodo_pago: metodoPago,
+          comprobante_url: pago.comprobante_url,
+        }
+      );
+
+      if (res.error) {
+        setError(res.error);
+        return;
       }
-    );
 
-    if (res.error) {
-      setError(res.error);
+      resetVentaPanel();
+      setVentaOk({
+        ...res,
+        email: null,
+        emailEnviando: true,
+        metodo_pago: metodoPago,
+        turno,
+        cortejo,
+        whatsappVenta,
+      });
+
+      enviarBoletaPorCorreo({
+        organizacionId,
+        organizacion,
+        cargador: res.cargador,
+        brazo: res.data,
+        turno,
+        cortejo,
+      })
+        .then((emailRes) => {
+          setVentaOk((prev) =>
+            prev ? { ...prev, email: emailRes, emailEnviando: false } : null
+          );
+        })
+        .catch(() => {
+          setVentaOk((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  email: { ok: false, error: 'No se pudo enviar el correo' },
+                  emailEnviando: false,
+                }
+              : null
+          );
+        });
+    } finally {
       setFinalizando(false);
-      return;
     }
-
-    const emailRes = await enviarBoletaPorCorreo({
-      organizacionId,
-      organizacion,
-      cargador: res.cargador,
-      brazo: res.data,
-      turno,
-      cortejo,
-    });
-
-    setVentaOk({
-      ...res,
-      email: emailRes,
-      metodo_pago: pago.metodo_pago,
-      turno,
-      cortejo,
-      whatsappVenta: form.whatsapp,
-    });
-    resetVentaPanel();
-    setFinalizando(false);
   };
 
   const turnoSel = selectedBrazo
@@ -259,74 +279,17 @@ export default function Taquilla() {
   const repertorioSel = turnoSel ? repertorioTurnoLista(turnoSel) : [];
   const necesitaComprobante = metodoRequiereComprobante(pago.metodo_pago);
 
-  const enlaceWhatsappBoleta =
-    ventaOk &&
-    construirEnlaceBoletaWhatsapp({
-      cargador: ventaOk.cargador,
-      brazo: ventaOk.data,
-      turno: ventaOk.turno,
-      cortejo: ventaOk.cortejo,
-      organizacion,
-    });
-
   return (
     <Layout
       title="Taquilla"
       subtitle="Venta por turno — Izquierda y Derecha"
       className={`app-content--taquilla${selectedBrazo ? ' taquilla--venta-abierta' : ''}`}
     >
-      {ventaOk && (
-        <>
-          <div className="venta-exito-overlay" role="dialog" aria-modal="true" aria-labelledby="venta-exito-titulo">
-            <div className="venta-exito-card">
-              <h2 id="venta-exito-titulo" className="venta-exito-card__titulo">Venta completada</h2>
-              <p className="venta-exito-card__codigo">
-                Boleta <strong>{ventaOk.codigo}</strong>
-                {' · '}
-                {labelMetodoPago(ventaOk.metodo_pago)}
-              </p>
-              {ventaOk.email?.ok && (
-                <p className="venta-exito-card__email">
-                  Correo enviado a <strong>{ventaOk.email.destinatario}</strong>
-                  {ventaOk.email.demo && ' (demo)'}
-                </p>
-              )}
-              {enlaceWhatsappBoleta ? (
-                <>
-                  <p className="venta-exito-card__hint">
-                    Toque el botón para abrir WhatsApp con el mensaje y el enlace de la boleta (QR en el link).
-                  </p>
-                  <a
-                    href={enlaceWhatsappBoleta}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn--whatsapp btn--block"
-                  >
-                    Enviar boleta por WhatsApp
-                  </a>
-                </>
-              ) : (
-                <p className="venta-exito-card__hint venta-exito-card__hint--warn">
-                  No se pudo armar el enlace de WhatsApp (revise que el número tenga 8 dígitos después de +502).
-                </p>
-              )}
-              <div className="venta-exito-card__links">
-                <Link to="/impresion" className="btn btn--ghost btn--sm">Imprimir boleta</Link>
-                <Link to="/entrega" className="btn btn--ghost btn--sm">Entrega</Link>
-              </div>
-              <button type="button" className="btn btn--primary btn--block venta-exito-card__cerrar" onClick={() => setVentaOk(null)}>
-                Cerrar y seguir vendiendo
-              </button>
-            </div>
-          </div>
-          <div className="alert alert--success">
-            <div>
-              <strong>Venta completada</strong> · Boleta {ventaOk.codigo}
-            </div>
-            <button type="button" className="alert__close" onClick={() => setVentaOk(null)} aria-label="Cerrar">×</button>
-          </div>
-        </>
-      )}
+      <VentaExitoModal
+        venta={ventaOk}
+        organizacion={organizacion}
+        onCerrar={() => setVentaOk(null)}
+      />
       {error && <div className="alert alert--error">{error}</div>}
 
       <div className="taquilla-toolbar">

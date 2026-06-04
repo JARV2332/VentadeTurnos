@@ -143,9 +143,13 @@ export async function enviarBoletaPorCorreo({
       headers.Authorization = `Bearer ${session.access_token}`;
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
     const res = await fetch(EMAIL_WEBHOOK_URL, {
       method: 'POST',
       headers,
+      signal: controller.signal,
       body: JSON.stringify({
         organizacionId,
         from: `${emailConfig.nombre_remitente} <${emailConfig.correo_remitente}>`,
@@ -157,6 +161,7 @@ export async function enviarBoletaPorCorreo({
         enlace_boleta: datos.enlaceBoleta,
       }),
     });
+    clearTimeout(timeoutId);
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
       return { ok: false, error: json.error || 'Error al enviar correo' };
@@ -173,6 +178,9 @@ export async function enviarBoletaPorCorreo({
     return { ok: true, destinatario: cargador.correo, asunto: datos.asunto };
   } catch (err) {
     const msg = err?.message || '';
+    if (err?.name === 'AbortError') {
+      return { ok: false, error: 'El envío de correo tardó demasiado. La venta ya está guardada.' };
+    }
     if (msg.includes('Failed to fetch')) {
       return {
         ok: false,
