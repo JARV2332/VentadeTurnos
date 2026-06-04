@@ -1,11 +1,18 @@
 import { formatPrecio } from './boletaUtils';
-import { isValidGtWhatsapp } from './phoneGtUtils';
+import { fullGtPhoneFromLocal, isValidGtWhatsapp } from './phoneGtUtils';
 
 function getAppBaseUrl() {
   if (typeof window !== 'undefined' && window.location?.origin) {
     return window.location.origin;
   }
   return process.env.REACT_APP_APP_URL || 'https://ventadeturnos.vercel.app';
+}
+
+function normalizarTelefono502(telefono) {
+  const digits = String(telefono || '').replace(/\D/g, '');
+  if (isValidGtWhatsapp(digits)) return digits;
+  if (digits.length === 8) return fullGtPhoneFromLocal(digits);
+  return digits;
 }
 
 /**
@@ -52,7 +59,8 @@ export function construirEnlaceWhatsApp(telefono502, mensaje) {
 
 export function construirEnlaceBoletaWhatsapp(props) {
   const mensaje = construirMensajeBoletaWhatsapp(props);
-  const telefono =
-    props.cargador?.whatsapp || props.whatsappFallback || props.cargador?.telefono;
+  const telefono = normalizarTelefono502(
+    props.cargador?.whatsapp || props.whatsappFallback || props.cargador?.telefono
+  );
   return construirEnlaceWhatsApp(telefono, mensaje);
 }

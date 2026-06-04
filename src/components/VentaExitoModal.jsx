@@ -8,24 +8,30 @@ import { construirEnlaceBoletaWhatsapp } from '../utils/whatsappUtils';
  * Modal de venta completada (portal en body para no quedar detrás del panel móvil).
  */
 export default function VentaExitoModal({ venta, organizacion, onCerrar }) {
-  const enlaceWhatsapp = venta
-    ? construirEnlaceBoletaWhatsapp({
+  let enlaceWhatsapp = null;
+  if (venta) {
+    try {
+      enlaceWhatsapp = construirEnlaceBoletaWhatsapp({
         cargador: venta.cargador,
         whatsappFallback: venta.whatsappVenta,
         brazo: venta.data,
         turno: venta.turno,
         cortejo: venta.cortejo,
         organizacion,
-      })
-    : null;
+      });
+    } catch (err) {
+      console.error('VentaExitoModal WhatsApp:', err);
+    }
+  }
 
   useEffect(() => {
+    if (!venta) return undefined;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = prev;
     };
-  }, []);
+  }, [venta]);
 
   if (!venta || typeof document === 'undefined') return null;
 

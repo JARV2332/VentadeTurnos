@@ -21,7 +21,7 @@ import {
 } from '../utils/pagoUtils';
 import { formatPrecio } from '../utils/boletaUtils';
 import { repertorioTurnoLista } from '../utils/turnoUtils';
-import { isValidGtWhatsapp } from '../utils/phoneGtUtils';
+import { isValidGtWhatsapp, fullGtPhoneFromLocal } from '../utils/phoneGtUtils';
 import PhoneInput502 from '../components/PhoneInput502';
 import VentaExitoModal from '../components/VentaExitoModal';
 
@@ -236,7 +236,6 @@ export default function Taquilla() {
         return;
       }
 
-      resetVentaPanel();
       setVentaOk({
         ...res,
         email: null,
@@ -244,8 +243,11 @@ export default function Taquilla() {
         metodo_pago: metodoPago,
         turno,
         cortejo,
-        whatsappVenta,
+        whatsappVenta: fullGtPhoneFromLocal(
+          whatsappVenta?.replace(/\D/g, '').replace(/^502/, '') || whatsappVenta
+        ) || whatsappVenta,
       });
+      resetVentaPanel();
 
       enviarBoletaPorCorreo({
         organizacionId,
