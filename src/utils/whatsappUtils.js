@@ -28,7 +28,7 @@ export function construirMensajeBoletaWhatsapp({
   const nombre = cargador?.nombre_completo?.split(' ')[0] || 'estimado/a';
   const etiqueta = turno?.etiqueta || turno?.tipo_turno || 'Turno';
   const codigo = brazo?.codigo_boleta_qr || '';
-  const enlace = `${APP_URL}/boleta/${codigo}`;
+  const enlace = `${getAppBaseUrl()}/boleta/${codigo}`;
   const precio = formatPrecio(brazo?.precio_pagado || turno?.precio || 0);
   const org = organizacion?.nombre_oficial || 'la organización';
 
