@@ -34,14 +34,20 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 /**
- * Suscripción Realtime filtrada por organización.
- * Canal: brazos:organizacion_id=eq.{organizacionId}
+ * Un canal Realtime por organización; varios listeners (Taquilla usa dos effects).
+ * No se puede llamar .on() después de .subscribe() en el mismo canal.
  */
-export function subscribeBrazos(organizacionId, onChange) {
-  if (MOCK_MODE) return () => {};
+const brazosRealtimeHub = new Map();
 
-  const channel = supabase
-    .channel(`brazos:org:${organizacionId}`)
+function getBrazosHub(organizacionId) {
+  if (brazosRealtimeHub.has(organizacionId)) {
+    return brazosRealtimeHub.get(organizacionId);
+  }
+
+  const listeners = new Set();
+  const channel = supabase.channel(`brazos:org:${organizacionId}`);
+
+  channel
     .on(
       'postgres_changes',
       {
@@ -50,14 +56,39 @@ export function subscribeBrazos(organizacionId, onChange) {
         table: 'brazos',
         filter: `organizacion_id=eq.${organizacionId}`,
       },
-      (payload) => onChange(payload)
+      (payload) => {
+        listeners.forEach((fn) => {
+          try {
+            fn(payload);
+          } catch (e) {
+            console.error('subscribeBrazos listener:', e);
+          }
+        });
+      }
     )
     .subscribe();
 
-  return () => {
-    supabase.removeChannel(channel);
-  };
+  const hub = { channel, listeners };
+  brazosRealtimeHub.set(organizacionId, hub);
+  return hub;
 }
 
+/**
+ * Suscripción Realtime filtrada por organización (tabla brazos).
+ */
+export function subscribeBrazos(organizacionId, onChange) {
+  if (MOCK_MODE || !organizacionId) return () => {};
+
+  const hub = getBrazosHub(organizacionId);
+  hub.listeners.add(onChange);
+
+  return () => {
+    hub.listeners.delete(onChange);
+    if (hub.listeners.size === 0) {
+      supabase.removeChannel(hub.channel);
+      brazosRealtimeHub.delete(organizacionId);
+    }
+  };
+}
 export const EMAIL_WEBHOOK_URL =
   process.env.REACT_APP_EMAIL_WEBHOOK_URL || '';

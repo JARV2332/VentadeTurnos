@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { TurnoCartulina } from '../components/TurnoCartulina';
 import { useAuth } from '../context/AuthContext';
-import { MOCK_MODE, subscribeBrazos } from '../config/supabaseClient';
 import {
   getCortejosByOrg,
   getTurnosAgrupados,
@@ -93,14 +92,13 @@ export default function Taquilla() {
 
   useEffect(() => {
     refreshCortejos();
-    return subscribeData(organizacionId, refreshCortejos);
-  }, [organizacionId, refreshCortejos]);
-
-  useEffect(() => {
     refresh();
-    if (MOCK_MODE) return subscribeData(organizacionId, refresh);
-    return subscribeBrazos(organizacionId, refresh);
-  }, [organizacionId, refresh]);
+    const unsub = subscribeData(organizacionId, () => {
+      refreshCortejos();
+      refresh();
+    });
+    return unsub;
+  }, [organizacionId, refreshCortejos, refresh]);
 
   const handleClickBrazo = async (brazo) => {
     if (brazo.estado === 'vendido') return;
