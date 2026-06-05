@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { MOCK_MODE } from '../config/supabaseClient';
 import { rutaInicioPorPermisos } from '../config/permisos';
 import BrandLogo from '../components/BrandLogo';
+import AppFooter from '../components/AppFooter';
 
 export default function Landing() {
   const { login, register, isAuthenticated, rutaInicio } = useAuth();
@@ -46,7 +47,8 @@ export default function Landing() {
   };
 
   return (
-    <div className="landing">
+    <div className="landing-page">
+      <div className="landing">
       <div className="landing__hero">
         <BrandLogo variant="hero" className="landing__brand" />
         <div className="landing__badge">Plataforma SaaS · Multi-tenant</div>
@@ -153,6 +155,7 @@ export default function Landing() {
           )}
         </div>
       </div>
+      <AppFooter className="app-footer--landing" />
     </div>
   );
 }

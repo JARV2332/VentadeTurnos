@@ -34,8 +34,15 @@ body {
 }
 
 /* ── Landing ── */
-.landing {
+.landing-page {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.landing {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: 1fr 420px;
 }
@@ -532,10 +539,75 @@ body {
 .app-content {
   flex: 1;
   min-height: 0;
-  padding: 1.5rem 2rem 2rem;
+  padding: 1.5rem 2rem 1rem;
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+}
+
+/* ── Pie global (copyright / desarrollador) ── */
+.app-footer {
+  flex-shrink: 0;
+  padding: 0.85rem 2rem 1rem;
+  text-align: center;
+  font-size: 0.72rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+.app-footer__copy {
+  margin: 0;
+}
+
+.app-footer__dev {
+  margin: 0.2rem 0 0;
+}
+
+.app-footer__dev strong {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.app-footer__contact {
+  margin: 0.35rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem 0.5rem;
+}
+
+.app-footer__link,
+.app-footer__email {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.app-footer__link:hover,
+.app-footer__email:hover {
+  text-decoration: underline;
+}
+
+.app-footer__sep {
+  opacity: 0.45;
+}
+
+.app-footer--landing {
+  background: var(--surface);
+}
+
+.app-footer--public {
+  margin-top: auto;
+  max-width: 420px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  border-top: none;
+  background: transparent;
+  padding-top: 1.5rem;
 }
 
 /* ── Metrics ── */
@@ -1505,8 +1577,10 @@ body {
 /* Boleta pública (enlace WhatsApp / correo) */
 .boleta-publica {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   background: var(--bg);
-  padding: 1.25rem 1rem 2rem;
+  padding: 1.25rem 1rem 1rem;
 }
 
 .boleta-publica__head {
@@ -2909,7 +2983,8 @@ body {
   .impresion-controls,
   .impresion-hint,
   .impresion-print-tip,
-  .venta-exito-overlay {
+  .venta-exito-overlay,
+  .app-footer {
     display: none !important;
   }
 
@@ -3610,6 +3685,20 @@ body {
 
   .app-content {
     padding: 1rem;
+  }
+
+  .app-footer {
+    padding: 0.75rem 1rem calc(0.5rem + env(safe-area-inset-bottom, 0));
+    font-size: 0.68rem;
+  }
+
+  .app-footer__contact {
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .app-footer__sep {
+    display: none;
   }
 
   .metrics-grid,

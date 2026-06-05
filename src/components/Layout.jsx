@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Navbar from './Navbar';
 import MobileNav from './MobileNav';
+import AppFooter from './AppFooter';
 
 export default function Layout({ title, subtitle, children, className = '' }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -40,6 +41,7 @@ export default function Layout({ title, subtitle, children, className = '' }) {
           onMenuToggle={() => setMenuOpen((open) => !open)}
         />
         <div className={`app-content ${className}`.trim()}>{children}</div>
+        <AppFooter />
       </main>
       <MobileNav />
     </div>

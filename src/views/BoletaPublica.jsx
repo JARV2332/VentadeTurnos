@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import BoletaRecibo from '../components/BoletaRecibo';
+import AppFooter from '../components/AppFooter';
 import { extraerCodigoBoleta } from '../utils/boletaUtils';
 import { mergeReciboConfig } from '../constants/reciboDefaults';
 
@@ -65,6 +66,7 @@ export default function BoletaPublica() {
           />
         )}
       </main>
+      <AppFooter className="app-footer--public" />
     </div>
   );
 }
