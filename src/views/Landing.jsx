@@ -155,6 +155,7 @@ export default function Landing() {
           )}
         </div>
       </div>
+      </div>
       <AppFooter className="app-footer--landing" />
     </div>
   );
