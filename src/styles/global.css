@@ -38,11 +38,12 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .landing {
-  flex: 1;
-  min-height: 0;
+  flex: 1 0 auto;
   display: grid;
   grid-template-columns: 1fr 420px;
 }
@@ -358,6 +359,13 @@ body {
   flex-direction: column;
   padding: 1.5rem 1rem;
   flex-shrink: 0;
+  height: 100dvh;
+  max-height: 100dvh;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .sidebar__brand {
@@ -432,7 +440,10 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
   min-width: 0;
   width: 100%;
   min-height: 0;
@@ -447,6 +458,9 @@ body {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 40;
 }
 
 .navbar__head {
@@ -537,12 +551,10 @@ body {
 }
 
 .app-content {
-  flex: 1;
+  flex: 1 0 auto;
   min-height: 0;
   padding: 1.5rem 2rem 1rem;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
+  overflow: visible;
 }
 
 /* ── Pie global (copyright / desarrollador) ── */
@@ -1059,13 +1071,11 @@ body {
 .legend-dot--reservado { background: #fbbf24; }
 .legend-dot--vendido { background: #475569; }
 
-/* Taquilla: mismo scroll que el resto de pantallas (área app-content) */
+/* Taquilla: scroll unificado en app-main (sin contenedor interno bloqueado) */
 .app-content--taquilla {
-  flex: 1 1 auto;
+  flex: 1 0 auto;
   min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
+  overflow: visible;
 }
 
 .taquilla-layout {
@@ -1581,6 +1591,8 @@ body {
   flex-direction: column;
   background: var(--bg);
   padding: 1.25rem 1rem 1rem;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .boleta-publica__head {
@@ -3622,6 +3634,9 @@ body {
     bottom: 0;
     z-index: 260;
     width: min(288px, 88vw);
+    height: auto;
+    max-height: none;
+    align-self: auto;
     transform: translateX(-105%);
     transition: transform 0.28s ease;
     box-shadow: none;
@@ -3661,6 +3676,10 @@ body {
     padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0));
   }
 
+  .app-main:has(.taquilla--venta-abierta) {
+    overflow: hidden;
+  }
+
   .navbar {
     padding: 0.75rem 1rem;
     flex-wrap: nowrap;
@@ -3688,7 +3707,7 @@ body {
   }
 
   .app-footer {
-    padding: 0.75rem 1rem calc(0.5rem + env(safe-area-inset-bottom, 0));
+    padding: 0.75rem 1rem 0.5rem;
     font-size: 0.68rem;
   }
 
@@ -3751,10 +3770,8 @@ body {
 
   .app-content--taquilla {
     display: block;
-    overflow-y: auto;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0));
+    overflow: visible;
+    padding-bottom: 1rem;
   }
 
   .taquilla-layout {
