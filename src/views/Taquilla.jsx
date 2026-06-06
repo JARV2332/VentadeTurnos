@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import Layout from '../components/Layout';
 import { TurnoCartulina } from '../components/TurnoCartulina';
 import { useAuth } from '../context/AuthContext';
@@ -52,9 +53,13 @@ export default function Taquilla() {
   const [cortejos, setCortejos] = useState([]);
   const [finalizando, setFinalizando] = useState(false);
   const [mesaActiva, setMesaActiva] = useState(null);
+  const [esMovil, setEsMovil] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 1024px)').matches
+  );
   const ventaPanelRef = useRef(null);
 
   const ventaAbierta = carrito.length > 0;
+  const cobroAbierto = ventaAbierta && pasoVenta >= 1;
 
   const scrollVentaPanelTop = () => {
     ventaPanelRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -65,19 +70,32 @@ export default function Taquilla() {
   }, [pasoVenta, carrito.length]);
 
   useEffect(() => {
-    const mobile = window.matchMedia('(max-width: 1024px)');
-    const bloquear = mobile.matches && ventaAbierta && pasoVenta >= 1;
-    if (!bloquear) return undefined;
+    const mq = window.matchMedia('(max-width: 1024px)');
+    const sync = () => setEsMovil(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
+  useEffect(() => {
+    if (!esMovil || !cobroAbierto) return undefined;
+    document.body.classList.add('taquilla-cobro-activo');
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
+      document.body.classList.remove('taquilla-cobro-activo');
       document.body.style.overflow = prev;
     };
-  }, [ventaAbierta, pasoVenta]);
+  }, [esMovil, cobroAbierto]);
 
   const abrirCobro = () => {
     setPasoVenta(1);
     requestAnimationFrame(() => scrollVentaPanelTop());
+  };
+
+  const cerrarCobro = () => {
+    if (esMovil) setPasoVenta(0);
+    else resetVentaPanel();
   };
 
   const vendedorAuthId = user?.authUserId || user?.id;
@@ -447,17 +465,13 @@ export default function Taquilla() {
           )}
         </div>
 
-        {ventaAbierta && pasoVenta >= 1 && (
+        {cobroAbierto && !esMovil && (
           <>
             <button
               type="button"
               className="venta-backdrop"
               aria-label="Cerrar venta"
-              onClick={() => {
-                const mobile = window.matchMedia('(max-width: 1024px)').matches;
-                if (mobile) setPasoVenta(0);
-                else resetVentaPanel();
-              }}
+              onClick={cerrarCobro}
             />
             <aside ref={ventaPanelRef} className="venta-panel venta-panel--sheet">
               <div className="venta-panel__top">
@@ -468,11 +482,7 @@ export default function Taquilla() {
                   type="button"
                   className="venta-panel__cerrar"
                   aria-label="Cerrar"
-                  onClick={() => {
-                    const mobile = window.matchMedia('(max-width: 1024px)').matches;
-                    if (mobile) setPasoVenta(0);
-                    else resetVentaPanel();
-                  }}
+                  onClick={cerrarCobro}
                 >
                   ×
                 </button>
@@ -696,6 +706,231 @@ export default function Taquilla() {
           </>
         )}
       </div>
+
+      {cobroAbierto &&
+        esMovil &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div className="venta-cobro-portal" role="dialog" aria-modal="true" aria-label="Cobro de turnos">
+            <button
+              type="button"
+              className="venta-backdrop"
+              aria-label="Cerrar venta"
+              onClick={cerrarCobro}
+            />
+            <aside ref={ventaPanelRef} className="venta-panel venta-panel--sheet venta-panel--movil">
+              <div className="venta-panel__top">
+                <h3 className="venta-panel__titulo-movil">
+                  Compra · {carrito.length} turno(s)
+                </h3>
+                <button
+                  type="button"
+                  className="venta-panel__cerrar"
+                  aria-label="Cerrar"
+                  onClick={cerrarCobro}
+                >
+                  ×
+                </button>
+              </div>
+
+              {pasoVenta === 1 && (
+                <form className="venta-panel__form" onSubmit={handleContinuarAPago}>
+                  <div className="venta-panel__scroll">
+                    {error && (
+                      <div className="alert alert--error venta-panel__error">{error}</div>
+                    )}
+                    <div className="venta-pasos">
+                      <span className="venta-paso--active">1. {TERMINO_DEVOTO}</span>
+                      <span>2. Pago</span>
+                    </div>
+
+                    <div className="venta-resumen">
+                      <h4 className="venta-resumen__titulo">Turnos adquiridos</h4>
+                      <table className="venta-carrito-tabla">
+                        <thead>
+                          <tr>
+                            <th>Cant.</th>
+                            <th>Turno</th>
+                            <th>Ofrenda</th>
+                            <th />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {carrito.map((b) => {
+                            const t = turnoDeBrazo(b);
+                            return (
+                              <tr key={b.id}>
+                                <td>1</td>
+                                <td>
+                                  <strong>#{b.numero_turno}</strong>{' '}
+                                  <span className="text-muted">{etiquetaHonorTurno(t)} · Brazo {b.numero_brazo}</span>
+                                </td>
+                                <td>{formatPrecio(t?.precio || 0)}</td>
+                                <td>
+                                  <button
+                                    type="button"
+                                    className="btn btn--ghost btn--sm"
+                                    onClick={() => quitarDelCarrito(b.id)}
+                                  >
+                                    Quitar
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <td colSpan={2}><strong>Total ofrenda</strong></td>
+                            <td colSpan={2}><strong>{totalCarritoFmt}</strong></td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+
+                    <h3>Datos {TERMINO_DEVOTO_ARTICULO}</h3>
+                    <p className="venta-panel__timer">Reserva activa · 5 min</p>
+                    <label>
+                      CUI / DPI
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="2998722460101"
+                        value={form.cui_o_identificacion}
+                        onChange={(e) => handleCuiChange(e.target.value)}
+                        maxLength={CUI_DIGITS}
+                        required
+                      />
+                    </label>
+                    <label>
+                      Nombre {TERMINO_DEVOTO_ARTICULO}
+                      <input
+                        type="text"
+                        value={form.nombre_completo}
+                        onChange={(e) => setForm({ ...form, nombre_completo: e.target.value })}
+                        required
+                      />
+                    </label>
+                    <PhoneInput502
+                      label="WhatsApp"
+                      value={form.whatsapp}
+                      onChange={handleWhatsappChange}
+                      required
+                      hint="Solo los 8 números; el +502 ya está incluido"
+                    />
+                    <label>
+                      Correo electrónico (boleta)
+                      <input
+                        type="email"
+                        placeholder="devoto@correo.com"
+                        value={form.correo}
+                        onChange={(e) => setForm({ ...form, correo: e.target.value })}
+                        required
+                      />
+                    </label>
+                    <PhoneInput502
+                      label="Teléfono emergencia (opcional)"
+                      value={form.telefono_emergencia}
+                      onChange={(val) => setForm({ ...form, telefono_emergencia: val })}
+                      hint="Opcional"
+                    />
+                  </div>
+                  <div className="venta-panel__actions">
+                    <button type="button" className="btn btn--ghost" onClick={resetVentaPanel}>
+                      Cancelar
+                    </button>
+                    <button type="submit" className="btn btn--primary">
+                      Continuar al pago →
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {pasoVenta === 2 && (
+                <form className="venta-panel__form" onSubmit={handleFinalizarVenta}>
+                  <div className="venta-panel__scroll">
+                    {error && (
+                      <div className="alert alert--error venta-panel__error">{error}</div>
+                    )}
+                    <div className="venta-pasos">
+                      <span className="venta-paso--done">1. {TERMINO_DEVOTO}</span>
+                      <span className="venta-paso--active">2. Pago</span>
+                    </div>
+                    <div className="venta-resumen venta-resumen--compact">
+                      <p className="text-muted">
+                        {carrito.length} turno(s) · Total <strong>{totalCarritoFmt}</strong>
+                      </p>
+                    </div>
+                    <h3>Confirmar pago</h3>
+                    <p className="text-muted venta-pago-intro">
+                      Seleccione cómo pagó el cliente. La venta se cierra al confirmar el pago
+                      y se envía la boleta por correo.
+                    </p>
+                    <div className="metodos-pago">
+                      {METODOS_PAGO.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          className={`metodo-pago-btn ${pago.metodo_pago === m.id ? 'metodo-pago-btn--active' : ''}`}
+                          onClick={() => setPago({
+                            metodo_pago: m.id,
+                            comprobante_url: m.id === pago.metodo_pago ? pago.comprobante_url : null,
+                            comprobante_nombre: m.id === pago.metodo_pago ? pago.comprobante_nombre : '',
+                          })}
+                        >
+                          <span className="metodo-pago-btn__icon">{m.icon}</span>
+                          <span>{m.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="venta-pago-total">
+                      Total a cobrar: <strong>{totalCarritoFmt}</strong>
+                    </div>
+                    {necesitaComprobante && (
+                      <div className="comprobante-upload">
+                        <label className="comprobante-upload__label">
+                          Foto del comprobante (transferencia / voucher)
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={handleComprobanteChange}
+                          />
+                        </label>
+                        {pago.comprobante_url ? (
+                          <div className="comprobante-preview">
+                            <img src={pago.comprobante_url} alt="Comprobante de pago" />
+                            <span>{pago.comprobante_nombre}</span>
+                          </div>
+                        ) : (
+                          <p className="hint-error">Obligatorio para transferencia y tarjeta</p>
+                        )}
+                      </div>
+                    )}
+                    {pago.metodo_pago === 'efectivo' && (
+                      <div className="info-box">
+                        Pago en efectivo: no requiere comprobante digital. Verifique el monto recibido.
+                      </div>
+                    )}
+                  </div>
+                  <div className="venta-panel__actions">
+                    <button type="button" className="btn btn--ghost" onClick={() => setPasoVenta(1)}>
+                      ← Atrás
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn btn--primary"
+                      disabled={finalizando || (necesitaComprobante && !pago.comprobante_url)}
+                    >
+                      {finalizando ? 'Procesando...' : 'Finalizar venta y enviar boleta'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </aside>
+          </div>,
+          document.body
+        )}
     </Layout>
   );
 }
