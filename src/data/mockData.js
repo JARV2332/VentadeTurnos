@@ -2,6 +2,7 @@
  * Datos de demostración — estructura real de turnos (Izq + Der).
  */
 import { crearBrazosParaTurno } from '../utils/turnoUtils';
+import { LEYENDA_CORREO_DEFAULT } from '../utils/emailTemplateUtils';
 
 const ORG_A = 'org-demo-001';
 const ORG_B = 'org-demo-002';
@@ -200,6 +201,7 @@ export const DEMO_EMAIL_CONFIG = {
     correo_respuesta: 'contacto@pastoral-asuncion.org',
     notificaciones_activas: true,
     pie_correo: 'Gracias por su participación en nuestros eventos.',
+    leyenda_correo: LEYENDA_CORREO_DEFAULT,
   },
 };
 
@@ -263,6 +265,7 @@ export function crearStoreInicial() {
     brazos: DEMO_BRAZOS.map((b) => ({ ...b })),
     emailConfig: { ...DEMO_EMAIL_CONFIG },
     correosEnviados: {},
+    compras: [],
   };
 }
 

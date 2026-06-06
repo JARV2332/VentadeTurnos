@@ -39,7 +39,10 @@ export default function EspacioBrazo({ brazo, selected, onClick, readOnly = fals
   );
 }
 
-export function TurnoCartulina({ turno, selectedBrazo, onClickBrazo, readOnly = false }) {
+export function TurnoCartulina({ turno, selectedBrazo, selectedBrazoIds, onClickBrazo, readOnly = false }) {
+  const idsEnCarrito = Array.isArray(selectedBrazoIds) ? selectedBrazoIds : [];
+  const isSelected = (id) =>
+    idsEnCarrito.includes(id) || selectedBrazo?.id === id;
   const formatQ = (n) =>
     new Intl.NumberFormat('es-GT', { style: 'currency', currency: 'GTQ' }).format(n);
   const repertorio = repertorioTurnoLista(turno);
@@ -78,7 +81,7 @@ export function TurnoCartulina({ turno, selectedBrazo, onClickBrazo, readOnly = 
               <EspacioBrazo
                 key={b.id}
                 brazo={b}
-                selected={selectedBrazo?.id === b.id}
+                selected={isSelected(b.id)}
                 onClick={readOnly ? () => {} : onClickBrazo}
                 readOnly={readOnly}
               />
@@ -99,7 +102,7 @@ export function TurnoCartulina({ turno, selectedBrazo, onClickBrazo, readOnly = 
               <EspacioBrazo
                 key={b.id}
                 brazo={b}
-                selected={selectedBrazo?.id === b.id}
+                selected={isSelected(b.id)}
                 onClick={readOnly ? () => {} : onClickBrazo}
                 readOnly={readOnly}
               />

@@ -5,13 +5,19 @@
 
 import { MOCK_MODE, supabase } from '../config/supabaseClient';
 import { getEmailConfig, registrarCorreoEnviado } from './dataService';
+import { formatPrecio } from '../utils/boletaUtils';
+import { construirLineasRecibo, codigoReciboDisplay } from '../utils/compraUtils';
+import { aplicarLeyendaCorreo } from '../utils/emailTemplateUtils';
 
 const APP_URL = process.env.REACT_APP_APP_URL || 'https://ventadeturnos.com';
 const EMAIL_WEBHOOK_URL =
   process.env.REACT_APP_EMAIL_WEBHOOK_URL ||
   (process.env.NODE_ENV === 'production' ? '/api/send-email' : '');
 
-export function construirAsuntoBoleta({ turno, cortejo }) {
+export function construirAsuntoBoleta({ turno, cortejo, items }) {
+  if (items?.length > 1) {
+    return `Sus turnos (${items.length}) — ${cortejo?.nombre_evento || 'Procesión'}`;
+  }
   const etiqueta = turno?.etiqueta || turno?.tipo_turno || 'Turno';
   return `Su ${etiqueta} — ${cortejo?.nombre_evento || 'Procesión'}`;
 }
@@ -23,41 +29,56 @@ export function construirCuerpoBoleta({
   cortejo,
   organizacion,
   emailConfig,
+  items,
+  compra,
 }) {
-  const etiqueta = turno?.etiqueta || turno?.tipo_turno || 'Turno';
-  const precio = new Intl.NumberFormat('es-GT', {
-    style: 'currency',
-    currency: 'GTQ',
-  }).format(brazo.precio_pagado || turno?.precio || 0);
+  const listaItems =
+    items?.length > 0
+      ? items
+      : brazo
+        ? [{ brazo, turno }]
+        : [];
+  const { lineas, totalFmt } = construirLineasRecibo(listaItems);
+  const brazosLista = listaItems.map((i) => i.brazo).filter(Boolean);
+  const codigoRecibo = codigoReciboDisplay(compra, brazosLista);
+  const enlaceBoleta = `${APP_URL}/boleta/${brazosLista[0]?.codigo_boleta_qr || codigoRecibo}`;
 
   const nombre = cargador?.nombre_completo?.split(' ')[0] || 'devoto';
-  const enlaceBoleta = `${APP_URL}/boleta/${brazo.codigo_boleta_qr}`;
+  const lineasTexto = lineas
+    .map(
+      (l) =>
+        `  • ${l.cantidad} × Turno #${l.numero_turno} (${l.etiqueta}) — ${formatPrecio(l.ofrenda)}`
+    )
+    .join('\n');
 
-  const cuerpo = `Estimado/a ${nombre},
+  const cuerpoBase = aplicarLeyendaCorreo(emailConfig?.leyenda_correo, {
+    nombre,
+    nombre_completo: cargador?.nombre_completo?.trim() || '',
+    evento: cortejo?.nombre_evento || 'Procesión',
+    turnos: lineasTexto,
+    total: totalFmt,
+    codigo: codigoRecibo,
+    enlace: enlaceBoleta,
+    organizacion: organizacion?.nombre_oficial || '',
+  });
 
-Su turno #${brazo.numero_turno} (${etiqueta}) para la procesión "${cortejo?.nombre_evento}" ya está apartado.
+  const pie = emailConfig?.pie_correo?.trim();
+  const firma = emailConfig?.nombre_remitente || organizacion?.nombre_oficial || '';
+  const cuerpo = pie
+    ? `${cuerpoBase}\n\n${pie}\n\n— ${firma}`
+    : `${cuerpoBase}\n\n— ${firma}`;
 
-  • Código de boleta: ${brazo.codigo_boleta_qr}
-  • Monto pagado: ${precio}
-
-En este correo encontrará su código QR (imagen adjunta y en el cuerpo del mensaje).
-También puede abrir su boleta digital aquí: ${enlaceBoleta}
-
-Para la entrega del turno físico, presente ese QR en taquilla.
-En taquilla escanearán el código para validar su compra y entregarle el turno de cartulina.
-
-Organización: ${organizacion?.nombre_oficial}
-${emailConfig?.pie_correo || ''}
-
-— ${emailConfig?.nombre_remitente || organizacion?.nombre_oficial}`;
-
-  return { cuerpo, enlaceBoleta, asunto: construirAsuntoBoleta({ turno, cortejo }) };
+  return {
+    cuerpo,
+    enlaceBoleta,
+    asunto: construirAsuntoBoleta({ turno, cortejo, items: listaItems }),
+  };
 }
 
 /** Datos estructurados para vista previa HTML */
 export function construirDatosBoletaEmail(props) {
   const { cuerpo, enlaceBoleta, asunto } = construirCuerpoBoleta(props);
-  const { cargador, brazo, turno, cortejo, organizacion, emailConfig } = props;
+  const { cargador, brazo, turno, cortejo, organizacion, emailConfig, items, compra } = props;
   return {
     asunto,
     cuerpo,
@@ -72,6 +93,8 @@ export function construirDatosBoletaEmail(props) {
     cortejo,
     cargador,
     organizacion,
+    items: items?.length ? items : brazo ? [{ brazo, turno }] : [],
+    compra,
   };
 }
 
@@ -101,6 +124,8 @@ export async function enviarBoletaPorCorreo({
   brazo,
   turno,
   cortejo,
+  items,
+  compra,
   forzarEnvio = false,
 }) {
   const emailConfig = await getEmailConfig(organizacionId);
@@ -124,6 +149,8 @@ export async function enviarBoletaPorCorreo({
     cortejo,
     organizacion,
     emailConfig,
+    items,
+    compra,
   });
 
   if (MOCK_MODE || !EMAIL_WEBHOOK_URL) {
@@ -161,7 +188,7 @@ export async function enviarBoletaPorCorreo({
         to: cargador.correo,
         subject: datos.asunto,
         text: datos.cuerpo,
-        codigo_boleta: brazo.codigo_boleta_qr,
+        codigo_boleta: compra?.codigo_recibo || brazo.codigo_boleta_qr,
         enlace_boleta: datos.enlaceBoleta,
       }),
     });

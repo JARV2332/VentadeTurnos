@@ -42,7 +42,9 @@ export default function ConfigImportReservas() {
 
   useEffect(() => {
     if (!cortejoId || !organizacionId) return;
-    getResumenApartados(cortejoId, organizacionId).then(setResumen);
+    getResumenApartados(cortejoId, organizacionId).then((data) =>
+      setResumen(Array.isArray(data) ? data : [])
+    );
   }, [cortejoId, organizacionId]);
 
   const handleArchivo = async (e) => {
@@ -96,7 +98,7 @@ export default function ConfigImportReservas() {
     setTimeout(() => setOkMsg(''), 6000);
   };
 
-  const totalApartados = resumen.reduce((s, r) => s + r.apartados, 0);
+  const totalApartados = (resumen || []).reduce((s, r) => s + (r.apartados || 0), 0);
 
   return (
     <Layout
@@ -213,7 +215,7 @@ export default function ConfigImportReservas() {
             <strong>{resultadoImport.omitidos}</strong> omitidos
           </p>
           <div className="import-resultados">
-            {resultadoImport.resultados.map((r) => (
+            {(resultadoImport.resultados || []).map((r) => (
               <div
                 key={`${r.fila}-${r.mensaje}`}
                 className={`import-resultado ${r.ok ? 'import-resultado--ok' : 'import-resultado--err'}`}
@@ -249,11 +251,11 @@ export default function ConfigImportReservas() {
                     libres
                   </span>
                 </div>
-                {item.detalle.length === 0 ? (
+                {(item.detalle || []).length === 0 ? (
                   <p className="text-muted resumen-apartados__vacio">Sin apartados en este turno</p>
                 ) : (
                   <ul className="resumen-apartados__lista">
-                    {item.detalle.map((d) => (
+                    {(item.detalle || []).map((d) => (
                       <li key={d.brazo.id}>
                         Brazo {d.brazo.numero_brazo} {d.brazo.lado}:{' '}
                         <strong>{d.etiqueta}</strong>

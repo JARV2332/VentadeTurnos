@@ -1,19 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../context/AuthContext';
 import { getReciboConfig } from '../services/dataService';
 import { mergeReciboConfig } from '../constants/reciboDefaults';
 import { getQrPayload, formatPrecio } from '../utils/boletaUtils';
-import { etiquetaHonorTurno, repertorioTurnoLista } from '../utils/turnoUtils';
+import { construirLineasRecibo, codigoReciboDisplay } from '../utils/compraUtils';
 
 /**
- * Contraseña de turno — media carta horizontal (8.5" × 5.5").
+ * Contraseña / recibo de turno(s) — media carta horizontal (8.5" × 5.5").
+ * Soporta 1 o N turnos en la misma compra (tabla Turnos adquiridos).
  */
 export default function BoletaContraseñaTurno({
   organizacion,
   cortejo,
   turno,
   brazo,
+  items: itemsProp,
+  compra,
   config: configProp,
 }) {
   const { organizacionId } = useAuth();
@@ -31,16 +34,23 @@ export default function BoletaContraseñaTurno({
     };
   }, [organizacionId, configProp]);
 
+  const items = useMemo(() => {
+    if (itemsProp?.length) return itemsProp;
+    if (brazo) return [{ brazo, turno }];
+    return [];
+  }, [itemsProp, brazo, turno]);
+
+  const { lineas, totalFmt } = useMemo(() => construirLineasRecibo(items), [items]);
+  const brazosLista = items.map((i) => i.brazo).filter(Boolean);
+
   const cfg = mergeReciboConfig(configProp ?? configGuardada);
-  const codigo = brazo?.codigo_boleta_qr;
-  const precioValor = formatPrecio(brazo?.precio_pagado ?? turno?.precio);
+  const codigo = codigoReciboDisplay(compra, brazosLista);
   const titulo =
     cfg.titulo_personalizado?.trim() ||
     (cfg.mostrar_nombre_org !== false ? organizacion?.nombre_oficial : '') ||
     'Contraseña de turno';
   const primary = cfg.color_primario || '#4f46e5';
-  const honorTurno = etiquetaHonorTurno(turno);
-  const repertorio = repertorioTurnoLista(turno);
+  const esMulti = items.length > 1;
 
   return (
     <article
@@ -70,35 +80,50 @@ export default function BoletaContraseñaTurno({
       </header>
 
       <section className="boleta-contraseña__seccion">
-        <h2 className="boleta-contraseña__seccion-titulo">Datos del turno</h2>
+        <h2 className="boleta-contraseña__seccion-titulo">Turnos adquiridos</h2>
         <div className="boleta-contraseña__caja boleta-contraseña__caja--turno">
-          <div className="boleta-contraseña__turno-datos">
-            {cfg.mostrar_turno !== false && (
-              <>
-                <p className="boleta-contraseña__turno-num">
-                  <span>Turno</span>
-                  <strong>#{brazo?.numero_turno ?? turno?.numero_turno ?? '—'}</strong>
-                </p>
-                <p className="boleta-contraseña__turno-tipo">
-                  <strong>{honorTurno}</strong>
-                </p>
-                {repertorio.map((item) => (
-                  <p key={item.tipo} className="boleta-contraseña__melodia">
-                    <span>{item.tipo}</span>
-                    <strong>{item.texto}</strong>
-                  </p>
+          <div className="boleta-contraseña__turno-datos boleta-contraseña__turno-datos--tabla">
+            <table className="boleta-turnos-tabla">
+              <thead>
+                <tr>
+                  <th>Cant.</th>
+                  <th>Nº turno</th>
+                  <th>Ofrenda</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lineas.map((linea) => (
+                  <tr key={`${linea.numero_turno}-${linea.etiqueta}-${linea.ofrenda}`}>
+                    <td>{linea.cantidad}</td>
+                    <td>
+                      <strong>#{linea.numero_turno}</strong>
+                      <span className="boleta-turnos-tabla__tipo">{linea.etiqueta}</span>
+                    </td>
+                    <td>{formatPrecio(linea.ofrenda)}</td>
+                  </tr>
                 ))}
-              </>
-            )}
-            {cfg.mostrar_precio !== false && (
-              <p className="boleta-contraseña__ofrenda">
-                <span>Ofrenda</span>
-                <strong>{precioValor}</strong>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={2} className="boleta-turnos-tabla__total-label">
+                    Total ofrenda
+                  </td>
+                  <td className="boleta-turnos-tabla__total-valor">
+                    <strong>{totalFmt}</strong>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+            {esMulti && (
+              <p className="boleta-contraseña__nota-multi text-muted">
+                Cada turno tiene su código VT- para entrega en taquilla.
               </p>
             )}
           </div>
           <div className="boleta-contraseña__codigo-box">
-            <span className="boleta-contraseña__label">Código boleta</span>
+            <span className="boleta-contraseña__label">
+              {esMulti || compra?.codigo_recibo ? 'Código recibo' : 'Código boleta'}
+            </span>
             {cfg.mostrar_codigo_texto !== false && (
               <strong className="boleta-contraseña__codigo">{codigo || '—'}</strong>
             )}

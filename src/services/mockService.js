@@ -123,6 +123,7 @@ export function saveEmailConfig(organizacionId, config) {
     correo_respuesta: config.correo_respuesta,
     notificaciones_activas: config.notificaciones_activas !== false,
     pie_correo: config.pie_correo,
+    leyenda_correo: config.leyenda_correo?.trim() || null,
     gmail_smtp_user: config.gmail_smtp_user?.trim() || config.correo_remitente?.trim(),
   };
   if (nuevaPass) {
@@ -334,6 +335,138 @@ export function confirmarVentaMock(brazoId, cargadorData, precioPagado, organiza
   store.brazos = store.brazos.map((b) => (b.id === brazoId ? actualizado : b));
   emit('brazos', { eventType: 'UPDATE', new: actualizado });
   return { data: actualizado, cargador, codigo };
+}
+
+function upsertCargadorVentaMock(organizacionId, cargadorData) {
+  const whatsappReq = cargadorData.whatsapp?.replace(/\D/g, '');
+  const cuiNorm = String(cargadorData.cui_o_identificacion || '').replace(/\D/g, '');
+  if (!whatsappReq || whatsappReq.length < 11) {
+    return { error: 'WhatsApp obligatorio para confirmar la venta' };
+  }
+  if (cuiNorm.length !== 13) {
+    return { error: 'Ingrese un CUI válido (13 dígitos).' };
+  }
+
+  let cargador = buscarCargadorPorCui(organizacionId, cuiNorm);
+  const porWhatsapp = buscarCargadorPorWhatsapp(organizacionId, cargadorData.whatsapp);
+  if (cargador && porWhatsapp && cargador.id !== porWhatsapp.id) {
+    return {
+      error:
+        'Este CUI y este WhatsApp están registrados en devotos distintos. Verifique los datos.',
+    };
+  }
+  if (!cargador) cargador = porWhatsapp;
+
+  if (!cargador) {
+    cargador = {
+      id: `carg-${Date.now()}`,
+      organizacion_id: organizacionId,
+      ...cargadorData,
+      whatsapp: whatsappReq,
+      cui_o_identificacion: cuiNorm,
+      correo: cargadorData.correo?.trim() || '',
+    };
+    store.cargadores.push(cargador);
+  } else {
+    cargador = {
+      ...cargador,
+      nombre_completo: cargadorData.nombre_completo || cargador.nombre_completo,
+      whatsapp: whatsappReq,
+      correo: cargadorData.correo || cargador.correo,
+      cui_o_identificacion: cuiNorm,
+      telefono_emergencia: cargadorData.telefono_emergencia || cargador.telefono_emergencia,
+    };
+    store.cargadores = store.cargadores.map((c) =>
+      c.id === cargador.id ? cargador : c
+    );
+  }
+  return { cargador };
+}
+
+export function confirmarVentaCompraMock(
+  brazoIds,
+  cargadorData,
+  precios,
+  organizacionId,
+  pagoData = {}
+) {
+  const ids = Array.isArray(brazoIds) ? brazoIds : [];
+  if (!ids.length) return { error: 'Seleccione al menos un turno' };
+
+  const upsert = upsertCargadorVentaMock(organizacionId, cargadorData);
+  if (upsert.error) return upsert;
+  const { cargador } = upsert;
+
+  const brazosVenta = [];
+  let total = 0;
+
+  for (let i = 0; i < ids.length; i += 1) {
+    const brazoId = ids[i];
+    const brazo = store.brazos.find(
+      (b) => b.id === brazoId && b.organizacion_id === organizacionId
+    );
+    if (!brazo || brazo.estado !== 'reservado') {
+      return { error: 'Uno o más espacios ya no están reservados. Actualice la taquilla.' };
+    }
+    const precio = Number(precios[i] ?? 0);
+    total += precio;
+    brazosVenta.push({ brazo, precio });
+  }
+
+  const compraId = `compra-${Date.now()}`;
+  const codigoRecibo = `VR-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+  const compra = {
+    id: compraId,
+    organizacion_id: organizacionId,
+    cargador_id: cargador.id,
+    codigo_recibo: codigoRecibo,
+    total_pagado: total,
+    metodo_pago: pagoData?.metodo_pago || 'efectivo',
+    comprobante_url: pagoData?.comprobante_url || null,
+    pago_confirmado_en: new Date().toISOString(),
+  };
+  store.compras = store.compras || [];
+  store.compras.push(compra);
+
+  const brazosActualizados = brazosVenta.map(({ brazo, precio }) => {
+    const codigo = `VT-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+    return {
+      ...brazo,
+      estado: 'vendido',
+      cargador_id: cargador.id,
+      precio_pagado: precio,
+      codigo_boleta_qr: codigo,
+      compra_id: compraId,
+      bloqueado_hasta: null,
+      reserva_apartado: false,
+      asignado_nombre: null,
+      apartado_notas: null,
+      estado_entrega: 'pendiente',
+      entregado_en: null,
+      entregado_por: null,
+      metodo_pago: pagoData?.metodo_pago || 'efectivo',
+      comprobante_url: pagoData?.comprobante_url || null,
+      pago_confirmado_en: compra.pago_confirmado_en,
+    };
+  });
+
+  store.brazos = store.brazos.map((b) => {
+    const upd = brazosActualizados.find((x) => x.id === b.id);
+    return upd || b;
+  });
+  brazosActualizados.forEach((b) => emit('brazos', { eventType: 'UPDATE', new: b }));
+
+  return {
+    compra,
+    brazos: brazosActualizados,
+    cargador,
+    codigo: codigoRecibo,
+    data: brazosActualizados[0],
+  };
+}
+
+export function getComprasByOrgMock(organizacionId) {
+  return (store.compras || []).filter((c) => c.organizacion_id === organizacionId);
 }
 
 /** Genera procesión: turno 1 salida, último entrada, extraordinarios en posiciones elegidas */

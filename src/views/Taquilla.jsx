@@ -8,7 +8,7 @@ import {
   getMesasByOrg,
   subscribeData,
   reservarBrazo,
-  confirmarVenta,
+  confirmarVentaCompra,
   buscarCargadorPorWhatsapp,
   buscarCargadorPorCui,
   getCargadorById,
@@ -17,11 +17,11 @@ import { enviarBoletaPorCorreo } from '../services/emailService';
 import {
   METODOS_PAGO,
   metodoRequiereComprobante,
-  labelMetodoPago,
   leerImagenComoDataUrl,
 } from '../utils/pagoUtils';
 import { formatPrecio } from '../utils/boletaUtils';
-import { repertorioTurnoLista } from '../utils/turnoUtils';
+import { etiquetaHonorTurno } from '../utils/turnoUtils';
+import { construirLineasRecibo } from '../utils/compraUtils';
 import { isValidGtWhatsapp, fullGtPhoneFromLocal } from '../utils/phoneGtUtils';
 import { normalizarCui, isValidCui, CUI_DIGITS } from '../utils/cuiUtils';
 import { TERMINO_DEVOTO, TERMINO_DEVOTO_ARTICULO } from '../constants/terminologia';
@@ -33,8 +33,8 @@ export default function Taquilla() {
   const [cortejoId, setCortejoId] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('all');
   const [turnos, setTurnos] = useState([]);
-  const [selectedBrazo, setSelectedBrazo] = useState(null);
-  const [pasoVenta, setPasoVenta] = useState(1);
+  const [carrito, setCarrito] = useState([]);
+  const [pasoVenta, setPasoVenta] = useState(0);
   const [form, setForm] = useState({
     nombre_completo: '',
     whatsapp: '',
@@ -60,9 +60,20 @@ export default function Taquilla() {
 
   useEffect(() => {
     scrollVentaPanelTop();
-  }, [pasoVenta, selectedBrazo?.id]);
+  }, [pasoVenta, carrito.length]);
 
   const vendedorAuthId = user?.authUserId || user?.id;
+  const ventaAbierta = carrito.length > 0;
+  const carritoIds = carrito.map((b) => b.id);
+
+  const turnoDeBrazo = (brazo) => turnos.find((t) => t.id === brazo.turno_id);
+
+  const itemsCarrito = carrito.map((b) => ({
+    brazo: b,
+    turno: turnoDeBrazo(b),
+  }));
+
+  const { totalFmt: totalCarritoFmt } = construirLineasRecibo(itemsCarrito);
 
   const devotoToForm = (devoto) => ({
     nombre_completo: devoto?.nombre_completo || '',
@@ -73,8 +84,8 @@ export default function Taquilla() {
   });
 
   const resetVentaPanel = () => {
-    setSelectedBrazo(null);
-    setPasoVenta(1);
+    setCarrito([]);
+    setPasoVenta(0);
     setPago({ metodo_pago: 'efectivo', comprobante_url: null, comprobante_nombre: '' });
     setForm({
       nombre_completo: '',
@@ -83,6 +94,22 @@ export default function Taquilla() {
       cui_o_identificacion: '',
       telefono_emergencia: '',
     });
+  };
+
+  const quitarDelCarrito = (brazoId) => {
+    setCarrito((prev) => {
+      const next = prev.filter((b) => b.id !== brazoId);
+      if (next.length === 0) setPasoVenta(0);
+      return next;
+    });
+  };
+
+  const agregarAlCarrito = (brazo) => {
+    setCarrito((prev) => {
+      if (prev.some((b) => b.id === brazo.id)) return prev;
+      return [...prev, brazo];
+    });
+    setPasoVenta((p) => (p === 0 ? 1 : p));
   };
 
   const refreshCortejos = useCallback(async () => {
@@ -129,6 +156,7 @@ export default function Taquilla() {
 
   const handleClickBrazo = async (brazo) => {
     if (brazo.estado === 'vendido') return;
+    if (carrito.some((b) => b.id === brazo.id)) return;
     setError('');
     setVentaOk(null);
 
@@ -143,31 +171,32 @@ export default function Taquilla() {
         setError(res.error);
         return;
       }
-      setSelectedBrazo(res.data);
-      setPasoVenta(1);
-      setPago({ metodo_pago: 'efectivo', comprobante_url: null, comprobante_nombre: '' });
-      setForm({
-        nombre_completo: '',
-        whatsapp: '',
-        correo: '',
-        cui_o_identificacion: '',
-        telefono_emergencia: '',
-      });
+      agregarAlCarrito(res.data);
+      if (carrito.length === 0) {
+        setPago({ metodo_pago: 'efectivo', comprobante_url: null, comprobante_nombre: '' });
+        setForm({
+          nombre_completo: '',
+          whatsapp: '',
+          correo: '',
+          cui_o_identificacion: '',
+          telefono_emergencia: '',
+        });
+      }
     } else if (brazo.reserva_apartado && brazo.estado === 'reservado') {
       const cargador = brazo.cargador_id ? await getCargadorById(brazo.cargador_id) : null;
-      setSelectedBrazo(brazo);
-      setPasoVenta(1);
-      setPago({ metodo_pago: 'efectivo', comprobante_url: null, comprobante_nombre: '' });
-      setForm({
-        nombre_completo: cargador?.nombre_completo || brazo.asignado_nombre || '',
-        whatsapp: cargador?.whatsapp || '',
-        correo: cargador?.correo || '',
-        cui_o_identificacion: cargador?.cui_o_identificacion || '',
-        telefono_emergencia: cargador?.telefono_emergencia || '',
-      });
+      agregarAlCarrito(brazo);
+      if (carrito.length === 0) {
+        setPago({ metodo_pago: 'efectivo', comprobante_url: null, comprobante_nombre: '' });
+        setForm(devotoToForm(cargador) || {
+          nombre_completo: brazo.asignado_nombre || '',
+          whatsapp: '',
+          correo: '',
+          cui_o_identificacion: '',
+          telefono_emergencia: '',
+        });
+      }
     } else if (brazo.vendedor_id === vendedorAuthId) {
-      setSelectedBrazo(brazo);
-      setPasoVenta(1);
+      agregarAlCarrito(brazo);
     } else {
       setError('Reservado por otra mesa. Espere a que expire (5 min) o elija otro brazo.');
     }
@@ -248,20 +277,22 @@ export default function Taquilla() {
     }
 
     setFinalizando(true);
-    const turno = turnos.find((t) => t.id === selectedBrazo.turno_id);
     const cortejo = cortejos.find((c) => c.id === cortejoId);
     const whatsappVenta = form.whatsapp;
     const metodoPago = pago.metodo_pago;
+    const precios = carrito.map((b) => turnoDeBrazo(b)?.precio || 0);
 
     try {
-      const res = await confirmarVenta(
-        selectedBrazo.id,
+      const res = await confirmarVentaCompra(
+        carrito.map((b) => b.id),
         form,
-        turno?.precio || 0,
+        precios,
         organizacionId,
         {
           metodo_pago: metodoPago,
           comprobante_url: pago.comprobante_url,
+          mesa_id: mesaActiva?.id,
+          vendedor_id: vendedorAuthId,
         }
       );
 
@@ -271,13 +302,19 @@ export default function Taquilla() {
         return;
       }
 
+      const itemsVenta = (res.brazos || []).map((b) => ({
+        brazo: b,
+        turno: turnoDeBrazo(b) || turnos.find((t) => t.id === b.turno_id),
+      }));
+
       setVentaOk({
         ...res,
         email: null,
         emailEnviando: true,
         metodo_pago: metodoPago,
-        turno,
+        turno: itemsVenta[0]?.turno,
         cortejo,
+        items: itemsVenta,
         whatsappVenta: fullGtPhoneFromLocal(
           whatsappVenta?.replace(/\D/g, '').replace(/^502/, '') || whatsappVenta
         ) || whatsappVenta,
@@ -289,8 +326,11 @@ export default function Taquilla() {
         organizacion,
         cargador: res.cargador,
         brazo: res.data,
-        turno,
+        turno: itemsVenta[0]?.turno,
         cortejo,
+        items: itemsVenta,
+        compra: res.compra,
+        forzarEnvio: true,
       })
         .then((emailRes) => {
           setVentaOk((prev) =>
@@ -313,26 +353,36 @@ export default function Taquilla() {
     }
   };
 
-  const turnoSel = selectedBrazo
-    ? turnos.find((t) => t.id === selectedBrazo.turno_id)
-    : null;
-
-  const precioTurno = turnoSel?.precio || 0;
-  const repertorioSel = turnoSel ? repertorioTurnoLista(turnoSel) : [];
   const necesitaComprobante = metodoRequiereComprobante(pago.metodo_pago);
 
   return (
     <Layout
       title="Taquilla"
-      subtitle="Venta por turno — Izquierda y Derecha"
-      className={`app-content--taquilla${selectedBrazo ? ' taquilla--venta-abierta' : ''}`}
+      subtitle="Venta por turno — puede agregar varios turnos al mismo devoto(a)"
+      className={`app-content--taquilla${ventaAbierta ? ' taquilla--venta-abierta' : ''}`}
     >
       <VentaExitoModal
         venta={ventaOk}
         organizacion={organizacion}
         onCerrar={() => setVentaOk(null)}
       />
-      {error && !selectedBrazo && <div className="alert alert--error">{error}</div>}
+      {error && !ventaAbierta && <div className="alert alert--error">{error}</div>}
+
+      {carrito.length > 0 && (
+        <div className="taquilla-carrito-bar no-print">
+          <span>
+            <strong>{carrito.length}</strong> turno(s) en compra · Total{' '}
+            <strong>{totalCarritoFmt}</strong>
+          </span>
+          <button
+            type="button"
+            className="btn btn--primary btn--sm"
+            onClick={() => setPasoVenta((p) => (p === 0 ? 1 : p))}
+          >
+            {pasoVenta === 0 ? 'Cobrar' : 'Ver compra'}
+          </button>
+        </div>
+      )}
 
       <div className="taquilla-toolbar">
         <label>
@@ -357,6 +407,7 @@ export default function Taquilla() {
           <span className="legend-dot legend-dot--disponible" /> Libre
           <span className="legend-dot legend-dot--reservado" /> Reservado
           <span className="legend-dot legend-dot--vendido" /> Vendido
+          <span className="taquilla-legend__hint">Toque varios brazos para una misma compra</span>
         </div>
       </div>
 
@@ -369,14 +420,14 @@ export default function Taquilla() {
               <TurnoCartulina
                 key={turno.id}
                 turno={turno}
-                selectedBrazo={selectedBrazo}
+                selectedBrazoIds={carritoIds}
                 onClickBrazo={handleClickBrazo}
               />
             ))
           )}
         </div>
 
-        {selectedBrazo && (
+        {ventaAbierta && pasoVenta >= 1 && (
           <>
             <button
               type="button"
@@ -386,7 +437,9 @@ export default function Taquilla() {
             />
             <aside ref={ventaPanelRef} className="venta-panel venta-panel--sheet">
               <div className="venta-panel__top">
-                <h3 className="venta-panel__titulo-movil">Venta en curso</h3>
+                <h3 className="venta-panel__titulo-movil">
+                  Compra · {carrito.length} turno(s)
+                </h3>
                 <button
                   type="button"
                   className="venta-panel__cerrar"
@@ -396,7 +449,7 @@ export default function Taquilla() {
                   ×
                 </button>
               </div>
-            {error && selectedBrazo && (
+            {error && (
               <div className="alert alert--error venta-panel__error">{error}</div>
             )}
             <div className="venta-pasos">
@@ -405,18 +458,47 @@ export default function Taquilla() {
             </div>
 
             <div className="venta-resumen">
-              <p><strong>Turno #{selectedBrazo.numero_turno}</strong> · {formatPrecio(precioTurno)}</p>
-              <p className="text-muted">{turnoSel?.etiqueta || turnoSel?.tipo_turno}</p>
-              {repertorioSel.length > 0 && (
-                <div className="venta-repertorio">
-                  <span className="venta-repertorio__titulo">Se toca en este turno</span>
-                  {repertorioSel.map((item) => (
-                    <p key={item.tipo} className="venta-repertorio__linea">
-                      <strong>{item.tipo}:</strong> {item.texto}
-                    </p>
-                  ))}
-                </div>
-              )}
+              <h4 className="venta-resumen__titulo">Turnos adquiridos</h4>
+              <table className="venta-carrito-tabla">
+                <thead>
+                  <tr>
+                    <th>Cant.</th>
+                    <th>Turno</th>
+                    <th>Ofrenda</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {carrito.map((b) => {
+                    const t = turnoDeBrazo(b);
+                    return (
+                      <tr key={b.id}>
+                        <td>1</td>
+                        <td>
+                          <strong>#{b.numero_turno}</strong>{' '}
+                          <span className="text-muted">{etiquetaHonorTurno(t)} · Brazo {b.numero_brazo}</span>
+                        </td>
+                        <td>{formatPrecio(t?.precio || 0)}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            onClick={() => quitarDelCarrito(b.id)}
+                          >
+                            Quitar
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={2}><strong>Total ofrenda</strong></td>
+                    <td colSpan={2}><strong>{totalCarritoFmt}</strong></td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
 
             {pasoVenta === 1 && (
@@ -511,7 +593,7 @@ export default function Taquilla() {
                   </div>
 
                   <div className="venta-pago-total">
-                    Total a cobrar: <strong>{formatPrecio(precioTurno)}</strong>
+                    Total a cobrar: <strong>{totalCarritoFmt}</strong>
                   </div>
 
                   {necesitaComprobante && (

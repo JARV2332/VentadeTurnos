@@ -3,12 +3,23 @@ import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { labelMetodoPago } from '../utils/pagoUtils';
 import { construirEnlaceBoletaWhatsapp } from '../utils/whatsappUtils';
+import { construirLineasRecibo, codigoReciboDisplay } from '../utils/compraUtils';
+import { formatPrecio } from '../utils/boletaUtils';
 import { TERMINO_DEVOTO_A } from '../constants/terminologia';
 
 /**
  * Modal de venta completada (portal en body para no quedar detrás del panel móvil).
  */
 export default function VentaExitoModal({ venta, organizacion, onCerrar }) {
+  const items = venta?.items?.length
+    ? venta.items
+    : venta?.data
+      ? [{ brazo: venta.data, turno: venta.turno }]
+      : [];
+  const { lineas, totalFmt } = construirLineasRecibo(items);
+  const brazos = items.map((i) => i.brazo).filter(Boolean);
+  const codigo = codigoReciboDisplay(venta?.compra, brazos) || venta?.codigo;
+
   let enlaceWhatsapp = null;
   if (venta) {
     try {
@@ -19,6 +30,8 @@ export default function VentaExitoModal({ venta, organizacion, onCerrar }) {
         turno: venta.turno,
         cortejo: venta.cortejo,
         organizacion,
+        items,
+        compra: venta.compra,
       });
     } catch (err) {
       console.error('VentaExitoModal WhatsApp:', err);
@@ -36,8 +49,6 @@ export default function VentaExitoModal({ venta, organizacion, onCerrar }) {
 
   if (!venta || typeof document === 'undefined') return null;
 
-  const codigo = venta.codigo || venta.data?.codigo_boleta_qr;
-
   return createPortal(
     <div
       className="venta-exito-overlay"
@@ -53,10 +64,41 @@ export default function VentaExitoModal({ venta, organizacion, onCerrar }) {
           Venta completada
         </h2>
         <p className="venta-exito-card__codigo">
-          Boleta <strong>{codigo}</strong>
+          Recibo <strong>{codigo}</strong>
           {' · '}
           {labelMetodoPago(venta.metodo_pago)}
         </p>
+        {lineas.length > 0 && (
+          <div className="venta-exito-card__tabla-wrap">
+            <p className="venta-exito-card__sub">Turnos adquiridos</p>
+            <table className="venta-carrito-tabla venta-carrito-tabla--compact">
+              <thead>
+                <tr>
+                  <th>Cant.</th>
+                  <th>Turno</th>
+                  <th>Ofrenda</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lineas.map((l) => (
+                  <tr key={`${l.numero_turno}-${l.etiqueta}`}>
+                    <td>{l.cantidad}</td>
+                    <td>
+                      #{l.numero_turno} {l.etiqueta}
+                    </td>
+                    <td>{formatPrecio(l.ofrenda)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={2}>Total ofrenda</td>
+                  <td><strong>{totalFmt}</strong></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
         {venta.emailEnviando && (
           <p className="venta-exito-card__email">Enviando boleta por correo…</p>
         )}
@@ -74,7 +116,7 @@ export default function VentaExitoModal({ venta, organizacion, onCerrar }) {
         {enlaceWhatsapp ? (
           <>
             <p className="venta-exito-card__hint">
-              Abra WhatsApp {TERMINO_DEVOTO_A} con el mensaje y el enlace de la boleta (QR en el link).
+              Abra WhatsApp {TERMINO_DEVOTO_A} con el resumen y enlace de la boleta.
             </p>
             <a
               href={enlaceWhatsapp}

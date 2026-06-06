@@ -438,6 +438,101 @@ export async function confirmarVenta(brazoId, cargadorData, precioPagado, pagoDa
   return { data: brazo, cargador, codigo: brazo.codigo_boleta_qr };
 }
 
+export async function getComprasByOrg(organizacionId) {
+  const { data, error } = await supabase
+    .from('compras')
+    .select('*')
+    .eq('organizacion_id', organizacionId)
+    .order('pago_confirmado_en', { ascending: false });
+  if (error) {
+    if (error.code === '42P01') return [];
+    throw error;
+  }
+  return data || [];
+}
+
+export async function confirmarVentaCompra(brazoIds, cargadorData, precios, pagoData = {}) {
+  const orgId = cargadorData.organizacion_id;
+  const upsert = await upsertDevotoVenta(orgId, cargadorData);
+  if (upsert.error) return upsert;
+  const cargador = upsert.cargador;
+
+  const ids = Array.isArray(brazoIds) ? brazoIds : [];
+  const listaPrecios = Array.isArray(precios) ? precios : [];
+
+  const { data, error } = await supabase.rpc('confirmar_venta_compra', {
+    p_brazo_ids: ids,
+    p_cargador_id: cargador.id,
+    p_precios: listaPrecios,
+    p_metodo_pago: pagoData.metodo_pago || 'efectivo',
+    p_comprobante_url: pagoData.comprobante_url || null,
+    p_mesa_id: pagoData.mesa_id || null,
+    p_vendedor_id: pagoData.vendedor_id || null,
+  });
+
+  if (error) {
+    if (isMissingRpc(error)) {
+      return confirmarVentaCompraDirecto(ids, cargador, listaPrecios, orgId, pagoData);
+    }
+    return err(error);
+  }
+
+  const compra = data?.compra;
+  const brazos = Array.isArray(data?.brazos) ? data.brazos : [];
+  return {
+    compra,
+    brazos,
+    cargador,
+    codigo: compra?.codigo_recibo,
+    data: brazos[0] || null,
+  };
+}
+
+async function confirmarVentaCompraDirecto(brazoIds, cargador, precios, orgId, pagoData) {
+  const ids = brazoIds || [];
+  if (!ids.length) return { error: 'Seleccione al menos un turno' };
+
+  const total = precios.reduce((s, p) => s + Number(p || 0), 0);
+  const codigoRecibo = `VR-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+
+  const { data: compra, error: compraErr } = await supabase
+    .from('compras')
+    .insert({
+      organizacion_id: orgId,
+      cargador_id: cargador.id,
+      codigo_recibo: codigoRecibo,
+      total_pagado: total,
+      metodo_pago: pagoData.metodo_pago || 'efectivo',
+      comprobante_url: pagoData.comprobante_url || null,
+    })
+    .select()
+    .single();
+
+  if (compraErr) return err(compraErr);
+
+  const brazosActualizados = [];
+  for (let i = 0; i < ids.length; i += 1) {
+    const res = await confirmarVentaDirecto(ids[i], cargador, precios[i], pagoData);
+    if (res.error) return res;
+    const { data: brazoUpd, error: linkErr } = await supabase
+      .from('brazos')
+      .update({ compra_id: compra.id })
+      .eq('id', ids[i])
+      .select()
+      .single();
+    if (linkErr) return err(linkErr);
+    brazosActualizados.push(brazoUpd || res.data);
+  }
+
+  return {
+    compra,
+    brazos: brazosActualizados,
+    cargador,
+    codigo: codigoRecibo,
+    data: brazosActualizados[0] || null,
+  };
+}
+
 export async function buscarBoletaPorCodigo(organizacionId, codigo) {
   const codigoLimpio = codigo.trim().toUpperCase();
   const { data: brazo, error } = await supabase
@@ -555,7 +650,7 @@ export async function getDashboardMetrics(organizacionId) {
 }
 
 const EMAIL_CONFIG_PUBLIC =
-  'id, organizacion_id, correo_remitente, nombre_remitente, correo_respuesta, notificaciones_activas, pie_correo, gmail_smtp_user, gmail_password_configurada, created_at, updated_at';
+  'id, organizacion_id, correo_remitente, nombre_remitente, correo_respuesta, notificaciones_activas, pie_correo, leyenda_correo, gmail_smtp_user, gmail_password_configurada, created_at, updated_at';
 
 export async function getEmailConfig(organizacionId) {
   const { data } = await supabase
@@ -574,6 +669,7 @@ export async function saveEmailConfig(organizacionId, config) {
     correo_respuesta: config.correo_respuesta || null,
     notificaciones_activas: config.notificaciones_activas !== false,
     pie_correo: config.pie_correo || null,
+    leyenda_correo: config.leyenda_correo?.trim() || null,
     gmail_smtp_user: config.gmail_smtp_user?.trim() || config.correo_remitente?.trim() || null,
   };
 
@@ -929,39 +1025,183 @@ export async function eliminarProcesion(cortejoId, organizacionId) {
 
 export async function getResumenApartados(cortejoId, organizacionId) {
   const turnos = await getTurnosAgrupados(cortejoId, organizacionId);
+  const cargadores = await getCargadoresByOrg(organizacionId);
+  const cargadoresPorId = Object.fromEntries(cargadores.map((c) => [c.id, c]));
+
   return turnos.map((turno) => {
     const todos = [
       ...(Array.isArray(turno.izquierda) ? turno.izquierda : []),
       ...(Array.isArray(turno.derecha) ? turno.derecha : []),
     ];
-    const apartados = todos.filter((b) => b.reserva_apartado);
-    return { turno, apartados, total: todos.length, apartadosCount: apartados.length };
+    const apartadosLista = todos.filter(
+      (b) => b.estado === 'reservado' && b.reserva_apartado
+    );
+    const vendidos = todos.filter((b) => b.estado === 'vendido');
+    const libres = todos.filter((b) => b.estado === 'disponible');
+
+    return {
+      turno,
+      total: todos.length,
+      apartados: apartadosLista.length,
+      vendidos: vendidos.length,
+      libres: libres.length,
+      detalle: apartadosLista.map((b) => {
+        const cargador = cargadoresPorId[b.cargador_id];
+        return {
+          brazo: b,
+          cargador,
+          etiqueta:
+            cargador?.nombre_completo ||
+            b.asignado_nombre ||
+            b.apartado_notas ||
+            'Apartado',
+        };
+      }),
+    };
   });
 }
 
-export async function aplicarImportApartados(cortejoId, organizacionId, filas) {
+async function upsertCargadorParcialImport(organizacionId, datos) {
+  const cui = String(datos.cui || '').replace(/\D/g, '');
+  const whatsapp = datos.whatsapp?.replace(/\D/g, '');
+
+  let cargador = cui.length === 13 ? await buscarCargadorPorCui(organizacionId, cui) : null;
+  if (!cargador && whatsapp && whatsapp.length >= 11) {
+    cargador = await buscarCargadorPorWhatsapp(organizacionId, whatsapp);
+  }
+
+  if (whatsapp && whatsapp.length >= 11) {
+    const campos = {
+      nombre_completo: datos.nombre?.trim() || cargador?.nombre_completo || 'Sin nombre',
+      whatsapp,
+      correo: datos.correo?.trim() || cargador?.correo || '',
+      cui_o_identificacion: cui || cargador?.cui_o_identificacion || '',
+      telefono_emergencia:
+        datos.telefono_emergencia?.trim() || cargador?.telefono_emergencia || '',
+    };
+
+    if (!cargador) {
+      const { data, error } = await supabase
+        .from('cargadores_organizacion')
+        .insert({ organizacion_id: organizacionId, ...campos })
+        .select()
+        .single();
+      if (error) return null;
+      return data;
+    }
+
+    const { data, error } = await supabase
+      .from('cargadores_organizacion')
+      .update(campos)
+      .eq('id', cargador.id)
+      .select()
+      .single();
+    if (error) return cargador;
+    return data;
+  }
+
+  return cargador || null;
+}
+
+export async function aplicarImportApartados(cortejoId, organizacionId, filas, { usuarioId } = {}) {
+  const resultados = [];
+  let ok = 0;
+  let omitidos = 0;
+
   for (const fila of filas) {
+    const numeroTurno = parseInt(fila.turno, 10);
+    const numeroBrazo = parseInt(fila.brazo, 10);
     const lado = normalizarLado(fila.lado);
+
+    if (!numeroTurno || !numeroBrazo || !lado) {
+      resultados.push({
+        fila: fila.filaExcel,
+        ok: false,
+        mensaje: 'Turno, brazo o lado inválido',
+      });
+      omitidos += 1;
+      continue;
+    }
+
     const { data: turno } = await supabase
       .from('turnos')
       .select('id')
       .eq('cortejo_id', cortejoId)
-      .eq('numero_turno', fila.numero_turno)
+      .eq('numero_turno', numeroTurno)
       .maybeSingle();
-    if (!turno) continue;
 
-    await supabase
+    if (!turno) {
+      resultados.push({
+        fila: fila.filaExcel,
+        ok: false,
+        mensaje: `No existe turno ${numeroTurno}, brazo ${numeroBrazo} ${lado}`,
+      });
+      omitidos += 1;
+      continue;
+    }
+
+    const { data: brazo } = await supabase
+      .from('brazos')
+      .select('*')
+      .eq('turno_id', turno.id)
+      .eq('numero_brazo', numeroBrazo)
+      .eq('lado', lado)
+      .maybeSingle();
+
+    if (!brazo) {
+      resultados.push({
+        fila: fila.filaExcel,
+        ok: false,
+        mensaje: `No existe turno ${numeroTurno}, brazo ${numeroBrazo} ${lado}`,
+      });
+      omitidos += 1;
+      continue;
+    }
+
+    if (brazo.estado === 'vendido') {
+      resultados.push({
+        fila: fila.filaExcel,
+        ok: false,
+        mensaje: 'Ya está vendido',
+      });
+      omitidos += 1;
+      continue;
+    }
+
+    const cargador = await upsertCargadorParcialImport(organizacionId, fila);
+    const nombreSolo = fila.nombre?.trim() || null;
+
+    const { error } = await supabase
       .from('brazos')
       .update({
         estado: 'reservado',
         reserva_apartado: true,
-        asignado_nombre: fila.asignado_nombre || null,
-        apartado_notas: fila.apartado_notas || null,
         bloqueado_hasta: null,
+        cargador_id: cargador?.id || null,
+        asignado_nombre: cargador ? null : nombreSolo,
+        apartado_notas: fila.notas?.trim() || null,
+        vendedor_id: usuarioId || null,
+        mesa_id: null,
       })
-      .eq('turno_id', turno.id)
-      .eq('numero_brazo', fila.numero_brazo)
-      .eq('lado', lado);
+      .eq('id', brazo.id);
+
+    if (error) {
+      resultados.push({
+        fila: fila.filaExcel,
+        ok: false,
+        mensaje: error.message || 'Error al apartar',
+      });
+      omitidos += 1;
+      continue;
+    }
+
+    resultados.push({
+      fila: fila.filaExcel,
+      ok: true,
+      mensaje: `Apartado T${numeroTurno} B${numeroBrazo} ${lado}`,
+    });
+    ok += 1;
   }
-  return { ok: true, aplicados: filas.length };
+
+  return { ok, omitidos, total: filas.length, resultados };
 }

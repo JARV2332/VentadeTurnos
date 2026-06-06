@@ -1728,6 +1728,54 @@ body {
 
 .email-preview__saludo { font-weight: 600; margin-bottom: 0.75rem; }
 
+.email-preview__cuerpo {
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.85rem;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.correo-leyenda-textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.correo-placeholders {
+  margin: 0.75rem 0 1rem;
+  padding: 0.75rem 0.85rem;
+  background: var(--surface-muted, #f8fafc);
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border);
+}
+
+.correo-placeholders__titulo {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.correo-placeholders__lista {
+  margin: 0 0 0.65rem;
+  padding-left: 1.1rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.correo-placeholders__lista code {
+  font-size: 0.78rem;
+  color: var(--primary);
+}
+
 .email-preview__adjunto { margin: 1.25rem 0; }
 
 .email-preview__adjunto-label {
@@ -2186,6 +2234,126 @@ body {
 .boleta-contraseña__datos-grid p strong {
   color: #0f172a;
   font-weight: 600;
+}
+
+.boleta-turnos-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  margin-top: 0.25rem;
+}
+
+.boleta-turnos-tabla th,
+.boleta-turnos-tabla td {
+  padding: 0.35rem 0.45rem;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+}
+
+.boleta-turnos-tabla th {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.boleta-turnos-tabla tfoot td {
+  border-top: 2px solid #cbd5e1;
+  border-bottom: none;
+  padding-top: 0.5rem;
+}
+
+.boleta-turnos-tabla__tipo {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.boleta-turnos-tabla__total-label {
+  text-align: right !important;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  color: #64748b;
+}
+
+.boleta-turnos-tabla__total-valor {
+  font-size: 1rem;
+}
+
+.boleta-contraseña__turno-datos--tabla {
+  flex: 1;
+  min-width: 0;
+}
+
+.taquilla-carrito-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background: var(--primary-light);
+  border: 1px solid #c7d2fe;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+}
+
+.taquilla-legend__hint {
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.venta-resumen__titulo {
+  font-size: 0.85rem;
+  margin: 0 0 0.5rem;
+  color: var(--text);
+}
+
+.venta-carrito-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  margin-bottom: 0.75rem;
+}
+
+.venta-carrito-tabla th,
+.venta-carrito-tabla td {
+  padding: 0.35rem 0.4rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.venta-carrito-tabla th {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.venta-carrito-tabla tfoot td {
+  border-top: 2px solid var(--border);
+  font-weight: 600;
+}
+
+.venta-carrito-tabla--compact {
+  font-size: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.venta-exito-card__tabla-wrap {
+  margin: 0.75rem 0;
+  text-align: left;
+}
+
+.venta-exito-card__sub {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin: 0 0 0.35rem;
 }
 
 .boleta-contraseña__caja--turno {

@@ -6,6 +6,7 @@ import StatusBadge from '../components/StatusBadge';
 import { useAuth } from '../context/AuthContext';
 import {
   getBrazosByOrg,
+  getComprasByOrg,
   getCortejosByOrg,
   getCargadoresByOrg,
   getTurnoById,
@@ -14,7 +15,53 @@ import {
 import { enviarBoletaPorCorreo } from '../services/emailService';
 import { construirEnlaceBoletaWhatsapp } from '../utils/whatsappUtils';
 import { localDigitsFromGtPhone } from '../utils/phoneGtUtils';
+import { codigoReciboDisplay } from '../utils/compraUtils';
 import { TERMINO_DEVOTO } from '../constants/terminologia';
+
+function agruparRecibos(vendidos, comprasPorId) {
+  const map = new Map();
+  (vendidos || []).forEach((b) => {
+    const key = b.compra_id || `solo-${b.id}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        id: key,
+        compra: b.compra_id ? comprasPorId[b.compra_id] : null,
+        brazos: [],
+      });
+    }
+    map.get(key).brazos.push(b);
+  });
+  return [...map.values()];
+}
+
+function filtrarRecibos(recibos, cargadoresPorId, busqueda) {
+  const q = normalizarBusqueda(busqueda);
+  if (!q) return recibos;
+  return recibos.filter((r) => {
+    const cargador = cargadoresPorId[r.brazos[0]?.cargador_id];
+    const nombre = normalizarBusqueda(cargador?.nombre_completo);
+    const cui = normalizarBusqueda(cargador?.cui_o_identificacion);
+    const codigoRecibo = normalizarBusqueda(
+      codigoReciboDisplay(r.compra, r.brazos)
+    );
+    const codigos = r.brazos.map((b) => normalizarBusqueda(b.codigo_boleta_qr)).join(' ');
+    return (
+      nombre.includes(q) ||
+      cui.includes(q) ||
+      codigoRecibo.includes(q) ||
+      codigos.includes(q)
+    );
+  });
+}
+
+function etiquetaRecibo(recibo, cargadoresPorId) {
+  const nombre =
+    cargadoresPorId[recibo.brazos[0]?.cargador_id]?.nombre_completo?.trim() ||
+    'Sin nombre';
+  const codigo = codigoReciboDisplay(recibo.compra, recibo.brazos);
+  const n = recibo.brazos.length;
+  return `${nombre} — ${n} turno(s) · ${codigo}`;
+}
 
 function normalizarBusqueda(texto) {
   return String(texto || '')
@@ -24,51 +71,37 @@ function normalizarBusqueda(texto) {
     .trim();
 }
 
-function filtrarVentas(ventas, cargadoresPorId, busqueda) {
-  const q = normalizarBusqueda(busqueda);
-  if (!q) return ventas;
-
-  return ventas.filter((v) => {
-    const cargador = cargadoresPorId[v.cargador_id];
-    const nombre = normalizarBusqueda(cargador?.nombre_completo);
-    const cui = normalizarBusqueda(cargador?.cui_o_identificacion);
-    const codigo = normalizarBusqueda(v.codigo_boleta_qr);
-    const turno = String(v.numero_turno ?? '');
-    return (
-      nombre.includes(q) ||
-      cui.includes(q) ||
-      codigo.includes(q) ||
-      turno.includes(q)
-    );
-  });
-}
-
-function etiquetaVenta(v, cargadoresPorId) {
-  const nombre = cargadoresPorId[v.cargador_id]?.nombre_completo?.trim() || 'Sin nombre';
-  return `${nombre} — Turno ${v.numero_turno} · Brazo ${v.numero_brazo} (${v.codigo_boleta_qr})`;
-}
-
 export default function Impresion() {
   const { organizacion, organizacionId, hasPermiso } = useAuth();
-  const [ventas, setVentas] = useState([]);
+  const [recibos, setRecibos] = useState([]);
   const [cargadoresPorId, setCargadoresPorId] = useState({});
   const [busqueda, setBusqueda] = useState('');
-  const [selected, setSelected] = useState(null);
-  const [detalle, setDetalle] = useState({ cargador: null, turno: null, cortejo: null });
+  const [selectedId, setSelectedId] = useState(null);
+  const [detalle, setDetalle] = useState({
+    cargador: null,
+    cortejo: null,
+    items: [],
+    compra: null,
+  });
   const [enviandoCorreo, setEnviandoCorreo] = useState(false);
   const [msgReenvio, setMsgReenvio] = useState(null);
 
   const refresh = useCallback(async () => {
-    const [brazos, cargadores] = await Promise.all([
+    const [brazos, cargadores, compras] = await Promise.all([
       getBrazosByOrg(organizacionId),
       getCargadoresByOrg(organizacionId),
+      getComprasByOrg(organizacionId),
     ]);
     const vendidos = (Array.isArray(brazos) ? brazos : []).filter((b) => b.estado === 'vendido');
     const map = {};
     (Array.isArray(cargadores) ? cargadores : []).forEach((c) => {
       map[c.id] = c;
     });
-    setVentas(vendidos);
+    const comprasMap = {};
+    (Array.isArray(compras) ? compras : []).forEach((c) => {
+      comprasMap[c.id] = c;
+    });
+    setRecibos(agruparRecibos(vendidos, comprasMap));
     setCargadoresPorId(map);
   }, [organizacionId]);
 
@@ -77,53 +110,71 @@ export default function Impresion() {
     return subscribeData(organizacionId, refresh);
   }, [organizacionId, refresh]);
 
-  const ventasFiltradas = useMemo(
-    () => filtrarVentas(ventas, cargadoresPorId, busqueda),
-    [ventas, cargadoresPorId, busqueda]
+  const recibosFiltrados = useMemo(
+    () => filtrarRecibos(recibos, cargadoresPorId, busqueda),
+    [recibos, cargadoresPorId, busqueda]
+  );
+
+  const reciboSel = useMemo(
+    () => recibosFiltrados.find((r) => r.id === selectedId) || null,
+    [recibosFiltrados, selectedId]
   );
 
   useEffect(() => {
-    if (!ventasFiltradas.length) {
-      setSelected(null);
+    if (!recibosFiltrados.length) {
+      setSelectedId(null);
       return;
     }
-    setSelected((prev) =>
-      prev && ventasFiltradas.some((v) => v.id === prev.id) ? prev : ventasFiltradas[0]
+    setSelectedId((prev) =>
+      prev && recibosFiltrados.some((r) => r.id === prev) ? prev : recibosFiltrados[0].id
     );
-  }, [ventasFiltradas]);
+  }, [recibosFiltrados]);
 
   useEffect(() => {
     setMsgReenvio(null);
     (async () => {
-      if (!selected) {
-        setDetalle({ cargador: null, turno: null, cortejo: null });
+      if (!reciboSel) {
+        setDetalle({ cargador: null, cortejo: null, items: [], compra: null });
         return;
       }
-      const cargador = cargadoresPorId[selected.cargador_id] || null;
-      const turno = await getTurnoById(selected.turno_id);
+      const cargador = cargadoresPorId[reciboSel.brazos[0]?.cargador_id] || null;
       const cortejos = await getCortejosByOrg(organizacionId);
-      const cortejo = cortejos.find((c) => c.id === turno?.cortejo_id) || null;
-      setDetalle({ cargador, turno, cortejo });
+      const items = await Promise.all(
+        reciboSel.brazos.map(async (b) => ({
+          brazo: b,
+          turno: await getTurnoById(b.turno_id),
+        }))
+      );
+      const cortejo =
+        cortejos.find((c) => c.id === items[0]?.turno?.cortejo_id) || null;
+      setDetalle({
+        cargador,
+        cortejo,
+        items,
+        compra: reciboSel.compra,
+      });
     })();
-  }, [selected, organizacionId, cargadoresPorId]);
+  }, [reciboSel, organizacionId, cargadoresPorId]);
 
-  const { cargador, turno, cortejo } = detalle;
+  const { cargador, cortejo, items, compra } = detalle;
 
   const enlaceWhatsapp =
-    selected && cargador
+    reciboSel && cargador
       ? construirEnlaceBoletaWhatsapp({
           cargador,
-          brazo: selected,
-          turno,
+          brazo: reciboSel.brazos[0],
+          turno: items[0]?.turno,
           cortejo,
           organizacion,
+          items,
+          compra,
         })
       : null;
 
   const handlePrint = () => window.print();
 
   const handleReenviarCorreo = async () => {
-    if (!selected || !cargador) return;
+    if (!reciboSel || !cargador) return;
     setEnviandoCorreo(true);
     setMsgReenvio(null);
     try {
@@ -131,9 +182,11 @@ export default function Impresion() {
         organizacionId,
         organizacion,
         cargador,
-        brazo: selected,
-        turno,
+        brazo: reciboSel.brazos[0],
+        turno: items[0]?.turno,
         cortejo,
+        items,
+        compra,
         forzarEnvio: true,
       });
       if (res.ok) {
@@ -154,7 +207,7 @@ export default function Impresion() {
     }
   };
 
-  if (!ventas.length) {
+  if (!recibos.length) {
     return (
       <Layout title="Impresión de boletas" subtitle="Boleta con QR para validación y entrega">
         <p className="text-muted">No hay ventas confirmadas para imprimir.</p>
@@ -175,22 +228,20 @@ export default function Impresion() {
             autoComplete="off"
           />
           <small className="field-hint">
-            {ventasFiltradas.length} de {ventas.length} boleta(s)
+            {recibosFiltrados.length} de {recibos.length} recibo(s)
           </small>
         </label>
 
-        {ventasFiltradas.length > 0 ? (
+        {recibosFiltrados.length > 0 ? (
           <label>
             Resultado
             <select
-              value={selected?.id || ''}
-              onChange={(e) =>
-                setSelected(ventasFiltradas.find((v) => v.id === e.target.value) || null)
-              }
+              value={selectedId || ''}
+              onChange={(e) => setSelectedId(e.target.value)}
             >
-              {ventasFiltradas.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {etiquetaVenta(v, cargadoresPorId)}
+              {recibosFiltrados.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {etiquetaRecibo(r, cargadoresPorId)}
                 </option>
               ))}
             </select>
@@ -206,7 +257,7 @@ export default function Impresion() {
             type="button"
             className="btn btn--primary"
             onClick={handlePrint}
-            disabled={!selected}
+            disabled={!reciboSel}
           >
             Imprimir boleta
           </button>
@@ -218,7 +269,7 @@ export default function Impresion() {
         </div>
       </div>
 
-      {selected && (
+      {reciboSel && (
         <div className="impresion-reenvio no-print">
           <div className="impresion-reenvio__info">
             <strong>{cargador?.nombre_completo || 'Devoto(a)'}</strong>
@@ -271,16 +322,21 @@ export default function Impresion() {
         </div>
       )}
 
-      {selected ? (
+      {reciboSel ? (
         <div className="impresion-boleta print-area">
           <BoletaContraseñaTurno
             organizacion={organizacion}
-            brazo={selected}
-            turno={turno}
+            brazo={reciboSel.brazos[0]}
+            turno={items[0]?.turno}
+            items={items}
+            compra={compra}
             cortejo={cortejo}
           />
           <p className="text-muted impresion-hint no-print">
-            Estado entrega: <StatusBadge status={selected.estado_entrega} />
+            {reciboSel.brazos.length} turno(s) ·{' '}
+            {reciboSel.brazos.map((b) => (
+              <StatusBadge key={b.id} status={b.estado_entrega} />
+            ))}
           </p>
         </div>
       ) : (

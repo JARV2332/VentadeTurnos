@@ -24,6 +24,8 @@ import {
 
 import { construirDatosBoletaEmail } from '../services/emailService';
 
+import { LEYENDA_CORREO_DEFAULT, LEYENDA_CORREO_PLACEHOLDERS } from '../utils/emailTemplateUtils';
+
 import { MOCK_MODE } from '../config/supabaseClient';
 
 import { DEMO_NOMBRE_ORGANIZACION } from '../data/mockData';
@@ -51,6 +53,8 @@ const DEFAULT_CONFIG = {
   notificaciones_activas: true,
 
   pie_correo: 'Gracias por su participación en nuestros eventos.',
+
+  leyenda_correo: LEYENDA_CORREO_DEFAULT,
 
 };
 
@@ -393,6 +397,72 @@ export default function ConfigCorreo() {
 
               <label>
 
+                Leyenda del correo (mensaje que recibe el devoto)
+
+                <textarea
+
+                  rows={12}
+
+                  className="correo-leyenda-textarea"
+
+                  value={config.leyenda_correo ?? LEYENDA_CORREO_DEFAULT}
+
+                  onChange={(e) => setConfig({ ...config, leyenda_correo: e.target.value })}
+
+                  spellCheck
+
+                />
+
+                <small className="field-hint">
+
+                  Use los marcadores entre llaves; al enviar se reemplazan con los datos reales de la
+
+                  venta. La vista previa a la derecha se actualiza al guardar o al editar.
+
+                </small>
+
+              </label>
+
+              <div className="correo-placeholders">
+
+                <p className="correo-placeholders__titulo">Marcadores disponibles</p>
+
+                <ul className="correo-placeholders__lista">
+
+                  {LEYENDA_CORREO_PLACEHOLDERS.map((p) => (
+
+                    <li key={p.token}>
+
+                      <code>{p.token}</code> — {p.desc}
+
+                    </li>
+
+                  ))}
+
+                </ul>
+
+                <button
+
+                  type="button"
+
+                  className="btn btn--ghost btn--sm"
+
+                  onClick={() =>
+
+                    setConfig({ ...config, leyenda_correo: LEYENDA_CORREO_DEFAULT })
+
+                  }
+
+                >
+
+                  Restaurar leyenda predeterminada
+
+                </button>
+
+              </div>
+
+              <label>
+
                 Nombre remitente (visible en De:)
 
                 <input
@@ -431,7 +501,7 @@ export default function ConfigCorreo() {
 
               <label>
 
-                Pie de correo
+                Pie de correo (texto final antes de la firma)
 
                 <textarea
 

@@ -65,6 +65,18 @@ export const confirmarVenta = (brazoId, cargadorData, precio, organizacionId, pa
     ? sb.confirmarVenta(brazoId, { ...cargadorData, organizacion_id: organizacionId }, precio, pagoData)
     : Promise.resolve(mock.confirmarVentaMock(brazoId, cargadorData, precio, organizacionId, pagoData));
 
+export const confirmarVentaCompra = (brazoIds, cargadorData, precios, organizacionId, pagoData) =>
+  useSb()
+    ? sb.confirmarVentaCompra(brazoIds, { ...cargadorData, organizacion_id: organizacionId }, precios, pagoData)
+    : Promise.resolve(
+        mock.confirmarVentaCompraMock(brazoIds, cargadorData, precios, organizacionId, pagoData)
+      );
+
+export const getComprasByOrg = (organizacionId) =>
+  useSb()
+    ? sb.getComprasByOrg(organizacionId)
+    : Promise.resolve(mock.getComprasByOrgMock(organizacionId));
+
 export const buscarBoletaPorCodigo = (organizacionId, codigo) =>
   useSb()
     ? sb.buscarBoletaPorCodigo(organizacionId, codigo)
@@ -167,7 +179,7 @@ export const getResumenApartados = (cortejoId, orgId) =>
 
 export const aplicarImportApartados = (cortejoId, orgId, filas, opts) =>
   useSb()
-    ? sb.aplicarImportApartados(cortejoId, orgId, filas)
+    ? sb.aplicarImportApartados(cortejoId, orgId, filas, opts)
     : Promise.resolve(mock.aplicarImportApartadosMock(cortejoId, orgId, filas, opts));
 
 export const updatePerfil = (userId, orgId, datos, email) =>

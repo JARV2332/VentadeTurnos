@@ -1,5 +1,6 @@
 import { formatPrecio } from './boletaUtils';
 import { fullGtPhoneFromLocal, isValidGtWhatsapp } from './phoneGtUtils';
+import { construirLineasRecibo, codigoReciboDisplay } from './compraUtils';
 
 function getAppBaseUrl() {
   if (typeof window !== 'undefined' && window.location?.origin) {
@@ -24,26 +25,36 @@ export function construirMensajeBoletaWhatsapp({
   turno,
   cortejo,
   organizacion,
+  items,
+  compra,
 }) {
   const nombre = cargador?.nombre_completo?.split(' ')[0] || 'estimado/a';
-  const etiqueta = turno?.etiqueta || turno?.tipo_turno || 'Turno';
-  const codigo = brazo?.codigo_boleta_qr || '';
-  const enlace = `${getAppBaseUrl()}/boleta/${codigo}`;
-  const precio = formatPrecio(brazo?.precio_pagado || turno?.precio || 0);
   const org = organizacion?.nombre_oficial || 'la organización';
+  const listaItems =
+    items?.length > 0 ? items : brazo ? [{ brazo, turno }] : [];
+  const { lineas, totalFmt } = construirLineasRecibo(listaItems);
+  const brazosLista = listaItems.map((i) => i.brazo).filter(Boolean);
+  const codigo = codigoReciboDisplay(compra, brazosLista);
+  const enlace = `${getAppBaseUrl()}/boleta/${brazosLista[0]?.codigo_boleta_qr || codigo}`;
+
+  const lineasMsg = lineas.map(
+    (l) => `• ${l.cantidad}× Turno #${l.numero_turno} (${l.etiqueta}) — ${formatPrecio(l.ofrenda)}`
+  );
 
   return [
     `Hola ${nombre},`,
     '',
-    `Su turno #${brazo?.numero_turno ?? '—'} (${etiqueta}) para "${cortejo?.nombre_evento || 'la procesión'}" está confirmado.`,
+    `Turnos adquiridos para "${cortejo?.nombre_evento || 'la procesión'}":`,
     '',
-    `Código: ${codigo}`,
-    `Monto: ${precio}`,
+    ...lineasMsg,
     '',
-    `Boleta digital (abra el enlace y guarde el QR):`,
+    `Total ofrenda: ${totalFmt}`,
+    `Código recibo: ${codigo}`,
+    '',
+    `Boleta digital:`,
     enlace,
     '',
-    'Presente ese QR en taquilla para recibir su turno físico.',
+    'Presente el QR de cada turno (VT-…) en taquilla para recibir su cartulina.',
     '',
     `— ${org}`,
   ].join('\n');
