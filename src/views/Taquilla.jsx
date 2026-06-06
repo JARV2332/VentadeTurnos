@@ -62,6 +62,22 @@ export default function Taquilla() {
     scrollVentaPanelTop();
   }, [pasoVenta, carrito.length]);
 
+  useEffect(() => {
+    const mobile = window.matchMedia('(max-width: 1024px)');
+    const bloquear = mobile.matches && ventaAbierta && pasoVenta >= 1;
+    if (!bloquear) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [ventaAbierta, pasoVenta]);
+
+  const abrirCobro = () => {
+    setPasoVenta(1);
+    requestAnimationFrame(() => scrollVentaPanelTop());
+  };
+
   const vendedorAuthId = user?.authUserId || user?.id;
   const ventaAbierta = carrito.length > 0;
   const carritoIds = carrito.map((b) => b.id);
@@ -109,7 +125,10 @@ export default function Taquilla() {
       if (prev.some((b) => b.id === brazo.id)) return prev;
       return [...prev, brazo];
     });
-    setPasoVenta((p) => (p === 0 ? 1 : p));
+    const esEscritorio = window.matchMedia('(min-width: 1025px)').matches;
+    if (esEscritorio) {
+      setPasoVenta((p) => (p === 0 ? 1 : p));
+    }
   };
 
   const refreshCortejos = useCallback(async () => {
@@ -359,7 +378,7 @@ export default function Taquilla() {
     <Layout
       title="Taquilla"
       subtitle="Venta por turno — puede agregar varios turnos al mismo devoto(a)"
-      className={`app-content--taquilla${ventaAbierta ? ' taquilla--venta-abierta' : ''}`}
+      className={`app-content--taquilla${ventaAbierta ? ' taquilla--venta-abierta' : ''}${carrito.length > 0 ? ' taquilla--con-carrito' : ''}${pasoVenta >= 1 ? ' taquilla--cobro-abierto' : ''}`}
     >
       <VentaExitoModal
         venta={ventaOk}
@@ -368,18 +387,18 @@ export default function Taquilla() {
       />
       {error && !ventaAbierta && <div className="alert alert--error">{error}</div>}
 
-      {carrito.length > 0 && (
+      {carrito.length > 0 && pasoVenta < 1 && (
         <div className="taquilla-carrito-bar no-print">
           <span>
-            <strong>{carrito.length}</strong> turno(s) en compra · Total{' '}
+            <strong>{carrito.length}</strong> turno(s) · Total{' '}
             <strong>{totalCarritoFmt}</strong>
           </span>
           <button
             type="button"
             className="btn btn--primary btn--sm"
-            onClick={() => setPasoVenta((p) => (p === 0 ? 1 : p))}
+            onClick={abrirCobro}
           >
-            {pasoVenta === 0 ? 'Cobrar' : 'Ver compra'}
+            Cobrar →
           </button>
         </div>
       )}
@@ -433,7 +452,11 @@ export default function Taquilla() {
               type="button"
               className="venta-backdrop"
               aria-label="Cerrar venta"
-              onClick={resetVentaPanel}
+              onClick={() => {
+                const mobile = window.matchMedia('(max-width: 1024px)').matches;
+                if (mobile) setPasoVenta(0);
+                else resetVentaPanel();
+              }}
             />
             <aside ref={ventaPanelRef} className="venta-panel venta-panel--sheet">
               <div className="venta-panel__top">
@@ -444,68 +467,73 @@ export default function Taquilla() {
                   type="button"
                   className="venta-panel__cerrar"
                   aria-label="Cerrar"
-                  onClick={resetVentaPanel}
+                  onClick={() => {
+                    const mobile = window.matchMedia('(max-width: 1024px)').matches;
+                    if (mobile) setPasoVenta(0);
+                    else resetVentaPanel();
+                  }}
                 >
                   ×
                 </button>
               </div>
-            {error && (
-              <div className="alert alert--error venta-panel__error">{error}</div>
-            )}
-            <div className="venta-pasos">
-              <span className={pasoVenta === 1 ? 'venta-paso--active' : 'venta-paso--done'}>1. {TERMINO_DEVOTO}</span>
-              <span className={pasoVenta === 2 ? 'venta-paso--active' : ''}>2. Pago</span>
-            </div>
-
-            <div className="venta-resumen">
-              <h4 className="venta-resumen__titulo">Turnos adquiridos</h4>
-              <table className="venta-carrito-tabla">
-                <thead>
-                  <tr>
-                    <th>Cant.</th>
-                    <th>Turno</th>
-                    <th>Ofrenda</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {carrito.map((b) => {
-                    const t = turnoDeBrazo(b);
-                    return (
-                      <tr key={b.id}>
-                        <td>1</td>
-                        <td>
-                          <strong>#{b.numero_turno}</strong>{' '}
-                          <span className="text-muted">{etiquetaHonorTurno(t)} · Brazo {b.numero_brazo}</span>
-                        </td>
-                        <td>{formatPrecio(t?.precio || 0)}</td>
-                        <td>
-                          <button
-                            type="button"
-                            className="btn btn--ghost btn--sm"
-                            onClick={() => quitarDelCarrito(b.id)}
-                          >
-                            Quitar
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td colSpan={2}><strong>Total ofrenda</strong></td>
-                    <td colSpan={2}><strong>{totalCarritoFmt}</strong></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
 
             {pasoVenta === 1 && (
-              <>
-                <h3>Datos {TERMINO_DEVOTO_ARTICULO}</h3>
-                <p className="venta-panel__timer">Reserva activa · 5 min</p>
-                <form onSubmit={handleContinuarAPago}>
+              <form className="venta-panel__form" onSubmit={handleContinuarAPago}>
+                <div className="venta-panel__scroll">
+                  {error && (
+                    <div className="alert alert--error venta-panel__error">{error}</div>
+                  )}
+                  <div className="venta-pasos">
+                    <span className="venta-paso--active">1. {TERMINO_DEVOTO}</span>
+                    <span>2. Pago</span>
+                  </div>
+
+                  <div className="venta-resumen">
+                    <h4 className="venta-resumen__titulo">Turnos adquiridos</h4>
+                    <table className="venta-carrito-tabla">
+                      <thead>
+                        <tr>
+                          <th>Cant.</th>
+                          <th>Turno</th>
+                          <th>Ofrenda</th>
+                          <th />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {carrito.map((b) => {
+                          const t = turnoDeBrazo(b);
+                          return (
+                            <tr key={b.id}>
+                              <td>1</td>
+                              <td>
+                                <strong>#{b.numero_turno}</strong>{' '}
+                                <span className="text-muted">{etiquetaHonorTurno(t)} · Brazo {b.numero_brazo}</span>
+                              </td>
+                              <td>{formatPrecio(t?.precio || 0)}</td>
+                              <td>
+                                <button
+                                  type="button"
+                                  className="btn btn--ghost btn--sm"
+                                  onClick={() => quitarDelCarrito(b.id)}
+                                >
+                                  Quitar
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td colSpan={2}><strong>Total ofrenda</strong></td>
+                          <td colSpan={2}><strong>{totalCarritoFmt}</strong></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  <h3>Datos {TERMINO_DEVOTO_ARTICULO}</h3>
+                  <p className="venta-panel__timer">Reserva activa · 5 min</p>
                   <label>
                     CUI / DPI
                     <input
@@ -553,27 +581,41 @@ export default function Taquilla() {
                     onChange={(val) => setForm({ ...form, telefono_emergencia: val })}
                     hint="Opcional"
                   />
-                  <div className="venta-panel__actions">
-                    <button type="button" className="btn btn--ghost" onClick={resetVentaPanel}>
-                      Cancelar
-                    </button>
-                    <button type="submit" className="btn btn--primary">
-                      Continuar al pago →
-                    </button>
-                  </div>
-                </form>
-              </>
+                </div>
+                <div className="venta-panel__actions">
+                  <button type="button" className="btn btn--ghost" onClick={resetVentaPanel}>
+                    Cancelar
+                  </button>
+                  <button type="submit" className="btn btn--primary">
+                    Continuar al pago →
+                  </button>
+                </div>
+              </form>
             )}
 
             {pasoVenta === 2 && (
-              <>
-                <h3>Confirmar pago</h3>
-                <p className="text-muted venta-pago-intro">
-                  Seleccione cómo pagó el cliente. La venta se cierra al confirmar el pago
-                  y se envía la boleta por correo.
-                </p>
+              <form className="venta-panel__form" onSubmit={handleFinalizarVenta}>
+                <div className="venta-panel__scroll">
+                  {error && (
+                    <div className="alert alert--error venta-panel__error">{error}</div>
+                  )}
+                  <div className="venta-pasos">
+                    <span className="venta-paso--done">1. {TERMINO_DEVOTO}</span>
+                    <span className="venta-paso--active">2. Pago</span>
+                  </div>
 
-                <form onSubmit={handleFinalizarVenta}>
+                  <div className="venta-resumen venta-resumen--compact">
+                    <p className="text-muted">
+                      {carrito.length} turno(s) · Total <strong>{totalCarritoFmt}</strong>
+                    </p>
+                  </div>
+
+                  <h3>Confirmar pago</h3>
+                  <p className="text-muted venta-pago-intro">
+                    Seleccione cómo pagó el cliente. La venta se cierra al confirmar el pago
+                    y se envía la boleta por correo.
+                  </p>
+
                   <div className="metodos-pago">
                     {METODOS_PAGO.map((m) => (
                       <button
@@ -634,21 +676,20 @@ export default function Taquilla() {
                       Pago en efectivo: no requiere comprobante digital. Verifique el monto recibido.
                     </div>
                   )}
-
-                  <div className="venta-panel__actions">
-                    <button type="button" className="btn btn--ghost" onClick={() => setPasoVenta(1)}>
-                      ← Atrás
-                    </button>
-                    <button
-                      type="submit"
-                      className="btn btn--primary"
-                      disabled={finalizando || (necesitaComprobante && !pago.comprobante_url)}
-                    >
-                      {finalizando ? 'Procesando...' : 'Finalizar venta y enviar boleta'}
-                    </button>
-                  </div>
-                </form>
-              </>
+                </div>
+                <div className="venta-panel__actions">
+                  <button type="button" className="btn btn--ghost" onClick={() => setPasoVenta(1)}>
+                    ← Atrás
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn--primary"
+                    disabled={finalizando || (necesitaComprobante && !pago.comprobante_url)}
+                  >
+                    {finalizando ? 'Procesando...' : 'Finalizar venta y enviar boleta'}
+                  </button>
+                </div>
+              </form>
             )}
           </aside>
           </>
