@@ -54,6 +54,8 @@ export default function Taquilla() {
   const [mesaActiva, setMesaActiva] = useState(null);
   const ventaPanelRef = useRef(null);
 
+  const ventaAbierta = carrito.length > 0;
+
   const scrollVentaPanelTop = () => {
     ventaPanelRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -79,7 +81,6 @@ export default function Taquilla() {
   };
 
   const vendedorAuthId = user?.authUserId || user?.id;
-  const ventaAbierta = carrito.length > 0;
   const carritoIds = carrito.map((b) => b.id);
 
   const turnoDeBrazo = (brazo) => turnos.find((t) => t.id === brazo.turno_id);
