@@ -1479,6 +1479,11 @@ body {
 
 .venta-panel__actions .btn { flex: 1; }
 
+.venta-panel__error {
+  margin-bottom: 0.75rem;
+  font-size: 0.8rem;
+}
+
 /* ── Alerts ── */
 .alert {
   padding: 0.85rem 1rem;
@@ -3788,8 +3793,13 @@ body {
     padding-bottom: 1.5rem;
   }
 
-  .taquilla-layout .venta-panel {
+  .taquilla-layout .venta-panel:not(.venta-panel--sheet) {
     overflow-y: visible;
+  }
+
+  .taquilla-layout .venta-panel.venta-panel--sheet {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .app-content--taquilla.taquilla--venta-abierta {

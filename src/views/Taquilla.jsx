@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Layout from '../components/Layout';
 import { TurnoCartulina } from '../components/TurnoCartulina';
 import { useAuth } from '../context/AuthContext';
@@ -52,6 +52,15 @@ export default function Taquilla() {
   const [cortejos, setCortejos] = useState([]);
   const [finalizando, setFinalizando] = useState(false);
   const [mesaActiva, setMesaActiva] = useState(null);
+  const ventaPanelRef = useRef(null);
+
+  const scrollVentaPanelTop = () => {
+    ventaPanelRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollVentaPanelTop();
+  }, [pasoVenta, selectedBrazo?.id]);
 
   const vendedorAuthId = user?.authUserId || user?.id;
 
@@ -176,10 +185,10 @@ export default function Taquilla() {
   };
 
   const handleWhatsappChange = async (value) => {
-    const limpio = value.replace(/\D/g, '').slice(0, 11);
-    setForm((f) => ({ ...f, whatsapp: limpio }));
-    if (limpio.length >= 11) {
-      const existente = await buscarCargadorPorWhatsapp(organizacionId, limpio);
+    const whatsapp = String(value || '').replace(/\D/g, '').slice(0, 11);
+    setForm((f) => ({ ...f, whatsapp }));
+    if (isValidGtWhatsapp(whatsapp)) {
+      const existente = await buscarCargadorPorWhatsapp(organizacionId, whatsapp);
       if (existente) {
         setForm(devotoToForm(existente));
       }
@@ -191,18 +200,22 @@ export default function Taquilla() {
     setError('');
     if (!isValidCui(form.cui_o_identificacion)) {
       setError('Ingrese un CUI válido (13 dígitos).');
+      scrollVentaPanelTop();
       return;
     }
     if (!form.nombre_completo?.trim()) {
       setError(`Ingrese el nombre ${TERMINO_DEVOTO_ARTICULO}.`);
+      scrollVentaPanelTop();
       return;
     }
     if (!isValidGtWhatsapp(form.whatsapp)) {
       setError('Ingrese los 8 dígitos del WhatsApp (después de +502).');
+      scrollVentaPanelTop();
       return;
     }
     if (!form.correo?.trim()) {
       setError('Ingrese el correo para enviar la boleta.');
+      scrollVentaPanelTop();
       return;
     }
     setPasoVenta(2);
@@ -230,6 +243,7 @@ export default function Taquilla() {
 
     if (metodoRequiereComprobante(pago.metodo_pago) && !pago.comprobante_url) {
       setError('Suba la foto del comprobante de transferencia o voucher de pago.');
+      scrollVentaPanelTop();
       return;
     }
 
@@ -253,6 +267,7 @@ export default function Taquilla() {
 
       if (res.error) {
         setError(res.error);
+        scrollVentaPanelTop();
         return;
       }
 
@@ -317,7 +332,7 @@ export default function Taquilla() {
         organizacion={organizacion}
         onCerrar={() => setVentaOk(null)}
       />
-      {error && <div className="alert alert--error">{error}</div>}
+      {error && !selectedBrazo && <div className="alert alert--error">{error}</div>}
 
       <div className="taquilla-toolbar">
         <label>
@@ -369,7 +384,7 @@ export default function Taquilla() {
               aria-label="Cerrar venta"
               onClick={resetVentaPanel}
             />
-            <aside className="venta-panel venta-panel--sheet">
+            <aside ref={ventaPanelRef} className="venta-panel venta-panel--sheet">
               <div className="venta-panel__top">
                 <h3 className="venta-panel__titulo-movil">Venta en curso</h3>
                 <button
@@ -381,6 +396,9 @@ export default function Taquilla() {
                   ×
                 </button>
               </div>
+            {error && selectedBrazo && (
+              <div className="alert alert--error venta-panel__error">{error}</div>
+            )}
             <div className="venta-pasos">
               <span className={pasoVenta === 1 ? 'venta-paso--active' : 'venta-paso--done'}>1. {TERMINO_DEVOTO}</span>
               <span className={pasoVenta === 2 ? 'venta-paso--active' : ''}>2. Pago</span>
