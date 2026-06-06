@@ -317,6 +317,15 @@ export async function getCargadorById(cargadorId) {
   return data;
 }
 
+export async function getCargadoresByOrg(organizacionId) {
+  const { data, error } = await supabase
+    .from('cargadores_organizacion')
+    .select('*')
+    .eq('organizacion_id', organizacionId);
+  if (error) throw error;
+  return data || [];
+}
+
 import { normalizarCui, isValidCui } from '../utils/cuiUtils';
 
 export async function buscarCargadorPorCui(organizacionId, cui) {

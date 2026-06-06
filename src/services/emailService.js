@@ -101,10 +101,11 @@ export async function enviarBoletaPorCorreo({
   brazo,
   turno,
   cortejo,
+  forzarEnvio = false,
 }) {
   const emailConfig = await getEmailConfig(organizacionId);
 
-  if (!emailConfig?.notificaciones_activas) {
+  if (!forzarEnvio && !emailConfig?.notificaciones_activas) {
     return { ok: false, omitido: true, motivo: 'Notificaciones por correo desactivadas' };
   }
 

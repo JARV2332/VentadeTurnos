@@ -1936,12 +1936,34 @@ body {
 /* ── Impresión ── */
 .impresion-controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
-.impresion-controls label { font-size: 0.75rem; font-weight: 500; color: var(--text-muted); }
+.impresion-controls label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.impresion-controls__busqueda {
+  flex: 1 1 220px;
+  min-width: 200px;
+}
+
+.impresion-controls__busqueda input[type='search'] {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
 .impresion-controls select {
   display: block;
   margin-top: 0.25rem;
@@ -1949,7 +1971,59 @@ body {
   border: 1px solid var(--border);
   border-radius: 8px;
   font-family: inherit;
-  min-width: 280px;
+  min-width: min(100%, 420px);
+  max-width: 100%;
+}
+
+.impresion-controls__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.impresion-controls__sin-resultados {
+  margin: 0;
+  font-size: 0.85rem;
+  align-self: center;
+}
+
+.impresion-reenvio {
+  margin-bottom: 1.25rem;
+  padding: 1rem 1.15rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.impresion-reenvio__info {
+  font-size: 0.88rem;
+  margin-bottom: 0.75rem;
+}
+
+.impresion-reenvio__botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.impresion-reenvio__sin-wa {
+  font-size: 0.82rem;
+}
+
+.impresion-reenvio__msg {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+}
+
+.impresion-reenvio__msg--ok {
+  color: var(--success);
+}
+
+.impresion-reenvio__msg--error {
+  color: var(--danger);
 }
 
 .impresion-boleta {
@@ -2998,6 +3072,7 @@ body {
   .navbar,
   .mobile-nav,
   .impresion-controls,
+  .impresion-reenvio,
   .impresion-hint,
   .impresion-print-tip,
   .venta-exito-overlay,

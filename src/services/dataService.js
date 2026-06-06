@@ -40,6 +40,11 @@ export const getCargadorById = (id) =>
     ? sb.getCargadorById(id)
     : Promise.resolve(mock.getStore().cargadores.find((c) => c.id === id) || null);
 
+export const getCargadoresByOrg = (organizacionId) =>
+  useSb()
+    ? sb.getCargadoresByOrg(organizacionId)
+    : Promise.resolve(mock.getCargadoresByOrg(organizacionId));
+
 export const buscarCargadorPorWhatsapp = (organizacionId, whatsapp) =>
   useSb()
     ? sb.buscarCargadorPorWhatsapp(organizacionId, whatsapp)
