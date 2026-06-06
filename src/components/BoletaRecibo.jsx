@@ -120,7 +120,7 @@ export default function BoletaRecibo({
 
         codigo={codigo}
 
-        precio={precio}
+        precio={precioValor}
 
         showEntrega={showEntrega}
 
