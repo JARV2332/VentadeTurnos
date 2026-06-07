@@ -11,8 +11,10 @@ import {
   getCargadoresByOrg,
   getTurnoById,
   buscarBoletaPorCodigo,
+  updateDevoto,
   subscribeData,
 } from '../services/dataService';
+import EditDevotoModal from '../components/EditDevotoModal';
 import { enviarBoletaPorCorreo } from '../services/emailService';
 import { construirEnlaceBoletaWhatsapp } from '../utils/whatsappUtils';
 import { localDigitsFromGtPhone } from '../utils/phoneGtUtils';
@@ -102,6 +104,10 @@ export default function Impresion() {
   const [msgReenvio, setMsgReenvio] = useState(null);
   const [reciboPorCodigo, setReciboPorCodigo] = useState(null);
   const [buscandoCodigo, setBuscandoCodigo] = useState(false);
+  const [devotoEditando, setDevotoEditando] = useState(null);
+  const [guardandoDevoto, setGuardandoDevoto] = useState(false);
+  const [errorDevoto, setErrorDevoto] = useState('');
+  const [okDevoto, setOkDevoto] = useState('');
 
   const refresh = useCallback(async () => {
     const [brazos, cargadores, compras] = await Promise.all([
@@ -227,6 +233,34 @@ export default function Impresion() {
 
   const handlePrint = () => window.print();
 
+  const abrirEditarDevoto = () => {
+    if (!cargador) return;
+    setErrorDevoto('');
+    setOkDevoto('');
+    setDevotoEditando(cargador);
+  };
+
+  const handleGuardarDevoto = async (datos) => {
+    if (!devotoEditando?.id) return;
+    setErrorDevoto('');
+    setGuardandoDevoto(true);
+    try {
+      const res = await updateDevoto(organizacionId, devotoEditando.id, datos);
+      if (res.error) {
+        setErrorDevoto(res.error);
+        return;
+      }
+      setCargadoresPorId((prev) => ({ ...prev, [res.data.id]: res.data }));
+      setDetalle((prev) =>
+        prev.cargador?.id === res.data.id ? { ...prev, cargador: res.data } : prev
+      );
+      setDevotoEditando(null);
+      setOkDevoto(`Datos de ${res.data.nombre_completo} actualizados.`);
+    } finally {
+      setGuardandoDevoto(false);
+    }
+  };
+
   const handleReenviarCorreo = async () => {
     if (!reciboSel || !cargador) return;
     setEnviandoCorreo(true);
@@ -271,6 +305,7 @@ export default function Impresion() {
 
   return (
     <Layout title="Impresión de boletas" subtitle="Busque por devoto(a), imprima o reenvíe boleta">
+      {okDevoto && <div className="alert alert--success no-print">{okDevoto}</div>}
       <div className="impresion-controls no-print">
         <label className="impresion-controls__busqueda">
           Buscar {TERMINO_DEVOTO.toLowerCase()}
@@ -353,6 +388,14 @@ export default function Impresion() {
             <button
               type="button"
               className="btn btn--ghost"
+              onClick={abrirEditarDevoto}
+              disabled={!cargador}
+            >
+              Editar datos
+            </button>
+            <button
+              type="button"
+              className="btn btn--ghost"
               onClick={handleReenviarCorreo}
               disabled={enviandoCorreo || !cargador?.correo?.trim()}
               title={!cargador?.correo?.trim() ? 'Sin correo registrado' : undefined}
@@ -414,6 +457,14 @@ export default function Impresion() {
         Al imprimir o guardar PDF: desactive <strong>Encabezados y pies de página</strong>, active{' '}
         <strong>Gráficos en segundo plano</strong> y elija <strong>Guardar como PDF</strong>.
       </p>
+
+      <EditDevotoModal
+        devoto={devotoEditando}
+        guardando={guardandoDevoto}
+        errorGuardar={errorDevoto}
+        onGuardar={handleGuardarDevoto}
+        onCerrar={() => !guardandoDevoto && setDevotoEditando(null)}
+      />
     </Layout>
   );
 }

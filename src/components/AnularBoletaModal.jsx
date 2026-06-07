@@ -11,6 +11,7 @@ export default function AnularBoletaModal({
   anulando,
   onBuscar,
   onAnular,
+  onEditDevoto,
   onCerrar,
   codigoInicial = '',
 }) {
@@ -105,9 +106,18 @@ export default function AnularBoletaModal({
               <strong>{codigoDisplay}</strong>
               {preview.compra ? ' · recibo multi-turno' : ''}
             </p>
-            <p className="text-muted">
+            <p className="text-muted caja-anular-modal__devoto">
               Devoto(a):{' '}
               <strong>{preview.cargador?.nombre_completo || '—'}</strong>
+              {onEditDevoto && preview.cargador && (
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={onEditDevoto}
+                >
+                  Editar datos
+                </button>
+              )}
               {' · '}
               {labelMetodoPago(preview.brazo?.metodo_pago || preview.compra?.metodo_pago)}
               {' · '}

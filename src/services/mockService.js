@@ -286,6 +286,51 @@ export function getCargadoresByOrg(organizacionId) {
   return store.cargadores.filter((c) => c.organizacion_id === organizacionId);
 }
 
+export function updateDevotoMock(organizacionId, cargadorId, datos) {
+  if (!cargadorId) return { error: 'Devoto no válido.' };
+
+  const idx = store.cargadores.findIndex(
+    (c) => c.id === cargadorId && c.organizacion_id === organizacionId
+  );
+  if (idx === -1) return { error: 'Devoto(a) no encontrado(a).' };
+
+  const whatsapp = String(datos.whatsapp || '').replace(/\D/g, '');
+  const cuiNorm = normalizarCui(datos.cui_o_identificacion);
+
+  if (!datos.nombre_completo?.trim()) {
+    return { error: 'Nombre del devoto(a) obligatorio.' };
+  }
+  if (!isValidCui(cuiNorm)) {
+    return { error: 'Ingrese un CUI válido (13 dígitos).' };
+  }
+  if (!/^502[0-9]{8}$/.test(whatsapp)) {
+    return { error: 'WhatsApp inválido (+502 y 8 dígitos).' };
+  }
+
+  const otroCui = buscarCargadorPorCui(organizacionId, cuiNorm);
+  if (otroCui && otroCui.id !== cargadorId) {
+    return { error: 'Ese CUI ya está registrado en otro devoto(a).' };
+  }
+
+  const otroWa = buscarCargadorPorWhatsapp(organizacionId, whatsapp);
+  if (otroWa && otroWa.id !== cargadorId) {
+    return { error: 'Ese WhatsApp ya está registrado en otro devoto(a).' };
+  }
+
+  const actualizado = {
+    ...store.cargadores[idx],
+    nombre_completo: datos.nombre_completo.trim(),
+    whatsapp,
+    correo: datos.correo?.trim() || '',
+    cui_o_identificacion: cuiNorm,
+    telefono_emergencia: datos.telefono_emergencia?.replace(/\D/g, '') || '',
+  };
+
+  store.cargadores[idx] = actualizado;
+  emit('devoto:actualizado', { cargador: actualizado });
+  return { data: actualizado };
+}
+
 export function getEmailConfig(organizacionId) {
   const raw = store.emailConfig?.[organizacionId];
   if (!raw) return null;

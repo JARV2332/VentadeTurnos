@@ -60,6 +60,11 @@ export const getCargadoresByOrg = (organizacionId) =>
     ? sb.getCargadoresByOrg(organizacionId)
     : Promise.resolve(mock.getCargadoresByOrg(organizacionId));
 
+export const updateDevoto = (organizacionId, cargadorId, datos) =>
+  useSb()
+    ? sb.updateDevoto(organizacionId, cargadorId, datos)
+    : Promise.resolve(mock.updateDevotoMock(organizacionId, cargadorId, datos));
+
 export const buscarCargadorPorWhatsapp = (organizacionId, whatsapp) =>
   useSb()
     ? sb.buscarCargadorPorWhatsapp(organizacionId, whatsapp)

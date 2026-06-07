@@ -3,14 +3,18 @@ import Layout from '../components/Layout';
 import Loader from '../components/Loader';
 import CajaReportePanel from '../components/CajaReportePanel';
 import AnularBoletaModal from '../components/AnularBoletaModal';
+import EditDevotoModal from '../components/EditDevotoModal';
 import { useAuth } from '../context/AuthContext';
 import {
   getFinanzasByOrg,
   subscribeData,
   buscarBoletaPorCodigo,
   anularVentaPorCodigo,
+  buscarCargadorPorCui,
+  updateDevoto,
 } from '../services/dataService';
 import { labelMetodoPago } from '../utils/pagoUtils';
+import { normalizarCui, isValidCui } from '../utils/cuiUtils';
 import {
   filtrarVentasCaja,
   formatQ,
@@ -36,6 +40,11 @@ export default function CajaSaaS() {
   const [anulando, setAnulando] = useState(false);
   const [okMsg, setOkMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [cuiBuscar, setCuiBuscar] = useState('');
+  const [buscandoDevoto, setBuscandoDevoto] = useState(false);
+  const [devotoEditando, setDevotoEditando] = useState(null);
+  const [guardandoDevoto, setGuardandoDevoto] = useState(false);
+  const [errorDevoto, setErrorDevoto] = useState('');
 
   const refreshFinanzas = useCallback(async () => {
     try {
@@ -153,6 +162,51 @@ export default function CajaSaaS() {
     } finally {
       setAnulando(false);
     }
+  };
+
+  const handleBuscarDevotoCui = async (e) => {
+    e?.preventDefault();
+    setErrorMsg('');
+    const cui = normalizarCui(cuiBuscar);
+    if (!isValidCui(cui)) {
+      setErrorMsg('Ingrese un CUI válido (13 dígitos).');
+      return;
+    }
+    setBuscandoDevoto(true);
+    try {
+      const devoto = await buscarCargadorPorCui(organizacionId, cui);
+      if (!devoto) {
+        setErrorMsg('No hay devoto(a) registrado(a) con ese CUI.');
+        return;
+      }
+      setErrorDevoto('');
+      setDevotoEditando(devoto);
+    } finally {
+      setBuscandoDevoto(false);
+    }
+  };
+
+  const handleGuardarDevoto = async (datos) => {
+    if (!devotoEditando?.id) return;
+    setErrorDevoto('');
+    setGuardandoDevoto(true);
+    try {
+      const res = await updateDevoto(organizacionId, devotoEditando.id, datos);
+      if (res.error) {
+        setErrorDevoto(res.error);
+        return;
+      }
+      setDevotoEditando(null);
+      setOkMsg(`Datos de ${res.data.nombre_completo} actualizados.`);
+    } finally {
+      setGuardandoDevoto(false);
+    }
+  };
+
+  const abrirEditarDevotoDesdeAnular = () => {
+    if (!previewAnular?.cargador) return;
+    setErrorDevoto('');
+    setDevotoEditando(previewAnular.cargador);
   };
 
   if (!finanzas) {
@@ -285,6 +339,29 @@ export default function CajaSaaS() {
             Anular boleta…
           </button>
         </div>
+      </section>
+
+      <section className="panel caja-devoto-panel">
+        <h3 className="panel__title">Editar datos de devoto(a)</h3>
+        <p className="text-muted config-hint">
+          Busque por CUI/DPI para corregir nombre, WhatsApp o correo. También puede editar desde{' '}
+          <strong>Impresión</strong> al seleccionar una boleta.
+        </p>
+        <form className="caja-devoto-panel__buscar config-form" onSubmit={handleBuscarDevotoCui}>
+          <label>
+            CUI / DPI
+            <input
+              type="text"
+              inputMode="numeric"
+              value={cuiBuscar}
+              onChange={(e) => setCuiBuscar(normalizarCui(e.target.value))}
+              placeholder="13 dígitos"
+            />
+          </label>
+          <button type="submit" className="btn btn--primary btn--sm" disabled={buscandoDevoto}>
+            {buscandoDevoto ? 'Buscando…' : 'Buscar y editar'}
+          </button>
+        </form>
       </section>
 
       <div className="caja-grid">
@@ -424,9 +501,18 @@ export default function CajaSaaS() {
           codigoInicial={codigoAnular}
           onBuscar={handleBuscarAnular}
           onAnular={handleConfirmarAnular}
+          onEditDevoto={previewAnular?.cargador ? abrirEditarDevotoDesdeAnular : undefined}
           onCerrar={cerrarAnular}
         />
       )}
+
+      <EditDevotoModal
+        devoto={devotoEditando}
+        guardando={guardandoDevoto}
+        errorGuardar={errorDevoto}
+        onGuardar={handleGuardarDevoto}
+        onCerrar={() => !guardandoDevoto && setDevotoEditando(null)}
+      />
     </Layout>
   );
 }

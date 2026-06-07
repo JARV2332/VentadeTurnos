@@ -3893,6 +3893,21 @@ body {
   margin-top: 0.5rem;
 }
 
+.caja-anular-modal__devoto {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.caja-devoto-panel__buscar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+  align-items: end;
+  max-width: 420px;
+}
+
 .btn--danger-text {
   color: var(--danger, #dc2626);
 }
