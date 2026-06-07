@@ -400,7 +400,9 @@ export default function ConfigSaaS() {
     if (fecha === null) return;
 
     setError('');
-    setOkMsg('Copiando procesión… en procesiones grandes puede tardar hasta un minuto.');
+    setOkMsg(
+      `Copiando procesión… ${p.totalTurnos || '?'} turnos, espere varios minutos sin cerrar la pestaña.`
+    );
     setDuplicandoId(p.id);
     try {
       const res = await duplicarProcesion(

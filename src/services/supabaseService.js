@@ -47,16 +47,18 @@ function sinCamposApartado(brazos) {
   return brazos.map(({ reserva_apartado, apartado_notas, ...b }) => b);
 }
 
-const BRAZOS_INSERT_LOTE = 100;
+const BRAZOS_INSERT_LOTE = 40;
+const BRAZOS_INSERT_DELAY_MS = 0;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function esErrorRed(error) {
+function esErrorDuplicado(error) {
   if (!error) return false;
+  const code = error.code || '';
   const msg = String(error.message || error);
-  return /failed to fetch|networkerror|load failed|network request failed|aborted/i.test(msg);
+  return code === '23505' || /duplicate key|unique constraint/i.test(msg);
 }
 
 function filaBrazoParaInsert(b) {
@@ -77,34 +79,67 @@ function filaBrazoParaInsert(b) {
   return fila;
 }
 
-async function insertarBrazosEnLotes(brazos, { sinApartado = false } = {}) {
+/** Inserta brazos en lotes pequeños (generar procesión). Sin reintentos ciegos. */
+async function insertarBrazosEnLotes(brazos, { sinApartado = false, lote = BRAZOS_INSERT_LOTE, delayMs = BRAZOS_INSERT_DELAY_MS } = {}) {
   const filas = (sinApartado ? sinCamposApartado(brazos) : brazos).map(filaBrazoParaInsert);
-  for (let i = 0; i < filas.length; i += BRAZOS_INSERT_LOTE) {
-    const lote = filas.slice(i, i + BRAZOS_INSERT_LOTE);
-    let lastError = null;
-
-    for (let intento = 0; intento < 4; intento += 1) {
-      const { error } = await supabase.from('brazos').insert(lote);
-      if (!error) {
-        lastError = null;
-        break;
-      }
-      lastError = error;
-
-      if (
-        !sinApartado &&
-        (isMissingColumn(error, 'reserva_apartado') || isMissingColumn(error, 'apartado_notas'))
-      ) {
-        return insertarBrazosEnLotes(brazos, { sinApartado: true });
-      }
-
-      if (!esErrorRed(error)) break;
-      await sleep(500 * (intento + 1));
+  for (let i = 0; i < filas.length; i += lote) {
+    const chunk = filas.slice(i, i + lote);
+    const { error } = await supabase.from('brazos').insert(chunk);
+    if (!error) {
+      if (delayMs > 0) await sleep(delayMs);
+      continue;
     }
 
-    if (lastError) return lastError;
+    if (
+      !sinApartado &&
+      (isMissingColumn(error, 'reserva_apartado') || isMissingColumn(error, 'apartado_notas'))
+    ) {
+      return insertarBrazosEnLotes(brazos, { sinApartado: true, lote, delayMs });
+    }
+
+    return error;
   }
   return null;
+}
+
+/** Inserción lenta 1×1 para duplicar procesiones grandes sin saturar Supabase. */
+async function insertarBrazosUnoAUno(brazos, { sinApartado = false, delayMs = 80 } = {}) {
+  const filas = (sinApartado ? sinCamposApartado(brazos) : brazos).map(filaBrazoParaInsert);
+
+  for (let i = 0; i < filas.length; i += 1) {
+    const fila = filas[i];
+    const { error } = await supabase.from('brazos').insert(fila);
+
+    if (!error) {
+      if (delayMs > 0 && i < filas.length - 1) await sleep(delayMs);
+      continue;
+    }
+
+    if (
+      !sinApartado &&
+      (isMissingColumn(error, 'reserva_apartado') || isMissingColumn(error, 'apartado_notas'))
+    ) {
+      return insertarBrazosUnoAUno(brazos, { sinApartado: true, delayMs });
+    }
+
+    if (esErrorDuplicado(error)) {
+      return error;
+    }
+
+    return error;
+  }
+
+  return null;
+}
+
+async function rollbackCortejoCompleto(cortejoId) {
+  const { data: turnos } = await supabase.from('turnos').select('id').eq('cortejo_id', cortejoId);
+  const turnoIds = (turnos || []).map((t) => t.id);
+  if (turnoIds.length) {
+    await supabase.from('brazos').delete().in('turno_id', turnoIds);
+  }
+  await supabase.from('turnos').delete().eq('cortejo_id', cortejoId);
+  await supabase.from('cortejos').delete().eq('id', cortejoId);
 }
 
 /** Trae todos los brazos de un cortejo (Supabase limita ~1000 filas por consulta). */
@@ -1069,8 +1104,7 @@ export async function generarProcesion(cortejo, configProcesion, organizacionId)
   if (cErr) return err(cErr);
 
   const rollbackCortejo = async () => {
-    await supabase.from('turnos').delete().eq('cortejo_id', nuevoCortejo.id);
-    await supabase.from('cortejos').delete().eq('id', nuevoCortejo.id);
+    await rollbackCortejoCompleto(nuevoCortejo.id);
   };
 
   const turnosCreados = [];
@@ -1231,15 +1265,13 @@ export async function duplicarProcesion(cortejoOrigenId, datos, organizacionId) 
   if (cErr) return err(cErr);
 
   const rollbackCortejo = async () => {
-    await supabase.from('turnos').delete().eq('cortejo_id', nuevoCortejo.id);
-    await supabase.from('cortejos').delete().eq('id', nuevoCortejo.id);
+    await rollbackCortejoCompleto(nuevoCortejo.id);
   };
 
   const turnosCreados = [];
   const brazosCreados = [];
 
   try {
-    const turnosInsert = [];
     for (const turnoOrigen of turnosOrigen) {
       const totalBrazos = Number(turnoOrigen.total_brazos) || 0;
       if (!totalBrazos || totalBrazos % 2 !== 0) {
@@ -1248,39 +1280,32 @@ export async function duplicarProcesion(cortejoOrigenId, datos, organizacionId) 
           error: `Turno "${turnoOrigen.etiqueta || turnoOrigen.numero_turno}": total de brazos inválido.`,
         };
       }
-      turnosInsert.push({
-        organizacion_id: organizacionId,
-        cortejo_id: nuevoCortejo.id,
-        numero_turno: turnoOrigen.numero_turno,
-        tipo_turno: turnoOrigen.tipo_turno,
-        etiqueta: turnoOrigen.etiqueta,
-        total_brazos: totalBrazos,
-        precio: turnoOrigen.precio ?? 0,
-        son: turnoOrigen.son,
-        alabado: turnoOrigen.alabado,
-      });
-    }
 
-    const { data: turnosNuevos, error: tErr } = await supabase
-      .from('turnos')
-      .insert(turnosInsert)
-      .select();
-    if (tErr) {
-      await rollbackCortejo();
-      return err(tErr);
-    }
+      const { data: turno, error: tErr } = await supabase
+        .from('turnos')
+        .insert({
+          organizacion_id: organizacionId,
+          cortejo_id: nuevoCortejo.id,
+          numero_turno: turnoOrigen.numero_turno,
+          tipo_turno: turnoOrigen.tipo_turno,
+          etiqueta: turnoOrigen.etiqueta,
+          total_brazos: totalBrazos,
+          precio: turnoOrigen.precio ?? 0,
+          son: turnoOrigen.son,
+          alabado: turnoOrigen.alabado,
+        })
+        .select()
+        .single();
+      if (tErr) {
+        await rollbackCortejo();
+        return err(tErr);
+      }
 
-    turnosCreados.push(...(turnosNuevos || []));
-    const turnoIdPorNumero = Object.fromEntries(
-      turnosCreados.map((t) => [t.numero_turno, t.id])
-    );
+      turnosCreados.push(turno);
 
-    for (const turnoOrigen of turnosOrigen) {
-      const turnoId = turnoIdPorNumero[turnoOrigen.numero_turno];
-      const totalBrazos = Number(turnoOrigen.total_brazos) || 0;
       const brazosTurno = crearBrazosParaTurno({
-        turnoId,
-        numeroTurno: turnoOrigen.numero_turno,
+        turnoId: turno.id,
+        numeroTurno: turno.numero_turno,
         totalBrazos,
         organizacionId,
         idPrefix: 'brazo',
@@ -1288,15 +1313,20 @@ export async function duplicarProcesion(cortejoOrigenId, datos, organizacionId) 
         const origenBrazo = brazosPorClave.get(claveBrazo(b));
         return { ...b, ...camposApartadoCopiados(origenBrazo) };
       });
-      brazosCreados.push(...brazosTurno);
-    }
 
-    const bErr = await insertarBrazosEnLotes(brazosCreados);
-    if (bErr) {
-      await rollbackCortejo();
-      return {
-        error: `Error al copiar los espacios (brazos): ${bErr.message || bErr}. Intente de nuevo; si persiste, verifique su conexión.`,
-      };
+      const bErr = await insertarBrazosUnoAUno(brazosTurno, { delayMs: 80 });
+      if (bErr) {
+        await rollbackCortejo();
+        const etiquetaTurno = turnoOrigen.etiqueta || `Turno ${turnoOrigen.numero_turno}`;
+        return {
+          error: esErrorDuplicado(bErr)
+            ? `Error al copiar "${etiquetaTurno}": ya existían espacios duplicados (¿intento anterior a medias?). Elimine la copia incompleta en la lista e intente de nuevo.`
+            : `Error al copiar brazos de "${etiquetaTurno}": ${bErr.message || bErr}. No cierre la pestaña; espere a que termine.`,
+        };
+      }
+
+      brazosCreados.push(...brazosTurno);
+      await sleep(120);
     }
   } catch (e) {
     await rollbackCortejo();
