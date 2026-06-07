@@ -2,6 +2,7 @@ import React from 'react';
 import StatusBadge from './StatusBadge';
 import { repertorioTurnoLista } from '../utils/turnoUtils';
 import { etiquetaAsignado } from '../utils/importReservasUtils';
+import { resumenApartadosTurno } from '../utils/apartadosDisplayUtils';
 
 const ESTADO_CLASS = {
   disponible: 'espacio--disponible',
@@ -66,6 +67,7 @@ export function TurnoCartulina({
   const repertorio = repertorioTurnoLista(turno);
   const izquierda = Array.isArray(turno?.izquierda) ? turno.izquierda : [];
   const derecha = Array.isArray(turno?.derecha) ? turno.derecha : [];
+  const apartadosResumen = resumenApartadosTurno(turno);
 
   return (
     <article className="turno-cartulina">
@@ -86,6 +88,18 @@ export function TurnoCartulina({
             <span key={item.tipo} className="turno-repertorio-item">
               <span className="turno-repertorio-item__tipo">{item.tipo}</span>
               <span className="turno-repertorio-item__texto">{item.texto}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {apartadosResumen.length > 0 && (
+        <div className="turno-cartulina__apartados" aria-label="Apartados en este turno">
+          <span className="turno-cartulina__apartados-label">Apartados:</span>
+          {apartadosResumen.map((a) => (
+            <span key={a.nombre} className="turno-cartulina__apartado-chip" title={a.nombre}>
+              {a.nombre}
+              {a.cantidad > 1 ? ` (×${a.cantidad})` : ''}
             </span>
           ))}
         </div>

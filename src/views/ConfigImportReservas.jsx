@@ -5,9 +5,12 @@ import { useAuth } from '../context/AuthContext';
 import {
   getCortejosByOrg,
   getResumenApartados,
+  getTurnosAgrupados,
   aplicarImportApartados,
   subscribeData,
 } from '../services/dataService';
+import ManualApartadoForm from '../components/ManualApartadoForm';
+import { filasGeneralesApartados } from '../utils/apartadosDisplayUtils';
 import {
   PLANTILLA_LISTADO_COLUMNAS,
   PLANTILLA_COLUMNAS,
@@ -22,6 +25,7 @@ export default function ConfigImportReservas() {
   const [cortejoId, setCortejoId] = useState('');
   const [cortejos, setCortejos] = useState([]);
   const [resumen, setResumen] = useState([]);
+  const [turnos, setTurnos] = useState([]);
   const [preview, setPreview] = useState([]);
   const [formatoImport, setFormatoImport] = useState(null);
   const [advertenciasImport, setAdvertenciasImport] = useState([]);
@@ -53,7 +57,16 @@ export default function ConfigImportReservas() {
     getResumenApartados(cortejoId, organizacionId).then((data) =>
       setResumen(Array.isArray(data) ? data : [])
     );
+    getTurnosAgrupados(cortejoId, organizacionId).then((data) =>
+      setTurnos(Array.isArray(data) ? data : [])
+    );
   }, [cortejoId, organizacionId]);
+
+  const refreshResumen = async () => {
+    if (!cortejoId || !organizacionId) return;
+    const data = await getResumenApartados(cortejoId, organizacionId);
+    setResumen(Array.isArray(data) ? data : []);
+  };
 
   const handleArchivo = async (e) => {
     const file = e.target.files?.[0];
@@ -146,11 +159,12 @@ export default function ConfigImportReservas() {
 
   const totalApartados = (resumen || []).reduce((s, r) => s + (r.apartados || 0), 0);
   const statsPreview = resumenFilasImport(preview, formatoImport);
+  const filasGenerales = filasGeneralesApartados(resumen);
 
   return (
     <Layout
-      title="Apartados por Excel"
-      subtitle="Listado de devotos con turno apartado — se muestran en Taquilla con su nombre"
+      title="Apartados"
+      subtitle="Manual o Excel — turno y devoto(a) visibles en Taquilla"
     >
       {aplicacionOk && (
         <div className="alert alert--success">
@@ -199,8 +213,16 @@ export default function ConfigImportReservas() {
         </div>
       </div>
 
+      <ManualApartadoForm
+        cortejoId={cortejoId}
+        organizacionId={organizacionId}
+        user={user}
+        turnos={turnos}
+        onAplicado={refreshResumen}
+      />
+
       <section className="panel">
-        <h3 className="panel__title">Formato del listado (recomendado)</h3>
+        <h3 className="panel__title">Importar desde Excel (opcional)</h3>
         <p className="text-muted config-hint">
           Una fila por devoto(a). El <strong>DPI es opcional</strong> — si aún no lo tienen, déjelo
           vacío; el apartado se hace con apellido y nombre. Si traen DPI válido (13 dígitos), se
@@ -386,7 +408,53 @@ export default function ConfigImportReservas() {
 
       <section className="panel">
         <h3 className="panel__title">
-          Apartados actuales por turno ({totalApartados} espacios)
+          Listado general de apartados ({totalApartados} espacio(s))
+        </h3>
+        <p className="text-muted config-hint">
+          Vista tipo Excel: qué turno está apartado y a quién. También puede apartar arriba sin subir
+          archivo.
+        </p>
+        {filasGenerales.length === 0 ? (
+          <p className="text-muted">No hay apartados registrados en esta procesión.</p>
+        ) : (
+          <div className="table-wrap">
+            <table className="data-table data-table--compact apartados-general-table">
+              <thead>
+                <tr>
+                  <th>Turno</th>
+                  <th>Honor / tipo</th>
+                  <th>Devoto(a)</th>
+                  <th>DPI</th>
+                  <th>Cant.</th>
+                  <th>Brazos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filasGenerales.map((f) => (
+                  <tr key={`${f.turnoId}-${f.nombre}-${f.dpi}-${f.cantidad}`}>
+                    <td>
+                      <strong>#{f.turnoNum}</strong>
+                    </td>
+                    <td>{f.turnoEtiqueta}</td>
+                    <td>
+                      <strong>{f.nombre}</strong>
+                    </td>
+                    <td>{f.dpi || <em className="text-muted">sin DPI</em>}</td>
+                    <td>{f.cantidad}</td>
+                    <td className="text-muted">
+                      {f.brazos.map((b) => `${b.numero} ${b.lado[0]}`).join(', ')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="panel">
+        <h3 className="panel__title">
+          Detalle por turno ({totalApartados} espacios)
         </h3>
         <p className="text-muted config-hint">
           Los espacios importados aparecen en <strong>amarillo (apartado)</strong> en Taquilla con el

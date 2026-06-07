@@ -561,6 +561,7 @@ export default function Taquilla() {
         </label>
         <div className="taquilla-legend">
           <span className="legend-dot legend-dot--disponible" /> Libre
+          <span className="legend-dot legend-dot--apartado" /> Apartado
           <span className="legend-dot legend-dot--reservado" /> Reservado
           <span className="legend-dot legend-dot--vendido" /> Vendido
           <span className="taquilla-legend__hint">Toque varios brazos para una misma compra</span>
