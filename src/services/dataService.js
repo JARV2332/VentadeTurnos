@@ -97,6 +97,11 @@ export const buscarBoletaPorCodigo = (organizacionId, codigo) =>
     ? sb.buscarBoletaPorCodigo(organizacionId, codigo)
     : Promise.resolve(mock.buscarBoletaPorCodigo(organizacionId, codigo));
 
+export const anularVentaPorCodigo = (organizacionId, codigo, motivo) =>
+  useSb()
+    ? sb.anularVentaPorCodigo(organizacionId, codigo, motivo)
+    : Promise.resolve(mock.anularVentaPorCodigoMock(organizacionId, codigo, motivo));
+
 export const marcarEntregado = (brazoId, organizacionId, usuarioId) =>
   useSb()
     ? sb.marcarEntregado(brazoId)

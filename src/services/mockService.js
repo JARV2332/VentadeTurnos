@@ -12,6 +12,7 @@ import {
 } from '../utils/importReservasUtils';
 import { isValidCui, normalizarCui } from '../utils/cuiUtils';
 import { aplicarAsignacionBrazos } from '../utils/aplicarAsignacionBrazos';
+import { RESET_BRAZO_VENTA, normalizarCodigoBoleta } from '../utils/ventaAnulacionUtils';
 
 let store = crearStoreInicial();
 const listeners = new Set();
@@ -365,6 +366,9 @@ export function buscarBoletaPorCodigo(organizacionId, codigo) {
     if (!compra) {
       return { error: 'Boleta no encontrada o no corresponde a esta organización.' };
     }
+    if (compra.estado === 'anulada') {
+      return { error: 'Esta boleta ya fue anulada.' };
+    }
     const brazos = store.brazos.filter(
       (b) => b.compra_id === compra.id && b.estado === 'vendido'
     );
@@ -420,6 +424,58 @@ export function buscarBoletaPorCodigo(organizacionId, codigo) {
   }));
 
   return { brazo, brazos, compra, turno, cortejo, cargador, items };
+}
+
+export function anularVentaPorCodigoMock(organizacionId, codigo, motivo = '') {
+  const codigoLimpio = normalizarCodigoBoleta(codigo);
+  if (!codigoLimpio || !/^V[RT]-[A-Z0-9]+$/.test(codigoLimpio)) {
+    return { error: 'Código de boleta inválido.' };
+  }
+  if (!motivo?.trim()) {
+    return { error: 'Indique el motivo de la anulación.' };
+  }
+
+  const preview = buscarBoletaPorCodigo(organizacionId, codigoLimpio);
+  if (preview.error) return preview;
+
+  const brazos = preview.brazos || [];
+  if (!brazos.length) {
+    return { error: 'Boleta no encontrada o ya anulada.' };
+  }
+
+  if (brazos.some((b) => b.estado_entrega === 'entregado')) {
+    return {
+      error: 'No se puede anular: uno o más turnos ya fueron entregados al devoto(a).',
+    };
+  }
+
+  brazos.forEach((b) => {
+    const idx = store.brazos.findIndex((x) => x.id === b.id);
+    if (idx === -1) return;
+    store.brazos[idx] = { ...store.brazos[idx], ...RESET_BRAZO_VENTA };
+    emit('brazos', { eventType: 'UPDATE', new: store.brazos[idx] });
+  });
+
+  if (preview.compra?.id) {
+    const cIdx = (store.compras || []).findIndex((c) => c.id === preview.compra.id);
+    if (cIdx !== -1) {
+      store.compras[cIdx] = {
+        ...store.compras[cIdx],
+        estado: 'anulada',
+        anulada_en: new Date().toISOString(),
+        motivo_anulacion: motivo.trim(),
+      };
+    }
+  }
+
+  return {
+    data: {
+      codigo: codigoLimpio,
+      brazos_liberados: brazos.length,
+      compra_id: preview.compra?.id || null,
+      motivo: motivo.trim(),
+    },
+  };
 }
 
 /** Marca el turno físico como entregado tras validar QR. */

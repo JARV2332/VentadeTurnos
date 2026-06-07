@@ -16,6 +16,7 @@ import {
 } from '../utils/importReservasUtils';
 import { isValidCui, normalizarCui } from '../utils/cuiUtils';
 import { aplicarAsignacionBrazos } from '../utils/aplicarAsignacionBrazos';
+import { RESET_BRAZO_VENTA, normalizarCodigoBoleta } from '../utils/ventaAnulacionUtils';
 import { PERMISOS_ADMIN_COMPLETO } from '../config/permisos';
 
 function err(error) {
@@ -867,6 +868,9 @@ export async function buscarBoletaPorCodigo(organizacionId, codigo) {
     if (!compra) {
       return { error: 'Boleta no encontrada o no corresponde a esta organización.' };
     }
+    if (compra.estado === 'anulada') {
+      return { error: 'Esta boleta ya fue anulada.' };
+    }
 
     const { data: brazos, error: errBrazos } = await supabase
       .from('brazos')
@@ -943,6 +947,89 @@ export async function buscarBoletaPorCodigo(organizacionId, codigo) {
   );
 
   return { brazo, brazos, compra, turno, cortejo, cargador, items };
+}
+
+async function anularVentaPorCodigoDirecto(organizacionId, codigo, motivo) {
+  const preview = await buscarBoletaPorCodigo(organizacionId, codigo);
+  if (preview.error) return preview;
+
+  const brazos = preview.brazos || [];
+  if (!brazos.length) {
+    return { error: 'Boleta no encontrada o ya anulada.' };
+  }
+
+  if (brazos.some((b) => b.estado_entrega === 'entregado')) {
+    return {
+      error: 'No se puede anular: uno o más turnos ya fueron entregados al devoto(a).',
+    };
+  }
+
+  const ids = brazos.map((b) => b.id);
+  const { error: upErr } = await supabase
+    .from('brazos')
+    .update(RESET_BRAZO_VENTA)
+    .in('id', ids)
+    .eq('organizacion_id', organizacionId)
+    .eq('estado', 'vendido');
+
+  if (upErr) return err(upErr);
+
+  if (preview.compra?.id) {
+    const payloadCompra = {
+      estado: 'anulada',
+      anulada_en: new Date().toISOString(),
+      motivo_anulacion: motivo?.trim() || null,
+    };
+    const { error: cErr } = await supabase
+      .from('compras')
+      .update(payloadCompra)
+      .eq('id', preview.compra.id)
+      .eq('organizacion_id', organizacionId);
+
+    if (cErr && !isMissingColumn(cErr, 'estado')) {
+      return err(cErr);
+    }
+  }
+
+  return {
+    data: {
+      codigo: normalizarCodigoBoleta(codigo),
+      brazos_liberados: brazos.length,
+      compra_id: preview.compra?.id || null,
+      motivo: motivo?.trim() || null,
+    },
+  };
+}
+
+export async function anularVentaPorCodigo(organizacionId, codigo, motivo = '') {
+  const codigoLimpio = normalizarCodigoBoleta(codigo);
+  if (!codigoLimpio || !/^V[RT]-[A-Z0-9]+$/.test(codigoLimpio)) {
+    return { error: 'Código de boleta inválido.' };
+  }
+  if (!motivo?.trim()) {
+    return { error: 'Indique el motivo de la anulación.' };
+  }
+
+  const { data, error } = await supabase.rpc('anular_venta_por_codigo', {
+    p_codigo: codigoLimpio,
+    p_motivo: motivo.trim(),
+  });
+
+  if (error) {
+    if (isMissingRpc(error)) {
+      return anularVentaPorCodigoDirecto(organizacionId, codigoLimpio, motivo.trim());
+    }
+    const msg = error.message || String(error);
+    if (/entregad/i.test(msg)) {
+      return { error: 'No se puede anular: uno o más turnos ya fueron entregados al devoto(a).' };
+    }
+    if (/no encontrad|ya anulad/i.test(msg)) {
+      return { error: 'Boleta no encontrada o ya anulada.' };
+    }
+    return err(error);
+  }
+
+  return { data };
 }
 
 export async function marcarEntregado(brazoId) {
