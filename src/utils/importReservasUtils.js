@@ -9,7 +9,7 @@ import * as XLSX from 'xlsx';
 import { isValidCui, normalizarCui } from './cuiUtils';
 
 export const PLANTILLA_LISTADO_COLUMNAS = [
-  { key: 'dpi', label: 'DPI', obligatorio: true, ejemplo: '1234567890101' },
+  { key: 'dpi', label: 'DPI', obligatorio: false, ejemplo: '1234567890101' },
   { key: 'apellido', label: 'Apellido', obligatorio: true, ejemplo: 'Pérez' },
   { key: 'nombre', label: 'Nombre', obligatorio: true, ejemplo: 'Juan Carlos' },
   { key: 'cantidad', label: 'Cantidad', obligatorio: true, ejemplo: '2' },
@@ -142,7 +142,6 @@ export function brazosElegiblesParaApartado(brazos) {
 
 function detectarFormato(colMap) {
   const tieneListado =
-    colMap.dpi !== undefined &&
     colMap.cantidad !== undefined &&
     colMap.turno !== undefined &&
     (colMap.apellido !== undefined || colMap.nombre !== undefined);
@@ -168,15 +167,16 @@ function parseFilasListado(rows, headerIdx, colMap) {
       return idx !== undefined ? cells[idx]?.trim() || '' : '';
     };
 
-    const dpi = normalizarCui(get('dpi') || get('cui'));
+    const dpiRaw = get('dpi') || get('cui');
+    const dpi = dpiRaw ? normalizarCui(dpiRaw) : '';
     const apellido = get('apellido');
     const nombre = get('nombre');
     const nombreCompleto = combinarNombreDevoto(apellido, nombre);
     const cantidad = parseInt(get('cantidad'), 10);
     const turno = get('turno');
 
-    if (!isValidCui(dpi)) {
-      errores.push(`Fila ${i + 1}: DPI inválido (debe tener 13 dígitos).`);
+    if (dpiRaw && !isValidCui(dpi)) {
+      errores.push(`Fila ${i + 1}: DPI incompleto o inválido (debe tener 13 dígitos o dejarse vacío).`);
       continue;
     }
     if (!nombreCompleto) {
@@ -336,7 +336,7 @@ export function descargarPlantillaListado() {
     PLANTILLA_LISTADO_COLUMNAS.map((c) => c.label),
     PLANTILLA_LISTADO_COLUMNAS.map((c) => c.ejemplo),
     ['9876543210101', 'López', 'María', '1', '8'],
-    ['1234567890101', 'Pérez', 'Juan Carlos', '2', 'Turno 7'],
+    ['', 'García', 'Pedro', '2', 'Turno 7'],
   ]);
   ws['!cols'] = [{ wch: 16 }, { wch: 18 }, { wch: 18 }, { wch: 10 }, { wch: 14 }];
   const wb = XLSX.utils.book_new();

@@ -161,9 +161,9 @@ export default function ConfigImportReservas() {
       <section className="panel">
         <h3 className="panel__title">Formato del listado (recomendado)</h3>
         <p className="text-muted config-hint">
-          Una fila por devoto(a). El <strong>DPI</strong> identifica al devoto; el sistema asigna
-          automáticamente los primeros espacios libres del turno indicado. En Taquilla aparecen en
-          <strong> amarillo/ámbar (apartado)</strong> con el nombre del hermano(a).
+          Una fila por devoto(a). El <strong>DPI es opcional</strong> — si aún no lo tienen, déjelo
+          vacío; el apartado se hace con apellido y nombre. Si traen DPI válido (13 dígitos), se
+          registra o actualiza al devoto. Los espacios se asignan solos al turno indicado.
         </p>
         <div className="table-wrap">
           <table className="data-table data-table--compact">
@@ -251,7 +251,7 @@ export default function ConfigImportReservas() {
                   {preview.map((f, i) => (
                     <tr key={`${f.filaExcel}-${i}`}>
                       <td>{f.filaExcel}</td>
-                      <td>{f.dpi}</td>
+                      <td>{f.dpi || <em className="text-muted">sin DPI</em>}</td>
                       <td>{f.apellido}</td>
                       <td>{f.nombre}</td>
                       <td>{f.cantidad}</td>
