@@ -8,7 +8,7 @@ export function extraerCodigoBoleta(texto) {
   const trimmed = texto.trim();
   const urlMatch = trimmed.match(/[?&]codigo=([^&]+)/i);
   if (urlMatch) return decodeURIComponent(urlMatch[1]).trim().toUpperCase();
-  const codeMatch = trimmed.match(/VT-[A-Z0-9]+/i);
+  const codeMatch = trimmed.match(/V[RT]-[A-Z0-9]+/i);
   if (codeMatch) return codeMatch[0].toUpperCase();
   return trimmed.toUpperCase();
 }

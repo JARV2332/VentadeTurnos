@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import BoletaRecibo from '../components/BoletaRecibo';
+import BoletaContraseñaTurno from '../components/BoletaContraseñaTurno';
 import AppFooter from '../components/AppFooter';
 import { extraerCodigoBoleta } from '../utils/boletaUtils';
 import { mergeReciboConfig } from '../constants/reciboDefaults';
@@ -40,6 +40,13 @@ export default function BoletaPublica() {
   }, [codigoParam]);
 
   const { loading, error, data } = estado;
+  const items =
+    data?.items?.length > 0
+      ? data.items
+      : data?.brazo
+        ? [{ brazo: data.brazo, turno: data.turno }]
+        : [];
+  const reciboConfig = mergeReciboConfig(data?.reciboConfig || null);
 
   return (
     <div className="boleta-publica">
@@ -47,23 +54,25 @@ export default function BoletaPublica() {
         <Link to="/" className="boleta-publica__brand">
           ventadeturnos.com
         </Link>
-        <p className="boleta-publica__hint">Boleta digital — presente el QR en taquilla</p>
+        <p className="boleta-publica__hint">Boleta digital — presente el QR en entrega de turno</p>
       </header>
 
       <main className="boleta-publica__main">
         {loading && <p className="text-muted">Cargando boleta…</p>}
-        {error && (
-          <div className="alert alert--error boleta-publica__alert">{error}</div>
-        )}
+        {error && <div className="alert alert--error boleta-publica__alert">{error}</div>}
         {data && (
-          <BoletaRecibo
-            brazo={data.brazo}
-            turno={data.turno}
-            cortejo={data.cortejo}
-            cargador={data.cargador}
-            organizacion={data.organizacion}
-            config={mergeReciboConfig(data.reciboConfig || null)}
-          />
+          <div className="boleta-publica__stage">
+            <BoletaContraseñaTurno
+              brazo={data.brazo}
+              turno={data.turno}
+              cortejo={data.cortejo}
+              cargador={data.cargador}
+              organizacion={data.organizacion}
+              items={items}
+              compra={data.compra}
+              config={reciboConfig}
+            />
+          </div>
         )}
       </main>
       <AppFooter className="app-footer--public" />

@@ -35,7 +35,7 @@ export function construirMensajeBoletaWhatsapp({
   const { lineas, totalFmt } = construirLineasRecibo(listaItems);
   const brazosLista = listaItems.map((i) => i.brazo).filter(Boolean);
   const codigo = codigoReciboDisplay(compra, brazosLista);
-  const enlace = `${getAppBaseUrl()}/boleta/${brazosLista[0]?.codigo_boleta_qr || codigo}`;
+  const enlace = `${getAppBaseUrl()}/boleta/${compra?.codigo_recibo || brazosLista[0]?.codigo_boleta_qr || codigo}`;
 
   const lineasMsg = lineas.map(
     (l) => `• ${l.cantidad}× Turno #${l.numero_turno} (${l.etiqueta}) — ${formatPrecio(l.ofrenda)}`

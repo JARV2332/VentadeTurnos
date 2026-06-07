@@ -45,7 +45,7 @@ export function construirCuerpoBoleta({
   const { lineas, totalFmt } = construirLineasRecibo(listaItems);
   const brazosLista = listaItems.map((i) => i.brazo).filter(Boolean);
   const codigoRecibo = codigoReciboDisplay(compra, brazosLista);
-  const enlaceBoleta = `${APP_URL}/boleta/${brazosLista[0]?.codigo_boleta_qr || codigoRecibo}`;
+  const enlaceBoleta = `${APP_URL}/boleta/${compra?.codigo_recibo || brazosLista[0]?.codigo_boleta_qr || codigoRecibo}`;
 
   const nombre = cargador?.nombre_completo?.split(' ')[0] || 'devoto(a)';
   const nombreCompleto = cargador?.nombre_completo?.trim() || 'Devoto(a)';
