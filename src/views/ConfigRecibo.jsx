@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import BoletaRecibo from '../components/BoletaRecibo';
+import BoletaContraseñaTurno from '../components/BoletaContraseñaTurno';
 import ReciboCanvasEditor from '../components/recibo/ReciboCanvasEditor';
 import { useAuth } from '../context/AuthContext';
 import { getReciboConfig, saveReciboConfig, getCortejosByOrg } from '../services/dataService';
@@ -14,14 +15,23 @@ import {
 } from '../constants/reciboDefaults';
 
 const DEMO_BOLETA = {
-  cargador: { nombre_completo: 'Juan Pérez López' },
+  cargador: {
+    nombre_completo: 'María José Álvarez López',
+    cui_o_identificacion: '2998722460101',
+  },
   brazo: {
-    numero_turno: 6,
+    numero_turno: 1,
     codigo_boleta_qr: 'VT-DEMO0001',
-    precio_pagado: 150,
+    precio_pagado: 250,
     estado_entrega: 'pendiente',
   },
-  turno: { tipo_turno: 'Ordinario', etiqueta: 'Ordinario 5', precio: 150 },
+  turno: {
+    tipo_turno: 'Salida',
+    etiqueta: 'Salida',
+    precio: 250,
+    son: 'Himno De La Asunción / Las Tortugas',
+    alabado: 'La Granadera / La Patrona De Mi Pueblo',
+  },
 };
 
 export default function ConfigRecibo() {
@@ -53,7 +63,12 @@ export default function ConfigRecibo() {
       setDiseño(mergeReciboConfig(saved));
     }
     const cortejos = await getCortejosByOrg(organizacionId);
-    setCortejoDemo(cortejos[0] || { nombre_evento: 'Procesión demo 2026' });
+    setCortejoDemo(
+      cortejos[0] || {
+        nombre_evento: 'Inscripciones Procesión Patronal',
+        fecha: '2026-08-15',
+      }
+    );
   }, [organizacionId]);
 
   useEffect(() => {
@@ -227,6 +242,126 @@ export default function ConfigRecibo() {
           </fieldset>
 
           <fieldset className="config-seccion">
+            <legend>Contraseña formal (media carta)</legend>
+            <p className="config-seccion__desc">
+              Estilo de inscripción procesional. El logo se sube arriba. Sin dirección, De: ni Autor:.
+            </p>
+            <label>
+              Saludo superior
+              <input
+                type="text"
+                value={diseño.encabezado_saludo || ''}
+                onChange={(e) => setCampo('encabezado_saludo', e.target.value)}
+              />
+            </label>
+            <label>
+              Línea pastoral (debajo del nombre de la parroquia)
+              <input
+                type="text"
+                value={diseño.linea_pastoral || ''}
+                onChange={(e) => setCampo('linea_pastoral', e.target.value)}
+              />
+            </label>
+            <label>
+              Título inscripción (vacío = nombre del evento)
+              <input
+                type="text"
+                value={diseño.titulo_inscripcion || ''}
+                onChange={(e) => setCampo('titulo_inscripcion', e.target.value)}
+                placeholder="Inscripciones Procesión Patronal"
+              />
+            </label>
+            <label>
+              Texto de constancia (centro)
+              <textarea
+                rows={2}
+                value={diseño.texto_constancia || ''}
+                onChange={(e) => setCampo('texto_constancia', e.target.value)}
+              />
+            </label>
+            <label>
+              Ciudad para la fecha del día
+              <input
+                type="text"
+                value={diseño.ciudad_lugar || ''}
+                onChange={(e) => setCampo('ciudad_lugar', e.target.value)}
+                placeholder="Guatemala de la Asunción"
+              />
+            </label>
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={diseño.mostrar_fecha_emision !== false}
+                onChange={(e) => setCampo('mostrar_fecha_emision', e.target.checked)}
+              />
+              Mostrar fecha del día en la boleta
+            </label>
+            <label>
+              Uniformidad — caballeros
+              <input
+                type="text"
+                value={diseño.uniformidad_caballeros || ''}
+                onChange={(e) => setCampo('uniformidad_caballeros', e.target.value)}
+              />
+            </label>
+            <label>
+              Uniformidad — damas
+              <input
+                type="text"
+                value={diseño.uniformidad_damas || ''}
+                onChange={(e) => setCampo('uniformidad_damas', e.target.value)}
+              />
+            </label>
+            <label>
+              Texto previo a la fecha de entrega
+              <input
+                type="text"
+                value={diseño.texto_entrega_prefijo || ''}
+                onChange={(e) => setCampo('texto_entrega_prefijo', e.target.value)}
+              />
+            </label>
+            <div className="form-row form-row--3">
+              <label>
+                Día entrega
+                <input
+                  type="text"
+                  value={diseño.entrega_dia || ''}
+                  onChange={(e) => setCampo('entrega_dia', e.target.value)}
+                  placeholder="28"
+                />
+              </label>
+              <label>
+                Mes entrega
+                <input
+                  type="text"
+                  value={diseño.entrega_mes || ''}
+                  onChange={(e) => setCampo('entrega_mes', e.target.value.toUpperCase())}
+                  placeholder="JULIO"
+                />
+              </label>
+              <label>
+                Año entrega (vacío = año actual)
+                <input
+                  type="text"
+                  value={diseño.entrega_anio || ''}
+                  onChange={(e) => setCampo('entrega_anio', e.target.value)}
+                  placeholder="2026"
+                />
+              </label>
+            </div>
+            <label>
+              Tamaño QR (px)
+              <input
+                type="number"
+                min={40}
+                max={96}
+                value={diseño.qr_tamano_px || 56}
+                onChange={(e) => setCampo('qr_tamano_px', Number(e.target.value))}
+              />
+            </label>
+          </fieldset>
+
+          <fieldset className="config-seccion">
             <legend>Qué mostrar en la boleta</legend>
             <div className="recibo-toggles">
               {[
@@ -277,8 +412,21 @@ export default function ConfigRecibo() {
               brazo={DEMO_BOLETA.brazo}
             />
           </div>
+          <details className="recibo-preview-print-hint" open>
+            <summary>Vista contraseña formal (impresión)</summary>
+            <div className="recibo-preview-stage recibo-preview-stage--formal">
+              <BoletaContraseñaTurno
+                organizacion={organizacion}
+                cortejo={cortejoDemo}
+                turno={DEMO_BOLETA.turno}
+                cargador={DEMO_BOLETA.cargador}
+                brazo={DEMO_BOLETA.brazo}
+                config={configPreview}
+              />
+            </div>
+          </details>
           <details className="recibo-preview-print-hint">
-            <summary>Vista de impresión</summary>
+            <summary>Vista boleta térmica / canvas</summary>
             <div className="recibo-preview-stage">
               <BoletaRecibo
                 organizacion={organizacion}

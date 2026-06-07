@@ -33,6 +33,7 @@ export default function BoletaCorreoPreview({ data, datos: datosProp }) {
               cortejo={datos.cortejo}
               turno={datos.turno}
               brazo={datos.brazo}
+              cargador={datos.cargador}
               items={datos.items}
               compra={datos.compra}
             />

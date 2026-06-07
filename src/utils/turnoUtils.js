@@ -192,3 +192,11 @@ export function etiquetaHonorTurno(turno) {
   }
   return turno?.etiqueta?.trim() || tipo || 'Turno';
 }
+
+/** Son y alabado unidos para la boleta impresa */
+export function textoMelodiaTurno(turno) {
+  const partes = [];
+  if (turno?.son?.trim()) partes.push(turno.son.trim());
+  if (turno?.alabado?.trim()) partes.push(turno.alabado.trim());
+  return partes.join(' / ');
+}

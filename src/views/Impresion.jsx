@@ -331,6 +331,7 @@ export default function Impresion() {
             items={items}
             compra={compra}
             cortejo={cortejo}
+            cargador={cargador}
           />
           <p className="text-muted impresion-hint no-print">
             {reciboSel.brazos.length} turno(s) ·{' '}

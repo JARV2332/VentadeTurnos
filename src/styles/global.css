@@ -2130,6 +2130,280 @@ body {
   justify-content: space-between;
 }
 
+/* Contraseña formal — estilo inscripción procesional */
+.boleta-contraseña--formal {
+  font-family: 'Times New Roman', Times, Georgia, serif;
+  border: 1px solid #94a3b8;
+  box-shadow: none;
+  gap: 0.35rem;
+}
+
+.boleta-formal__head {
+  display: grid;
+  grid-template-columns: minmax(5rem, 1fr) 2.2fr minmax(4.5rem, auto);
+  gap: 0.5rem 0.65rem;
+  align-items: start;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid #cbd5e1;
+}
+
+.boleta-formal__saludo {
+  margin: 0;
+  font-size: 0.62rem;
+  font-style: italic;
+  color: #475569;
+  line-height: 1.35;
+}
+
+.boleta-formal__head-centro {
+  text-align: center;
+}
+
+.boleta-formal__parroquia {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+}
+
+.boleta-formal__pastoral,
+.boleta-formal__inscripcion,
+.boleta-formal__fecha-evento {
+  margin: 0.12rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: #334155;
+}
+
+.boleta-formal__inscripcion {
+  font-weight: 600;
+}
+
+.boleta-formal__head-der {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.boleta-formal__logo {
+  height: auto;
+  max-height: 3.2rem;
+  object-fit: contain;
+}
+
+.boleta-formal__qr-mini {
+  line-height: 0;
+  padding: 2px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.boleta-formal__devoto-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.35rem 0 0.25rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.boleta-formal__devoto-nombre strong {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #0f172a;
+}
+
+.boleta-formal__dpi {
+  margin: 0.2rem 0 0;
+  font-size: 0.75rem;
+}
+
+.boleta-formal__dpi span,
+.boleta-formal__boleta-nums span {
+  font-weight: 600;
+  color: #64748b;
+}
+
+.boleta-formal__boleta-nums {
+  text-align: right;
+  font-size: 0.72rem;
+}
+
+.boleta-formal__boleta-nums p {
+  margin: 0 0 0.15rem;
+}
+
+.boleta-formal__constancia {
+  margin: 0.45rem 0 0.35rem;
+  text-align: center;
+  font-size: 0.78rem;
+  font-style: italic;
+  line-height: 1.45;
+  color: #334155;
+}
+
+.boleta-formal__cuerpo {
+  flex: 1;
+  min-height: 0;
+}
+
+.boleta-formal__turno-fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin: 0.35rem 0;
+}
+
+.boleta-formal__honor,
+.boleta-formal__melodia {
+  margin: 0 0 0.25rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.boleta-formal__honor span,
+.boleta-formal__melodia span {
+  font-weight: 600;
+  color: #64748b;
+}
+
+.boleta-formal__honor strong {
+  font-size: 0.88rem;
+  letter-spacing: 0.04em;
+}
+
+.boleta-formal__precio-caja {
+  flex-shrink: 0;
+  min-width: 6.5rem;
+  padding: 0.45rem 0.65rem;
+  background: #e2e8f0;
+  border: 1px solid #94a3b8;
+  text-align: center;
+  font-size: 0.72rem;
+}
+
+.boleta-formal__precio-caja strong {
+  display: block;
+  font-size: 1rem;
+  margin-top: 0.15rem;
+}
+
+.boleta-formal__seccion-label {
+  margin: 0 0 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.boleta-turnos-tabla--formal {
+  font-size: 0.72rem;
+}
+
+.boleta-formal__fecha-emision {
+  margin: 0.35rem 0 0.25rem;
+  text-align: center;
+  font-size: 0.75rem;
+  font-style: italic;
+  color: #475569;
+}
+
+.boleta-formal__pie {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  margin-top: auto;
+  padding: 0.55rem 0.65rem;
+  background: #e2e8f0;
+  border: 1px solid #94a3b8;
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.boleta-formal__uniformidad strong {
+  display: block;
+  margin-bottom: 0.15rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.boleta-formal__uniformidad p,
+.boleta-formal__entrega p {
+  margin: 0 0 0.12rem;
+}
+
+.boleta-formal__entrega {
+  border-left: 1px solid #94a3b8;
+  padding-left: 0.55rem;
+}
+
+.boleta-formal__nota-extra {
+  margin: 0.25rem 0 0;
+  font-size: 0.65rem;
+  text-align: center;
+  color: #64748b;
+}
+
+.recibo-preview-stage--formal {
+  overflow: auto;
+  padding: 0.5rem;
+  background: #f1f5f9;
+}
+
+.form-row--3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.65rem;
+}
+
+@media (max-width: 640px) {
+  .form-row--3 {
+    grid-template-columns: 1fr;
+  }
+
+  .boleta-formal__head {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .boleta-formal__head-der {
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .boleta-formal__devoto-row {
+    flex-direction: column;
+  }
+
+  .boleta-formal__boleta-nums {
+    text-align: left;
+  }
+
+  .boleta-formal__turno-fila {
+    flex-direction: column;
+  }
+
+  .boleta-formal__pie {
+    grid-template-columns: 1fr;
+  }
+
+  .boleta-formal__entrega {
+    border-left: none;
+    padding-left: 0;
+    border-top: 1px solid #94a3b8;
+    padding-top: 0.45rem;
+  }
+}
+
 .boleta-contraseña__head {
   display: flex;
   align-items: flex-start;

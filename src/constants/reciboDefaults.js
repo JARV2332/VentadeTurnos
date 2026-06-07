@@ -25,6 +25,24 @@ export const DEFAULT_RECIBO_CONFIG = {
   color_primario: '#6366f1',
   tamano_fuente: 'normal',
   editor_visual: true,
+  /* Contraseña formal (media carta — estilo inscripción) */
+  encabezado_saludo: 'Señor (a) / Devoto (a) / Presente',
+  linea_pastoral: 'Pastoral de Religiosidad Popular',
+  titulo_inscripcion: '',
+  texto_constancia:
+    'Por este medio hago constar su inscripción para llevar en hombros a nuestra Señora de la Asunción',
+  ciudad_lugar: 'Guatemala de la Asunción',
+  mostrar_fecha_emision: true,
+  mostrar_uniformidad: true,
+  uniformidad_caballeros: 'Caballeros: Traje oscuro, corbata acorde al traje',
+  uniformidad_damas: 'Damas: Vestido blanco, mantilla blanca',
+  mostrar_entrega_turno: true,
+  entrega_dia: '28',
+  entrega_mes: 'JULIO',
+  entrega_anio: '',
+  texto_entrega_prefijo:
+    'Esta contraseña debe presentarse para la entrega del turno los días:',
+  qr_tamano_px: 56,
 };
 
 export function mergeReciboConfig(guardado) {

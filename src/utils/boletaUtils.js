@@ -21,3 +21,24 @@ export function formatPrecio(valor) {
 export function formatOfrenda(valor) {
   return `Ofrenda ${formatPrecio(valor)}`;
 }
+
+/** Fecha larga en español: "domingo, 14 de julio de 2024" */
+export function formatFechaLarga(fecha = new Date()) {
+  const d = fecha instanceof Date ? fecha : new Date(`${fecha}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return '';
+  const raw = d.toLocaleDateString('es-GT', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
+/** Fecha de procesión: "15 de agosto de 2024" */
+export function formatFechaEvento(fecha) {
+  if (!fecha) return '';
+  const d = new Date(`${String(fecha).slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('es-GT', { day: 'numeric', month: 'long', year: 'numeric' });
+}
