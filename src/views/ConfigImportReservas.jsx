@@ -23,6 +23,8 @@ export default function ConfigImportReservas() {
   const [resumen, setResumen] = useState([]);
   const [preview, setPreview] = useState([]);
   const [formatoImport, setFormatoImport] = useState(null);
+  const [advertenciasImport, setAdvertenciasImport] = useState([]);
+  const [filasOmitidas, setFilasOmitidas] = useState([]);
   const [resultadoImport, setResultadoImport] = useState(null);
   const [error, setError] = useState('');
   const [okMsg, setOkMsg] = useState('');
@@ -56,6 +58,8 @@ export default function ConfigImportReservas() {
     if (!file) return;
     setError('');
     setResultadoImport(null);
+    setAdvertenciasImport([]);
+    setFilasOmitidas([]);
     setProcesando(true);
     try {
       const parsed = await parseArchivoImport(file);
@@ -73,11 +77,21 @@ export default function ConfigImportReservas() {
       }
       setPreview(parsed.filas);
       setFormatoImport(parsed.formato);
+      setAdvertenciasImport(parsed.advertencias || []);
+      setFilasOmitidas(parsed.errores || []);
       const stats = resumenFilasImport(parsed.filas, parsed.formato);
+      const omitMsg =
+        (parsed.errores?.length || 0) > 0
+          ? ` ${parsed.errores.length} fila(s) omitida(s) por datos incompletos.`
+          : '';
+      const advMsg =
+        (parsed.advertencias?.length || 0) > 0
+          ? ` ${parsed.advertencias.length} aviso(s) (DPI/cantidad ajustados).`
+          : '';
       setOkMsg(
         parsed.formato === 'listado'
-          ? `${stats.personas} persona(s) · ${stats.espacios} espacio(s) a apartar. Revise y confirme.`
-          : `${parsed.filas.length} fila(s) leídas. Revise la vista previa y confirme.`
+          ? `${stats.personas} persona(s) · ${stats.espacios} espacio(s) listos.${omitMsg}${advMsg} Revise y confirme.`
+          : `${parsed.filas.length} fila(s) leídas.${omitMsg} Revise y confirme.`
       );
       setTimeout(() => setOkMsg(''), 6000);
     } catch (err) {
@@ -108,6 +122,8 @@ export default function ConfigImportReservas() {
       );
       setPreview([]);
       setFormatoImport(null);
+      setAdvertenciasImport([]);
+      setFilasOmitidas([]);
       setResumen(await getResumenApartados(cortejoId, organizacionId));
       setTimeout(() => setOkMsg(''), 6000);
     } catch (err) {
@@ -234,6 +250,33 @@ export default function ConfigImportReservas() {
               {procesando ? 'Aplicando…' : 'Aplicar apartados a la procesión'}
             </button>
           </div>
+          {(advertenciasImport.length > 0 || filasOmitidas.length > 0) && (
+            <div className="import-avisos">
+              {filasOmitidas.length > 0 && (
+                <details className="import-avisos__block">
+                  <summary>{filasOmitidas.length} fila(s) omitida(s) del Excel</summary>
+                  <ul>
+                    {filasOmitidas.map((msg) => (
+                      <li key={msg}>{msg}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              {advertenciasImport.length > 0 && (
+                <details className="import-avisos__block" open>
+                  <summary>{advertenciasImport.length} aviso(s) — filas importadas con ajustes</summary>
+                  <ul>
+                    {advertenciasImport.slice(0, 30).map((msg) => (
+                      <li key={msg}>{msg}</li>
+                    ))}
+                    {advertenciasImport.length > 30 && (
+                      <li className="text-muted">… y {advertenciasImport.length - 30} más</li>
+                    )}
+                  </ul>
+                </details>
+              )}
+            </div>
+          )}
           <div className="table-wrap import-preview-table">
             {formatoImport === 'listado' ? (
               <table className="data-table">

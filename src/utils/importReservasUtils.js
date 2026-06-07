@@ -6,7 +6,7 @@
  */
 
 import * as XLSX from 'xlsx';
-import { isValidCui, normalizarCui } from './cuiUtils';
+import { normalizarCui, normalizarDpiImport, parseCantidadImport } from './cuiUtils';
 
 export const PLANTILLA_LISTADO_COLUMNAS = [
   { key: 'dpi', label: 'DPI', obligatorio: false, ejemplo: '1234567890101' },
@@ -157,6 +157,7 @@ function detectarFormato(colMap) {
 function parseFilasListado(rows, headerIdx, colMap) {
   const filas = [];
   const errores = [];
+  const advertencias = [];
 
   for (let i = headerIdx + 1; i < rows.length; i += 1) {
     const cells = rows[i].map((c) => String(c ?? '').trim());
@@ -168,17 +169,16 @@ function parseFilasListado(rows, headerIdx, colMap) {
     };
 
     const dpiRaw = get('dpi') || get('cui');
-    const dpi = dpiRaw ? normalizarCui(dpiRaw) : '';
+    const { dpi, advertencia: advDpi } = normalizarDpiImport(dpiRaw);
     const apellido = get('apellido');
     const nombre = get('nombre');
     const nombreCompleto = combinarNombreDevoto(apellido, nombre);
-    const cantidad = parseInt(get('cantidad'), 10);
+    const { cantidad, advertencia: advCant } = parseCantidadImport(get('cantidad'));
     const turno = get('turno');
 
-    if (dpiRaw && !isValidCui(dpi)) {
-      errores.push(`Fila ${i + 1}: DPI incompleto o inválido (debe tener 13 dígitos o dejarse vacío).`);
-      continue;
-    }
+    if (advDpi) advertencias.push(`Fila ${i + 1}: ${advDpi}`);
+    if (advCant) advertencias.push(`Fila ${i + 1}: ${advCant}`);
+
     if (!nombreCompleto) {
       errores.push(`Fila ${i + 1}: falta apellido o nombre del devoto(a).`);
       continue;
@@ -209,7 +209,7 @@ function parseFilasListado(rows, headerIdx, colMap) {
     });
   }
 
-  return { filas, errores };
+  return { filas, errores, advertencias };
 }
 
 function parseFilasCoordenadas(rows, headerIdx, colMap) {
@@ -242,7 +242,7 @@ function parseFilasCoordenadas(rows, headerIdx, colMap) {
     });
   }
 
-  return { filas, errores: [] };
+  return { filas, errores: [], advertencias: [] };
 }
 
 export function parseFilasTabla(rows) {
@@ -273,20 +273,29 @@ export function parseFilasTabla(rows) {
       ? parseFilasListado(rows, headerIdx, colMap)
       : parseFilasCoordenadas(rows, headerIdx, colMap);
 
-  if (parsed.errores?.length) {
+  const advertencias = parsed.advertencias || [];
+
+  if (!parsed.filas.length && parsed.errores?.length) {
     return {
       error: parsed.errores.join(' '),
-      filas: parsed.filas,
+      filas: [],
       formato,
       errores: parsed.errores,
+      advertencias,
     };
   }
 
   if (!parsed.filas.length) {
-    return { error: 'No se encontraron filas de datos válidas.', filas: [], formato, errores: [] };
+    return { error: 'No se encontraron filas de datos válidas.', filas: [], formato, errores: [], advertencias };
   }
 
-  return { filas: parsed.filas, formato, errores: [], error: null };
+  return {
+    filas: parsed.filas,
+    formato,
+    errores: parsed.errores || [],
+    advertencias,
+    error: null,
+  };
 }
 
 export function parseCSVText(text) {
