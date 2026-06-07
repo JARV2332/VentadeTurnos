@@ -40,6 +40,11 @@ export const updateTurno = (organizacionId, turnoId, datos) =>
     ? sb.updateTurno(organizacionId, turnoId, datos)
     : Promise.resolve(mock.updateTurnoMock(organizacionId, turnoId, datos));
 
+export const agregarTurnoProcesion = (organizacionId, cortejoId, datos) =>
+  useSb()
+    ? sb.agregarTurnoProcesion(organizacionId, cortejoId, datos)
+    : Promise.resolve(mock.agregarTurnoProcesionMock(organizacionId, cortejoId, datos));
+
 export const getMesasByOrg = (organizacionId) =>
   useSb()
     ? sb.getMesasByOrg(organizacionId)

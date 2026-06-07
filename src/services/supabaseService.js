@@ -6,6 +6,7 @@ import {
   agruparTurnosConBrazos,
   construirTurnosConfig,
   crearBrazosParaTurno,
+  validarBrazosPares,
 } from '../utils/turnoUtils';
 import {
   normalizarLado,
@@ -467,6 +468,68 @@ export async function updateTurno(organizacionId, turnoId, datos) {
 
   if (error) return err(error);
   return { data };
+}
+
+export async function agregarTurnoProcesion(organizacionId, cortejoId, datos) {
+  const numero = Number(datos.numero_turno);
+  if (!Number.isInteger(numero) || numero < 1) {
+    return { error: 'Indique un número de turno válido (entero ≥ 1).' };
+  }
+
+  const { data: cortejo, error: cErr } = await supabase
+    .from('cortejos')
+    .select('id')
+    .eq('id', cortejoId)
+    .eq('organizacion_id', organizacionId)
+    .maybeSingle();
+  if (cErr) return err(cErr);
+  if (!cortejo) return { error: 'Procesión no encontrada.' };
+
+  const existentes = await getTurnosByCortejo(cortejoId);
+  if (existentes.some((t) => t.numero_turno === numero)) {
+    return { error: `Ya existe el turno #${numero} en esta procesión.` };
+  }
+
+  const totalBrazos = Number(datos.total_brazos) || 0;
+  if (!validarBrazosPares(totalBrazos)) {
+    return { error: 'El total de brazos debe ser par y mayor que 0.' };
+  }
+
+  const tipo = datos.tipo_turno?.trim() || 'Ordinario';
+  const payload = {
+    organizacion_id: organizacionId,
+    cortejo_id: cortejoId,
+    numero_turno: numero,
+    tipo_turno: tipo,
+    etiqueta: datos.etiqueta?.trim() || null,
+    total_brazos: totalBrazos,
+    precio: Number(datos.precio) || 0,
+    son: datos.son?.trim() || null,
+    alabado: datos.alabado?.trim() || null,
+  };
+
+  const { data: turno, error: tErr } = await supabase
+    .from('turnos')
+    .insert(payload)
+    .select()
+    .single();
+  if (tErr) return err(tErr);
+
+  const brazosTurno = crearBrazosParaTurno({
+    turnoId: turno.id,
+    numeroTurno: turno.numero_turno,
+    totalBrazos,
+    organizacionId,
+    idPrefix: 'brazo',
+  }).map(({ id, ...b }) => b);
+
+  const bErr = await insertarBrazosEnLotes(brazosTurno);
+  if (bErr) {
+    await supabase.from('turnos').delete().eq('id', turno.id);
+    return { error: `Error al crear brazos del turno: ${bErr.message || bErr}` };
+  }
+
+  return { data: turno, brazos: brazosTurno };
 }
 
 export async function getTurnosByCortejo(cortejoId) {

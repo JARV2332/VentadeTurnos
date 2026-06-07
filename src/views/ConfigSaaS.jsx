@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { TurnoCartulina } from '../components/TurnoCartulina';
 import EditTurnoModal from '../components/EditTurnoModal';
+import AgregarTurnoModal from '../components/AgregarTurnoModal';
 import { useAuth } from '../context/AuthContext';
 import {
   generarProcesion,
@@ -14,6 +15,7 @@ import {
   eliminarProcesion,
   duplicarProcesion,
   updateTurno,
+  agregarTurnoProcesion,
 } from '../services/dataService';
 import StatusBadge from '../components/StatusBadge';
 import {
@@ -104,6 +106,8 @@ export default function ConfigSaaS() {
   const [duplicandoId, setDuplicandoId] = useState(null);
   const [turnoEditando, setTurnoEditando] = useState(null);
   const [guardandoTurno, setGuardandoTurno] = useState(false);
+  const [agregarTurnoAbierto, setAgregarTurnoAbierto] = useState(false);
+  const [guardandoNuevoTurno, setGuardandoNuevoTurno] = useState(false);
 
   const turnosPlanExcel = useMemo(() => {
     if (modoCreacion !== 'excel' || !excelImport?.bloques?.length) return [];
@@ -510,6 +514,24 @@ export default function ConfigSaaS() {
     }
   };
 
+  const handleAgregarTurno = async (datos) => {
+    if (!procesionVer || !organizacionId) return;
+    setError('');
+    setGuardandoNuevoTurno(true);
+    try {
+      const res = await agregarTurnoProcesion(organizacionId, procesionVer.id, datos);
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      setAgregarTurnoAbierto(false);
+      setOkMsg(`Turno #${datos.numero_turno} agregado con ${datos.total_brazos} espacios.`);
+      await refreshLista();
+    } finally {
+      setGuardandoNuevoTurno(false);
+    }
+  };
+
   return (
     <Layout title="Configuración" subtitle="Alta de procesión y estructura de turnos">
       {okMsg && (
@@ -549,11 +571,23 @@ export default function ConfigSaaS() {
 
         {procesionVer && (
           <div className="procesion-detalle">
-            <h4>Turnos de: {procesionVer.nombre_evento}</h4>
-            <p className="text-muted config-hint">
-              Orden del cortejo: turno 1 = salida del templo · último = entrada. Pulse{' '}
-              <strong>Editar</strong> en un turno para cambiar nombre, son o alabado.
-            </p>
+            <div className="procesion-detalle__head">
+              <div>
+                <h4>Turnos de: {procesionVer.nombre_evento}</h4>
+                <p className="text-muted config-hint">
+                  Orden del cortejo: turno 1 = salida · último = entrada. Use{' '}
+                  <strong>Editar</strong> para cambiar nombre, son o alabado;{' '}
+                  <strong>Agregar turno</strong> si falta un número en el cortejo.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn--primary btn--sm"
+                onClick={() => setAgregarTurnoAbierto(true)}
+              >
+                Agregar turno
+              </button>
+            </div>
             <div className="turnos-lista turnos-lista--compact">
               {procesionVer.turnos.map((turno) => (
                 <TurnoCartulina
@@ -576,6 +610,15 @@ export default function ConfigSaaS() {
         onGuardar={handleGuardarTurno}
         onCerrar={() => !guardandoTurno && setTurnoEditando(null)}
       />
+
+      {agregarTurnoAbierto && procesionVer && (
+        <AgregarTurnoModal
+          turnosExistentes={procesionVer.turnos}
+          guardando={guardandoNuevoTurno}
+          onGuardar={handleAgregarTurno}
+          onCerrar={() => !guardandoNuevoTurno && setAgregarTurnoAbierto(false)}
+        />
+      )}
 
       <div className="config-grid config-grid--wide">
         <form className="panel config-form" onSubmit={handleGenerar} noValidate>

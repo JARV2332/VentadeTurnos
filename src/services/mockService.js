@@ -215,6 +215,57 @@ export function updateTurnoMock(organizacionId, turnoId, datos) {
   return { data: actualizado };
 }
 
+export function agregarTurnoProcesionMock(organizacionId, cortejoId, datos) {
+  const numero = Number(datos.numero_turno);
+  if (!Number.isInteger(numero) || numero < 1) {
+    return { error: 'Indique un número de turno válido (entero ≥ 1).' };
+  }
+
+  const cortejo = store.cortejos.find(
+    (c) => c.id === cortejoId && c.organizacion_id === organizacionId
+  );
+  if (!cortejo) return { error: 'Procesión no encontrada.' };
+
+  const existentes = getTurnosByCortejo(cortejoId);
+  if (existentes.some((t) => t.numero_turno === numero)) {
+    return { error: `Ya existe el turno #${numero} en esta procesión.` };
+  }
+
+  const totalBrazos = Number(datos.total_brazos) || 0;
+  if (totalBrazos <= 0 || totalBrazos % 2 !== 0) {
+    return { error: 'El total de brazos debe ser par y mayor que 0.' };
+  }
+
+  const ts = Date.now();
+  const turnoId = `turno-add-${ts}`;
+  const turno = {
+    id: turnoId,
+    organizacion_id: organizacionId,
+    cortejo_id: cortejoId,
+    numero_turno: numero,
+    tipo_turno: datos.tipo_turno?.trim() || 'Ordinario',
+    etiqueta: datos.etiqueta?.trim() || null,
+    total_brazos: totalBrazos,
+    precio: Number(datos.precio) || 0,
+    son: datos.son?.trim() || null,
+    alabado: datos.alabado?.trim() || null,
+  };
+
+  const brazos = crearBrazosParaTurno({
+    turnoId,
+    numeroTurno: numero,
+    totalBrazos,
+    organizacionId,
+    idPrefix: `brazo-add-${ts}`,
+  });
+
+  store.turnos.push(turno);
+  store.brazos.push(...brazos);
+  emit('turno:actualizado', { turno });
+  emit('matriz', { cortejoId, turno, brazos });
+  return { data: turno, brazos };
+}
+
 export function getTurnosAgrupados(cortejoId, organizacionId) {
   const turnos = getTurnosByCortejo(cortejoId);
   const brazos = getBrazosByOrg(organizacionId).filter((b) =>

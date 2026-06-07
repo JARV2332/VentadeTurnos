@@ -221,3 +221,56 @@ export function textoMelodiaTurno(turno) {
   const melodias = melodiasDeTurno(turno);
   return melodias.join(' / ');
 }
+
+/** Números de turno libres entre 1 y el máximo existente (huecos). */
+export function huecosNumerosTurno(turnos, hasta = null) {
+  const lista = Array.isArray(turnos) ? turnos : [];
+  const existentes = new Set(lista.map((t) => t.numero_turno));
+  const max = hasta ?? Math.max(1, ...lista.map((t) => t.numero_turno), 0);
+  const huecos = [];
+  for (let n = 1; n <= max; n += 1) {
+    if (!existentes.has(n)) huecos.push(n);
+  }
+  return huecos;
+}
+
+/** Siguiente número disponible al final del cortejo (max + 1). */
+export function proximoNumeroTurno(turnos) {
+  const lista = Array.isArray(turnos) ? turnos : [];
+  const max = Math.max(0, ...lista.map((t) => t.numero_turno));
+  return max + 1;
+}
+
+/** Valores sugeridos al agregar un turno a una procesión existente. */
+export function sugerirDefaultsNuevoTurno(turnosExistentes, numeroTurno) {
+  const lista = Array.isArray(turnosExistentes) ? turnosExistentes : [];
+  const n = Number(numeroTurno);
+  const porTipo = (tipo) => lista.find((t) => t.tipo_turno === tipo);
+  const ordinarioRef = lista.find((t) => t.tipo_turno === 'Ordinario') || lista[0];
+  const extraRef = lista.find((t) => t.tipo_turno === 'Extraordinario') || ordinarioRef;
+  const maxNum = Math.max(0, ...lista.map((t) => t.numero_turno));
+
+  let tipo_turno = 'Ordinario';
+  let precio = ordinarioRef?.precio ?? 150;
+  let total_brazos = ordinarioRef?.total_brazos ?? 20;
+  let etiqueta = `Ordinario · turno ${n}`;
+
+  if (n === 1) {
+    tipo_turno = 'Salida';
+    precio = porTipo('Salida')?.precio ?? ordinarioRef?.precio ?? 400;
+    total_brazos = porTipo('Salida')?.total_brazos ?? ordinarioRef?.total_brazos ?? 20;
+    etiqueta = 'Salida';
+  } else if (n > maxNum) {
+    tipo_turno = 'Entrada';
+    precio = porTipo('Entrada')?.precio ?? ordinarioRef?.precio ?? 400;
+    total_brazos = porTipo('Entrada')?.total_brazos ?? ordinarioRef?.total_brazos ?? 20;
+    etiqueta = 'Entrada';
+  } else if (turnosElegiblesExtraordinarios(maxNum + 1).includes(n)) {
+    tipo_turno = 'Extraordinario';
+    precio = extraRef?.precio ?? 300;
+    total_brazos = extraRef?.total_brazos ?? ordinarioRef?.total_brazos ?? 12;
+    etiqueta = `Extraordinario · turno ${n}`;
+  }
+
+  return { tipo_turno, precio, total_brazos, etiqueta };
+}
