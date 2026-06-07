@@ -1248,7 +1248,7 @@ async function marcarBrazoApartado(brazo, fila, cargador, usuarioId) {
       cargador_id: cargador?.id || null,
       asignado_nombre: cargador ? null : nombreSolo,
       apartado_notas: apartadoNotas,
-      vendedor_id: usuarioId || null,
+      vendedor_id: null,
       mesa_id: null,
     })
     .eq('id', brazo.id);

@@ -92,6 +92,14 @@ export function parseNumeroTurnoImport(texto) {
   return null;
 }
 
+export function normalizarTextoTurno(texto) {
+  return normHeader(texto)
+    .replace(/\bextraordinario\b/g, '')
+    .replace(/\bdel\b/g, 'de')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function resolverTurnoEnLista(turnos, turnoTexto) {
   const lista = Array.isArray(turnos) ? turnos : [];
   const texto = String(turnoTexto || '').trim();
@@ -103,13 +111,13 @@ export function resolverTurnoEnLista(turnos, turnoTexto) {
     if (porNumero) return porNumero;
   }
 
-  const tgt = normHeader(texto);
-  const exacta = lista.find((t) => normHeader(t.etiqueta) === tgt);
+  const tgt = normalizarTextoTurno(texto);
+  const exacta = lista.find((t) => normalizarTextoTurno(t.etiqueta) === tgt);
   if (exacta) return exacta;
 
   return (
     lista.find((t) => {
-      const e = normHeader(t.etiqueta);
+      const e = normalizarTextoTurno(t.etiqueta);
       return e.includes(tgt) || tgt.includes(e);
     }) || null
   );
