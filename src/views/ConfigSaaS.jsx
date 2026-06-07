@@ -25,6 +25,8 @@ import {
   descargarPlantillaProcesionExcel,
   etiquetaAsignacion,
   reconstruirTurnosPlanExcel,
+  inferirBrazosDefaultDesdeBloques,
+  contarBrazosTurnosPlan,
 } from '../utils/importProcesionUtils';
 import { melodiasDeTurno } from '../utils/turnoUtils';
 
@@ -103,6 +105,11 @@ export default function ConfigSaaS() {
     if (errores?.length) return excelImport.turnosPlan || [];
     return [...turnosPlan].sort((a, b) => a.numero_turno - b.numero_turno);
   }, [modoCreacion, excelImport, config.brazosDefault]);
+
+  const totalBrazosExcel = useMemo(
+    () => contarBrazosTurnosPlan(turnosPlanExcel),
+    [turnosPlanExcel]
+  );
 
   const preview = useMemo(() => {
     if (modoCreacion === 'excel' && turnosPlanExcel.length) {
@@ -213,6 +220,18 @@ export default function ConfigSaaS() {
 
     setExcelImport(parsed);
 
+    const brazosInferidos = inferirBrazosDefaultDesdeBloques(parsed.bloques);
+    if (brazosInferidos !== config.brazosDefault) {
+      setConfig((prev) => ({ ...prev, brazosDefault: brazosInferidos }));
+    }
+
+    const previewPlan = reconstruirTurnosPlanExcel(parsed, brazosInferidos).turnosPlan;
+    const totalBrazos = contarBrazosTurnosPlan(previewPlan);
+    const brazosMsg =
+      brazosInferidos !== config.brazosDefault
+        ? ` Se detectaron ${brazosInferidos} brazos por turno en el Excel.`
+        : '';
+
     if (parsed.meta?.nombre_evento) {
       setCortejo((prev) => ({
         ...prev,
@@ -224,7 +243,7 @@ export default function ConfigSaaS() {
     }
 
     setOkMsg(
-      `Excel cargado: ${parsed.turnosPlan.length} turnos detectados.${
+      `Excel cargado: ${parsed.turnosPlan.length} turnos · ${totalBrazos} brazos en total.${brazosMsg}${
         parsed.advertencias?.length ? ` (${parsed.advertencias.length} aviso(s))` : ''
       }`
     );
@@ -569,10 +588,18 @@ export default function ConfigSaaS() {
                   onChange={(e) => setConfigField('brazosDefault', Number(e.target.value))}
                 />
                 <small className="field-hint">
-                  Este valor define cuántos brazos tiene cada turno. Si el Excel indica reservados
-                  (ej. 20 reservados), se reparten dentro de este total; el resto queda en venta.
+                  Para turnos que dicen solo &quot;Disponible para la venta&quot; se usa este total.
+                  Si el Excel indica cantidades (ej. 20 reservados + 26 venta), ese turno usa la suma
+                  del Excel. Al importar se detecta automáticamente (ej. 46).
                 </small>
               </label>
+
+              {turnosPlanExcel.length > 0 && (
+                <p className="config-hint">
+                  <strong>Vista previa:</strong> {turnosPlanExcel.length} turnos ·{' '}
+                  <strong>{totalBrazosExcel.toLocaleString('es-GT')} brazos</strong> en total
+                </p>
+              )}
 
               {excelImport?.advertencias?.length > 0 && (
                 <ul className="import-advertencias">
@@ -812,7 +839,7 @@ export default function ConfigSaaS() {
               <> · {config.turnosExtraordinarios.length} extraordinario(s)</>
             )}
             {modoCreacion === 'excel' && turnosPlanExcel.length > 0 && (
-              <> · desde Excel · {config.brazosDefault} brazos/turno</>
+              <> · desde Excel · {totalBrazosExcel.toLocaleString('es-GT')} brazos</>
             )}
           </p>
           <div className="preview-turnos">

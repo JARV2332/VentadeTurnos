@@ -43,6 +43,40 @@ function normalizarBrazosDefault(brazosDefault) {
   return n;
 }
 
+function ajustarPar(n) {
+  let v = Math.max(0, Number(n) || 0);
+  if (v % 2 !== 0) v += 1;
+  return v;
+}
+
+function extraerNumerosMixto(texto) {
+  const t = norm(texto);
+  const mRes = t.match(/reservad[^\d]*(\d+)/);
+  const mDis = t.match(/disponible[^\d]*(?:para\s*la\s*venta\s*)?(\d+)/);
+  if (!mRes || !mDis) return null;
+  let reservados = ajustarPar(Number(mRes[1]) || 0);
+  let disponibles = ajustarPar(Number(mDis[1]) || 0);
+  let totalBrazos = reservados + disponibles;
+  if (totalBrazos % 2 !== 0) totalBrazos += 1;
+  disponibles = totalBrazos - reservados;
+  return { reservados, disponibles, totalBrazos };
+}
+
+/** Infiere brazos/turno desde filas del Excel que traen cantidades explícitas (ej. 20+26=46). */
+export function inferirBrazosDefaultDesdeBloques(bloques) {
+  const totals = [];
+  (bloques || []).forEach((bloque) => {
+    const mixto = extraerNumerosMixto(bloque.asignacionTexto);
+    if (mixto?.totalBrazos) totals.push(mixto.totalBrazos);
+  });
+  if (!totals.length) return 20;
+  return Math.max(...totals);
+}
+
+export function contarBrazosTurnosPlan(turnosPlan) {
+  return (turnosPlan || []).reduce((s, t) => s + (Number(t.total_brazos) || 0), 0);
+}
+
 /** @returns {{ tipo: 'disponible'|'reservado_total'|'mixto', totalBrazos: number, reservados: number, disponibles: number }} */
 export function parseAsignacionTurno(texto, brazosDefault = 20) {
   const t = norm(texto);
@@ -56,13 +90,21 @@ export function parseAsignacionTurno(texto, brazosDefault = 20) {
     return { tipo: 'reservado_total', totalBrazos: total, reservados: total, disponibles: 0 };
   }
 
-  const mRes = t.match(/reservad[^\d]*(\d+)/);
+  const mixto = extraerNumerosMixto(texto);
   const tieneDisponible = /disponible/.test(t) && /venta/.test(t);
 
+  if (mixto && tieneDisponible) {
+    return {
+      tipo: 'mixto',
+      totalBrazos: mixto.totalBrazos,
+      reservados: mixto.reservados,
+      disponibles: mixto.disponibles,
+    };
+  }
+
+  const mRes = t.match(/reservad[^\d]*(\d+)/);
   if (mRes && tieneDisponible) {
-    let reservados = Math.min(Number(mRes[1]) || 0, total);
-    if (reservados % 2 !== 0) reservados -= 1;
-    if (reservados < 0) reservados = 0;
+    let reservados = Math.min(ajustarPar(Number(mRes[1]) || 0), total);
     const disponibles = total - reservados;
     return { tipo: 'mixto', totalBrazos: total, reservados, disponibles };
   }

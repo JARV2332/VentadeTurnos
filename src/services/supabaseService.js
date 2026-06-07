@@ -41,24 +41,54 @@ function sinCamposApartado(brazos) {
   return brazos.map(({ reserva_apartado, apartado_notas, ...b }) => b);
 }
 
-async function insertarBrazosEnLotes(brazos) {
-  for (let i = 0; i < brazos.length; i += 80) {
-    const lote = brazos.slice(i, i + 80);
+const BRAZOS_INSERT_LOTE = 40;
+
+async function insertarBrazosEnLotes(brazos, { sinApartado = false } = {}) {
+  const filas = sinApartado ? sinCamposApartado(brazos) : brazos;
+  for (let i = 0; i < filas.length; i += BRAZOS_INSERT_LOTE) {
+    const lote = filas.slice(i, i + BRAZOS_INSERT_LOTE);
     const { error } = await supabase.from('brazos').insert(lote);
     if (!error) continue;
 
     if (
-      isMissingColumn(error, 'reserva_apartado') ||
-      isMissingColumn(error, 'apartado_notas')
+      !sinApartado &&
+      (isMissingColumn(error, 'reserva_apartado') || isMissingColumn(error, 'apartado_notas'))
     ) {
-      const { error: retryErr } = await supabase.from('brazos').insert(sinCamposApartado(lote));
-      if (retryErr) return retryErr;
-      continue;
+      return insertarBrazosEnLotes(brazos, { sinApartado: true });
     }
 
     return error;
   }
   return null;
+}
+
+/** Trae todos los brazos de un cortejo (Supabase limita ~1000 filas por consulta). */
+export async function getBrazosByCortejo(cortejoId, organizacionId) {
+  const turnos = await getTurnosByCortejo(cortejoId);
+  const turnoIds = turnos.map((t) => t.id);
+  if (!turnoIds.length) return [];
+
+  const PAGE = 500;
+  const all = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('brazos')
+      .select('*')
+      .eq('organizacion_id', organizacionId)
+      .in('turno_id', turnoIds)
+      .order('turno_id')
+      .order('numero_brazo')
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    if (!data?.length) break;
+    all.push(...data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+
+  return all;
 }
 
 function generarCodigoBoletaCliente() {
@@ -326,9 +356,7 @@ export async function getBrazosByOrg(organizacionId) {
 
 export async function getTurnosAgrupados(cortejoId, organizacionId) {
   const turnos = await getTurnosByCortejo(cortejoId);
-  const brazos = (await getBrazosByOrg(organizacionId)).filter((b) =>
-    turnos.some((t) => t.id === b.turno_id)
-  );
+  const brazos = await getBrazosByCortejo(cortejoId, organizacionId);
   return agruparTurnosConBrazos(turnos, brazos);
 }
 
@@ -992,6 +1020,7 @@ export async function generarProcesion(cortejo, configProcesion, organizacionId)
   if (cErr) return err(cErr);
 
   const rollbackCortejo = async () => {
+    await supabase.from('turnos').delete().eq('cortejo_id', nuevoCortejo.id);
     await supabase.from('cortejos').delete().eq('id', nuevoCortejo.id);
   };
 
@@ -1030,7 +1059,7 @@ export async function generarProcesion(cortejo, configProcesion, organizacionId)
 
       turnosCreados.push(turno);
 
-      const brazos = aplicarAsignacionBrazos(
+      const brazosTurno = aplicarAsignacionBrazos(
         crearBrazosParaTurno({
           turnoId: turno.id,
           numeroTurno: turno.numero_turno,
@@ -1041,13 +1070,15 @@ export async function generarProcesion(cortejo, configProcesion, organizacionId)
         cfg.asignacion
       ).map(({ id, ...b }) => b);
 
-      brazosCreados.push(...brazos);
-    }
+      const bErr = await insertarBrazosEnLotes(brazosTurno);
+      if (bErr) {
+        await rollbackCortejo();
+        return {
+          error: `Error al crear brazos del turno "${cfg.etiqueta || cfg.numero_turno}" (${totalBrazos} espacios): ${bErr.message || bErr}`,
+        };
+      }
 
-    const bErr = await insertarBrazosEnLotes(brazosCreados);
-    if (bErr) {
-      await rollbackCortejo();
-      return err(bErr);
+      brazosCreados.push(...brazosTurno);
     }
   } catch (e) {
     await rollbackCortejo();
