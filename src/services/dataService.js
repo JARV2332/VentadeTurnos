@@ -172,6 +172,16 @@ export const eliminarProcesion = (id, orgId) =>
     ? sb.eliminarProcesion(id, orgId)
     : Promise.resolve(mock.eliminarProcesionMock(id, orgId));
 
+export const duplicarProcesion = (cortejoOrigenId, datos, orgId) =>
+  useSb()
+    ? sb.duplicarProcesion(cortejoOrigenId, datos, orgId)
+    : Promise.resolve(mock.duplicarProcesionMock(cortejoOrigenId, datos, orgId));
+
+export const setUsuarioActivo = (orgId, usuario, activo) =>
+  useSb()
+    ? sb.setUsuarioActivo(orgId, usuario, activo)
+    : Promise.resolve(mock.setUsuarioActivoMock(orgId, usuario, activo));
+
 export const getResumenApartados = (cortejoId, orgId) =>
   useSb()
     ? sb.getResumenApartados(cortejoId, orgId)

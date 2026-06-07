@@ -7,6 +7,7 @@ import {
   saveRol,
   deleteRol,
   saveUsuario,
+  setUsuarioActivo,
   subscribeData,
 } from '../services/dataService';
 import { pantallasPorGrupo, labelPermiso } from '../config/permisos';
@@ -26,7 +27,7 @@ const USUARIO_VACIO = {
 };
 
 export default function ConfigUsuarios() {
-  const { organizacionId } = useAuth();
+  const { organizacionId, user } = useAuth();
   const [tab, setTab] = useState('roles');
   const [roles, setRoles] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
@@ -36,6 +37,7 @@ export default function ConfigUsuarios() {
   const [userEditId, setUserEditId] = useState(null);
   const [error, setError] = useState('');
   const [okMsg, setOkMsg] = useState('');
+  const [toggleUsuarioId, setToggleUsuarioId] = useState(null);
 
   const refresh = useCallback(async () => {
     if (!organizacionId) return;
@@ -145,6 +147,42 @@ export default function ConfigUsuarios() {
     setUserForm(USUARIO_VACIO);
     refresh();
     setTimeout(() => setOkMsg(''), 4000);
+  };
+
+  const toggleActivoUsuario = async (u) => {
+    if (u.id === user?.id) {
+      setError('No puede desactivar su propia cuenta mientras está conectado.');
+      return;
+    }
+
+    const activoActual = u.activo !== false;
+    const accion = activoActual ? 'desactivar' : 'activar';
+    const confirmar = window.confirm(
+      `¿${accion.charAt(0).toUpperCase() + accion.slice(1)} a "${u.nombre}"?\n\n${
+        activoActual
+          ? 'Ya no podrá iniciar sesión hasta que lo reactive.'
+          : 'Podrá volver a iniciar sesión con su correo y contraseña.'
+      }`
+    );
+    if (!confirmar) return;
+
+    setError('');
+    setToggleUsuarioId(u.id);
+    try {
+      const res = await setUsuarioActivo(organizacionId, u, !activoActual);
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      setOkMsg(activoActual ? 'Usuario desactivado.' : 'Usuario activado.');
+      if (userEditId === u.id) {
+        setUserForm((prev) => ({ ...prev, activo: !activoActual }));
+      }
+      refresh();
+      setTimeout(() => setOkMsg(''), 4000);
+    } finally {
+      setToggleUsuarioId(null);
+    }
   };
 
   return (
@@ -328,13 +366,31 @@ export default function ConfigUsuarios() {
                         </span>
                       </td>
                       <td>
-                        <button
-                          type="button"
-                          className="btn btn--ghost btn--sm"
-                          onClick={() => editarUsuario(u)}
-                        >
-                          Editar
-                        </button>
+                        <div className="usuarios-tabla-acciones">
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            onClick={() => editarUsuario(u)}
+                          >
+                            Editar
+                          </button>
+                          {u.id !== user?.id && (
+                            <button
+                              type="button"
+                              className={`btn btn--sm ${
+                                u.activo !== false ? 'btn--warning' : 'btn--success'
+                              }`}
+                              disabled={toggleUsuarioId === u.id}
+                              onClick={() => toggleActivoUsuario(u)}
+                            >
+                              {toggleUsuarioId === u.id
+                                ? '…'
+                                : u.activo !== false
+                                  ? 'Desactivar'
+                                  : 'Activar'}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

@@ -1134,6 +1134,153 @@ export async function eliminarProcesion(cortejoId, organizacionId) {
   return { ok: true };
 }
 
+function claveBrazo(b) {
+  return `${b.numero_turno}|${b.numero_brazo}|${b.lado}`;
+}
+
+function camposApartadoCopiados(brazoOrigen) {
+  if (!brazoOrigen?.reserva_apartado || brazoOrigen.estado === 'vendido') return {};
+  return {
+    estado: 'reservado',
+    reserva_apartado: true,
+    asignado_nombre: brazoOrigen.asignado_nombre || null,
+    apartado_notas: brazoOrigen.apartado_notas || null,
+    cargador_id: brazoOrigen.cargador_id || null,
+  };
+}
+
+/** Duplica una procesión: turnos, melodías y apartados (sin ventas). */
+export async function duplicarProcesion(cortejoOrigenId, datos, organizacionId) {
+  const nombre = datos?.nombre_evento?.trim();
+  if (!nombre) return { error: 'Indique un nombre para la copia.' };
+
+  const { data: origen, error: oErr } = await supabase
+    .from('cortejos')
+    .select('*')
+    .eq('id', cortejoOrigenId)
+    .eq('organizacion_id', organizacionId)
+    .maybeSingle();
+  if (oErr) return err(oErr);
+  if (!origen) return { error: 'Procesión no encontrada.' };
+
+  const turnosOrigen = await getTurnosByCortejo(cortejoOrigenId);
+  if (!turnosOrigen.length) return { error: 'La procesión no tiene turnos para copiar.' };
+
+  const brazosOrigen = await getBrazosByCortejo(cortejoOrigenId, organizacionId);
+  const brazosPorClave = new Map(brazosOrigen.map((b) => [claveBrazo(b), b]));
+
+  const configGuardado = {
+    ...(origen.config_procesion && typeof origen.config_procesion === 'object'
+      ? origen.config_procesion
+      : {}),
+    fuente: 'duplicado',
+    duplicadoDe: cortejoOrigenId,
+  };
+
+  const { data: nuevoCortejo, error: cErr } = await supabase
+    .from('cortejos')
+    .insert({
+      organizacion_id: organizacionId,
+      nombre_evento: nombre,
+      fecha: datos?.fecha || origen.fecha,
+      descripcion: origen.descripcion,
+      estado: 'activa',
+      config_procesion: configGuardado,
+    })
+    .select()
+    .single();
+  if (cErr) return err(cErr);
+
+  const rollbackCortejo = async () => {
+    await supabase.from('turnos').delete().eq('cortejo_id', nuevoCortejo.id);
+    await supabase.from('cortejos').delete().eq('id', nuevoCortejo.id);
+  };
+
+  const turnosCreados = [];
+  const brazosCreados = [];
+
+  try {
+    for (const turnoOrigen of turnosOrigen) {
+      const totalBrazos = Number(turnoOrigen.total_brazos) || 0;
+      if (!totalBrazos || totalBrazos % 2 !== 0) {
+        await rollbackCortejo();
+        return {
+          error: `Turno "${turnoOrigen.etiqueta || turnoOrigen.numero_turno}": total de brazos inválido.`,
+        };
+      }
+
+      const { data: turno, error: tErr } = await supabase
+        .from('turnos')
+        .insert({
+          organizacion_id: organizacionId,
+          cortejo_id: nuevoCortejo.id,
+          numero_turno: turnoOrigen.numero_turno,
+          tipo_turno: turnoOrigen.tipo_turno,
+          etiqueta: turnoOrigen.etiqueta,
+          total_brazos: totalBrazos,
+          precio: turnoOrigen.precio ?? 0,
+          son: turnoOrigen.son,
+          alabado: turnoOrigen.alabado,
+        })
+        .select()
+        .single();
+      if (tErr) {
+        await rollbackCortejo();
+        return err(tErr);
+      }
+
+      turnosCreados.push(turno);
+
+      const brazosTurno = crearBrazosParaTurno({
+        turnoId: turno.id,
+        numeroTurno: turno.numero_turno,
+        totalBrazos,
+        organizacionId,
+        idPrefix: 'brazo',
+      }).map(({ id, ...b }) => {
+        const origenBrazo = brazosPorClave.get(claveBrazo(b));
+        return { ...b, ...camposApartadoCopiados(origenBrazo) };
+      });
+
+      const bErr = await insertarBrazosEnLotes(brazosTurno);
+      if (bErr) {
+        await rollbackCortejo();
+        return {
+          error: `Error al copiar brazos del turno "${turnoOrigen.etiqueta || turnoOrigen.numero_turno}": ${bErr.message || bErr}`,
+        };
+      }
+
+      brazosCreados.push(...brazosTurno);
+    }
+  } catch (e) {
+    await rollbackCortejo();
+    return { error: e.message || String(e) };
+  }
+
+  try {
+    sessionStorage.setItem('vtd_ultimo_cortejo', nuevoCortejo.id);
+  } catch (_) {
+    /* ignore */
+  }
+
+  return { cortejo: nuevoCortejo, turnos: turnosCreados, brazos: brazosCreados };
+}
+
+export async function setUsuarioActivo(organizacionId, usuario, activo) {
+  if (!usuario?.id) return { error: 'Usuario no válido.' };
+  return saveUsuario(
+    organizacionId,
+    {
+      nombre: usuario.nombre,
+      email: usuario.email,
+      password: '',
+      rol_id: usuario.rol_id,
+      activo: activo !== false,
+    },
+    usuario.id
+  );
+}
+
 export async function getResumenApartados(cortejoId, organizacionId) {
   const turnos = await getTurnosAgrupados(cortejoId, organizacionId);
   const cargadores = await getCargadoresByOrg(organizacionId);

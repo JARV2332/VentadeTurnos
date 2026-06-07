@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import Layout from '../components/Layout';
 import { TurnoCartulina } from '../components/TurnoCartulina';
@@ -28,12 +28,20 @@ import { normalizarCui, isValidCui, CUI_DIGITS } from '../utils/cuiUtils';
 import { TERMINO_DEVOTO, TERMINO_DEVOTO_ARTICULO } from '../constants/terminologia';
 import PhoneInput502 from '../components/PhoneInput502';
 import VentaExitoModal from '../components/VentaExitoModal';
+import {
+  buscarApartadosEnTurnos,
+  agruparApartadosBusqueda,
+  agruparApartadosPorDevoto,
+  formDesdeApartado,
+} from '../utils/taquillaApartadosUtils';
 
 export default function Taquilla() {
   const { organizacionId, organizacion, user } = useAuth();
   const [cortejoId, setCortejoId] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('all');
-  const [turnos, setTurnos] = useState([]);
+  const [turnosTodos, setTurnosTodos] = useState([]);
+  const [busquedaApartado, setBusquedaApartado] = useState('');
+  const [extraApartadosCui, setExtraApartadosCui] = useState([]);
   const [carrito, setCarrito] = useState([]);
   const [pasoVenta, setPasoVenta] = useState(0);
   const [form, setForm] = useState({
@@ -101,7 +109,41 @@ export default function Taquilla() {
   const vendedorAuthId = user?.authUserId || user?.id;
   const carritoIds = carrito.map((b) => b.id);
 
-  const turnoDeBrazo = (brazo) => turnos.find((t) => t.id === brazo.turno_id);
+  const turnoDeBrazo = (brazo) => turnosTodos.find((t) => t.id === brazo.turno_id);
+
+  const resultadosBusqueda = useMemo(() => {
+    const q = busquedaApartado.trim();
+    if (q.length < 2) return [];
+    const base = buscarApartadosEnTurnos(turnosTodos, q);
+    const ids = new Set(base.map((r) => r.brazo.id));
+    const merged = [...base];
+    extraApartadosCui.forEach((item) => {
+      if (!ids.has(item.brazo.id)) merged.push(item);
+    });
+    return merged;
+  }, [turnosTodos, busquedaApartado, extraApartadosCui]);
+
+  const gruposDevotoBusqueda = useMemo(
+    () => agruparApartadosPorDevoto(agruparApartadosBusqueda(resultadosBusqueda)),
+    [resultadosBusqueda]
+  );
+
+  const brazosDestacadosIds = useMemo(
+    () => resultadosBusqueda.map((r) => r.brazo.id),
+    [resultadosBusqueda]
+  );
+
+  const turnos = useMemo(() => {
+    let lista = turnosTodos;
+    if (filtroTipo !== 'all') {
+      lista = lista.filter((t) => t.tipo_turno === filtroTipo);
+    }
+    if (busquedaApartado.trim().length >= 2 && brazosDestacadosIds.length > 0) {
+      const idsTurnos = new Set(resultadosBusqueda.map((r) => r.turno.id));
+      lista = lista.filter((t) => idsTurnos.has(t.id));
+    }
+    return lista;
+  }, [turnosTodos, filtroTipo, busquedaApartado, brazosDestacadosIds, resultadosBusqueda]);
 
   const itemsCarrito = carrito.map((b) => ({
     brazo: b,
@@ -173,14 +215,50 @@ export default function Taquilla() {
     try {
       let lista = await getTurnosAgrupados(cortejoId, organizacionId);
       if (!Array.isArray(lista)) lista = [];
-      if (filtroTipo !== 'all') {
-        lista = lista.filter((t) => t.tipo_turno === filtroTipo);
-      }
-      setTurnos(lista);
+      setTurnosTodos(lista);
     } catch (err) {
       console.error('Error al actualizar turnos en taquilla:', err);
     }
-  }, [cortejoId, organizacionId, filtroTipo]);
+  }, [cortejoId, organizacionId]);
+
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      const q = normalizarCui(busquedaApartado);
+      if (!isValidCui(q) || !organizacionId || !turnosTodos.length) {
+        if (!cancelado) setExtraApartadosCui([]);
+        return;
+      }
+      const cargador = await buscarCargadorPorCui(organizacionId, q);
+      if (cancelado) return;
+      if (!cargador) {
+        setExtraApartadosCui([]);
+        return;
+      }
+      const encontrados = [];
+      turnosTodos.forEach((turno) => {
+        const brazos = [...(turno.izquierda || []), ...(turno.derecha || [])];
+        brazos.forEach((brazo) => {
+          if (
+            brazo.reserva_apartado &&
+            brazo.estado === 'reservado' &&
+            brazo.cargador_id === cargador.id
+          ) {
+            encontrados.push({
+              brazo,
+              turno,
+              nombre: cargador.nombre_completo || brazo.asignado_nombre || '',
+              dpi: q,
+            });
+          }
+        });
+      });
+      setExtraApartadosCui(encontrados);
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [busquedaApartado, turnosTodos, organizacionId]);
 
   useEffect(() => {
     refreshCortejos();
@@ -242,6 +320,42 @@ export default function Taquilla() {
       setError('Reservado por otra mesa. Espere a que expire (5 min) o elija otro brazo.');
     }
   };
+
+  const agregarApartadosDesdeBusqueda = async (brazos) => {
+    if (!brazos?.length) return;
+    setError('');
+    setVentaOk(null);
+
+    let primero = carrito.length === 0;
+    const idsAgregados = new Set(carrito.map((b) => b.id));
+
+    for (const brazo of brazos) {
+      if (brazo.estado === 'vendido' || idsAgregados.has(brazo.id)) continue;
+      if (!(brazo.reserva_apartado && brazo.estado === 'reservado')) continue;
+
+      if (primero) {
+        const cargador = brazo.cargador_id ? await getCargadorById(brazo.cargador_id) : null;
+        setPago({ metodo_pago: 'efectivo', comprobante_url: null, comprobante_nombre: '' });
+        setForm(formDesdeApartado(brazo, cargador));
+        primero = false;
+      }
+
+      idsAgregados.add(brazo.id);
+      setCarrito((prev) => (prev.some((b) => b.id === brazo.id) ? prev : [...prev, brazo]));
+    }
+
+    const esEscritorio = window.matchMedia('(min-width: 1025px)').matches;
+    if (esEscritorio) {
+      setPasoVenta((p) => (p === 0 ? 1 : p));
+    } else {
+      abrirCobro();
+    }
+  };
+
+  const resumenTurnosGrupo = (grupo) =>
+    grupo.turnosResumen
+      .map((t) => `#${t.turno.numero_turno} (${t.cantidad})`)
+      .join(', ');
 
   const handleCuiChange = async (value) => {
     const cui = normalizarCui(value);
@@ -452,16 +566,75 @@ export default function Taquilla() {
         </div>
       </div>
 
+      <div className="taquilla-busqueda-apartados">
+        <label className="taquilla-busqueda-apartados__label">
+          Buscar apartado
+          <input
+            type="search"
+            className="taquilla-busqueda-apartados__input"
+            placeholder="DPI o nombre del devoto(a)…"
+            value={busquedaApartado}
+            onChange={(e) => setBusquedaApartado(e.target.value)}
+            autoComplete="off"
+          />
+        </label>
+        {busquedaApartado.trim().length >= 2 && (
+          <div className="taquilla-busqueda-resultados">
+            {gruposDevotoBusqueda.length === 0 ? (
+              <p className="taquilla-busqueda-resultados__vacio">
+                No hay apartados que coincidan con «{busquedaApartado.trim()}».
+              </p>
+            ) : (
+              <>
+                <p className="taquilla-busqueda-resultados__meta">
+                  {gruposDevotoBusqueda.length} devoto(s) ·{' '}
+                  {resultadosBusqueda.length} espacio(s) apartado(s)
+                </p>
+                <ul className="taquilla-busqueda-lista">
+                  {gruposDevotoBusqueda.map((grupo) => (
+                    <li key={`${grupo.nombre}-${grupo.dpi}`} className="taquilla-busqueda-item">
+                      <div className="taquilla-busqueda-item__info">
+                        <strong>{grupo.nombre || 'Sin nombre'}</strong>
+                        {grupo.dpi && (
+                          <span className="taquilla-busqueda-item__dpi">DPI {grupo.dpi}</span>
+                        )}
+                        <span className="taquilla-busqueda-item__turnos">
+                          Turno(s) {resumenTurnosGrupo(grupo)} · {grupo.brazos.length} espacio(s)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn--primary btn--sm"
+                        onClick={() => agregarApartadosDesdeBusqueda(grupo.brazos)}
+                      >
+                        Agregar y cobrar
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="taquilla-layout">
         <div className="turnos-lista">
           {turnos.length === 0 ? (
-            <p className="text-muted">No hay turnos para esta procesión.</p>
+            <p className="text-muted">
+              {busquedaApartado.trim().length >= 2
+                ? 'Ningún turno visible coincide con la búsqueda.'
+                : 'No hay turnos para esta procesión.'}
+            </p>
           ) : (
             (turnos || []).map((turno) => (
               <TurnoCartulina
                 key={turno.id}
                 turno={turno}
                 selectedBrazoIds={carritoIds}
+                brazosDestacadosIds={
+                  busquedaApartado.trim().length >= 2 ? brazosDestacadosIds : undefined
+                }
                 onClickBrazo={handleClickBrazo}
               />
             ))

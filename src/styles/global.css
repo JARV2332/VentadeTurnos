@@ -1071,6 +1071,94 @@ body {
 .legend-dot--reservado { background: #fbbf24; }
 .legend-dot--vendido { background: #475569; }
 
+.taquilla-busqueda-apartados {
+  margin: -0.5rem 0 1.25rem;
+  position: relative;
+}
+
+.taquilla-busqueda-apartados__label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.taquilla-busqueda-apartados__input {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  margin-top: 0.35rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  background: #fff;
+}
+
+.taquilla-busqueda-apartados__input:focus {
+  outline: 2px solid rgba(59, 130, 246, 0.35);
+  border-color: #3b82f6;
+}
+
+.taquilla-busqueda-resultados {
+  margin-top: 0.65rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f8fafc;
+  max-width: 640px;
+}
+
+.taquilla-busqueda-resultados__meta {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.taquilla-busqueda-resultados__vacio {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.taquilla-busqueda-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.taquilla-busqueda-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.taquilla-busqueda-item__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.taquilla-busqueda-item__dpi,
+.taquilla-busqueda-item__turnos {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.taquilla-busqueda-item__dpi::before {
+  content: ' · ';
+}
+
 /* Taquilla: scroll unificado en app-main (sin contenedor interno bloqueado) */
 .app-content--taquilla {
   flex: 1 0 auto;
@@ -3820,6 +3908,13 @@ body {
   display: inline-block;
 }
 
+.usuarios-tabla-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+
 /* ── Import apartados ── */
 .import-toolbar {
   display: flex;
@@ -3958,6 +4053,12 @@ body {
 .espacio-brazo--apartado {
   border-color: #b45309 !important;
   background: #fffbeb !important;
+}
+
+.espacio-brazo--destacado {
+  box-shadow: 0 0 0 2px #2563eb, 0 0 0 4px rgba(37, 99, 235, 0.25);
+  z-index: 1;
+  position: relative;
 }
 
 .espacio-brazo__asignado {

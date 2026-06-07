@@ -9,7 +9,7 @@ const ESTADO_CLASS = {
   vendido: 'espacio--vendido',
 };
 
-export default function EspacioBrazo({ brazo, selected, onClick, readOnly = false }) {
+export default function EspacioBrazo({ brazo, selected, destacado, onClick, readOnly = false }) {
   const vendido = brazo.estado === 'vendido';
   const asignado = etiquetaAsignado(brazo, brazo.cargador);
   const esApartado = brazo.reserva_apartado && brazo.estado === 'reservado';
@@ -32,8 +32,8 @@ export default function EspacioBrazo({ brazo, selected, onClick, readOnly = fals
       className={`espacio-brazo ${ESTADO_CLASS[brazo.estado] || ''} ${
         brazo.reserva_apartado ? 'espacio-brazo--apartado' : ''
       } ${selected ? 'espacio-brazo--selected' : ''} ${
-        readOnly ? 'espacio-brazo--readonly' : ''
-      }`}
+        destacado ? 'espacio-brazo--destacado' : ''
+      } ${readOnly ? 'espacio-brazo--readonly' : ''}`}
       onClick={() => !readOnly && onClick(brazo)}
       disabled={vendido || readOnly}
       title={titleParts.join(' · ')}
@@ -48,10 +48,19 @@ export default function EspacioBrazo({ brazo, selected, onClick, readOnly = fals
   );
 }
 
-export function TurnoCartulina({ turno, selectedBrazo, selectedBrazoIds, onClickBrazo, readOnly = false }) {
+export function TurnoCartulina({
+  turno,
+  selectedBrazo,
+  selectedBrazoIds,
+  brazosDestacadosIds,
+  onClickBrazo,
+  readOnly = false,
+}) {
   const idsEnCarrito = Array.isArray(selectedBrazoIds) ? selectedBrazoIds : [];
+  const idsDestacados = Array.isArray(brazosDestacadosIds) ? brazosDestacadosIds : [];
   const isSelected = (id) =>
     idsEnCarrito.includes(id) || selectedBrazo?.id === id;
+  const isDestacado = (id) => idsDestacados.includes(id);
   const formatQ = (n) =>
     new Intl.NumberFormat('es-GT', { style: 'currency', currency: 'GTQ' }).format(n);
   const repertorio = repertorioTurnoLista(turno);
@@ -91,6 +100,7 @@ export function TurnoCartulina({ turno, selectedBrazo, selectedBrazoIds, onClick
                 key={b.id}
                 brazo={b}
                 selected={isSelected(b.id)}
+                destacado={isDestacado(b.id)}
                 onClick={readOnly ? () => {} : onClickBrazo}
                 readOnly={readOnly}
               />
@@ -107,11 +117,12 @@ export function TurnoCartulina({ turno, selectedBrazo, selectedBrazoIds, onClick
         <div className="turno-columna turno-columna--der">
           <span className="turno-columna__label">Derecha</span>
           <div className="turno-columna__lista">
-            {turno.derecha.map((b) => (
+            {derecha.map((b) => (
               <EspacioBrazo
                 key={b.id}
                 brazo={b}
                 selected={isSelected(b.id)}
+                destacado={isDestacado(b.id)}
                 onClick={readOnly ? () => {} : onClickBrazo}
                 readOnly={readOnly}
               />

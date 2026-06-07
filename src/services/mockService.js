@@ -96,6 +96,100 @@ export function eliminarProcesionMock(cortejoId, organizacionId) {
   return { ok: true };
 }
 
+function claveBrazoMock(b) {
+  return `${b.numero_turno}|${b.numero_brazo}|${b.lado}`;
+}
+
+function camposApartadoCopiadosMock(brazoOrigen) {
+  if (!brazoOrigen?.reserva_apartado || brazoOrigen.estado === 'vendido') return {};
+  return {
+    estado: 'reservado',
+    reserva_apartado: true,
+    asignado_nombre: brazoOrigen.asignado_nombre || null,
+    apartado_notas: brazoOrigen.apartado_notas || null,
+    cargador_id: brazoOrigen.cargador_id || null,
+  };
+}
+
+export function duplicarProcesionMock(cortejoOrigenId, datos, organizacionId) {
+  const nombre = datos?.nombre_evento?.trim();
+  if (!nombre) return { error: 'Indique un nombre para la copia.' };
+
+  const origen = store.cortejos.find(
+    (c) => c.id === cortejoOrigenId && c.organizacion_id === organizacionId
+  );
+  if (!origen) return { error: 'Procesión no encontrada.' };
+
+  const turnosOrigen = getTurnosByCortejo(cortejoOrigenId);
+  if (!turnosOrigen.length) return { error: 'La procesión no tiene turnos para copiar.' };
+
+  const turnoIdsOrigen = new Set(turnosOrigen.map((t) => t.id));
+  const brazosOrigen = store.brazos.filter(
+    (b) => b.organizacion_id === organizacionId && turnoIdsOrigen.has(b.turno_id)
+  );
+  const brazosPorClave = new Map(brazosOrigen.map((b) => [claveBrazoMock(b), b]));
+
+  const ts = Date.now();
+  const nuevoCortejo = {
+    id: `cortejo-${ts}`,
+    organizacion_id: organizacionId,
+    nombre_evento: nombre,
+    fecha: datos?.fecha || origen.fecha,
+    descripcion: origen.descripcion,
+    estado: 'activa',
+    config_procesion: {
+      ...(origen.config_procesion || {}),
+      fuente: 'duplicado',
+      duplicadoDe: cortejoOrigenId,
+    },
+  };
+  store.cortejos.push(nuevoCortejo);
+
+  const nuevosTurnos = [];
+  const nuevosBrazos = [];
+
+  turnosOrigen.forEach((turnoOrigen, i) => {
+    const turnoId = `turno-${ts}-${i}`;
+    nuevosTurnos.push({
+      id: turnoId,
+      organizacion_id: organizacionId,
+      cortejo_id: nuevoCortejo.id,
+      numero_turno: turnoOrigen.numero_turno,
+      tipo_turno: turnoOrigen.tipo_turno,
+      etiqueta: turnoOrigen.etiqueta,
+      total_brazos: turnoOrigen.total_brazos,
+      precio: turnoOrigen.precio,
+      son: turnoOrigen.son,
+      alabado: turnoOrigen.alabado,
+    });
+
+    const brazos = crearBrazosParaTurno({
+      turnoId,
+      numeroTurno: turnoOrigen.numero_turno,
+      totalBrazos: turnoOrigen.total_brazos,
+      organizacionId,
+      idPrefix: `brazo-${ts}`,
+    }).map((b) => {
+      const origenBrazo = brazosPorClave.get(claveBrazoMock(b));
+      return { ...b, ...camposApartadoCopiadosMock(origenBrazo) };
+    });
+    nuevosBrazos.push(...brazos);
+  });
+
+  store.turnos.push(...nuevosTurnos);
+  store.brazos.push(...nuevosBrazos);
+  emit('matriz', { cortejo: nuevoCortejo, turnos: nuevosTurnos, brazos: nuevosBrazos });
+  emit('procesion:creada', { cortejo: nuevoCortejo });
+
+  try {
+    sessionStorage.setItem('vtd_ultimo_cortejo', nuevoCortejo.id);
+  } catch (_) {
+    /* ignore */
+  }
+
+  return { cortejo: nuevoCortejo, turnos: nuevosTurnos, brazos: nuevosBrazos };
+}
+
 export function getTurnosByCortejo(cortejoId) {
   return store.turnos.filter((t) => t.cortejo_id === cortejoId);
 }
@@ -785,6 +879,20 @@ export function saveUsuarioMock(organizacionId, datos, usuarioId = null) {
   store.usuarios.push(nuevo);
   emit('usuarios', { eventType: 'INSERT', new: nuevo });
   return { data: nuevo };
+}
+
+export function setUsuarioActivoMock(organizacionId, usuario, activo) {
+  return saveUsuarioMock(
+    organizacionId,
+    {
+      nombre: usuario.nombre,
+      email: usuario.email,
+      password: '',
+      rol_id: usuario.rol_id,
+      activo: activo !== false,
+    },
+    usuario.id
+  );
 }
 
 // ── Importación apartados (Excel / CSV) ──

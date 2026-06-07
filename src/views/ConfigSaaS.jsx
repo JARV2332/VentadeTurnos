@@ -11,6 +11,7 @@ import {
   desactivarProcesion,
   activarProcesion,
   eliminarProcesion,
+  duplicarProcesion,
 } from '../services/dataService';
 import StatusBadge from '../components/StatusBadge';
 import {
@@ -98,6 +99,7 @@ export default function ConfigSaaS() {
   const [modoCreacion, setModoCreacion] = useState('manual');
   const [excelImport, setExcelImport] = useState(null);
   const [generando, setGenerando] = useState(false);
+  const [duplicandoId, setDuplicandoId] = useState(null);
 
   const turnosPlanExcel = useMemo(() => {
     if (modoCreacion !== 'excel' || !excelImport?.bloques?.length) return [];
@@ -381,6 +383,44 @@ export default function ConfigSaaS() {
     refreshLista();
   };
 
+  const handleDuplicar = async (p) => {
+    const nombreDefault = `${p.nombre_evento} (copia)`;
+    const nombre = window.prompt(
+      `Nombre de la copia de "${p.nombre_evento}":`,
+      nombreDefault
+    );
+    if (nombre === null) return;
+    if (!nombre.trim()) {
+      setError('Indique un nombre para la copia.');
+      return;
+    }
+
+    const fechaDefault = p.fecha || new Date().toISOString().slice(0, 10);
+    const fecha = window.prompt('Fecha de la copia (AAAA-MM-DD):', fechaDefault);
+    if (fecha === null) return;
+
+    setError('');
+    setDuplicandoId(p.id);
+    try {
+      const res = await duplicarProcesion(
+        p.id,
+        { nombre_evento: nombre.trim(), fecha: fecha.trim() || fechaDefault },
+        organizacionId
+      );
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      setVerCortejoId(res.cortejo.id);
+      setOkMsg(
+        `Copia "${res.cortejo.nombre_evento}" creada con ${res.turnos.length} turnos y ${res.brazos.length} espacios.`
+      );
+      refreshLista();
+    } finally {
+      setDuplicandoId(null);
+    }
+  };
+
   const procesionesActivas = procesiones.filter((p) => p.estado !== 'inactiva');
   const procesionesInactivas = procesiones.filter((p) => p.estado === 'inactiva');
 
@@ -418,6 +458,14 @@ export default function ConfigSaaS() {
             Taquilla
           </Link>
         )}
+        <button
+          type="button"
+          className="btn btn--ghost btn--sm"
+          disabled={duplicandoId === p.id}
+          onClick={() => handleDuplicar(p)}
+        >
+          {duplicandoId === p.id ? 'Copiando…' : 'Duplicar'}
+        </button>
         {p.estado === 'inactiva' ? (
           <button type="button" className="btn btn--success btn--sm" onClick={() => handleActivar(p)}>
             Reactivar
