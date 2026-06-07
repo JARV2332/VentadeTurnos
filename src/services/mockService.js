@@ -124,6 +124,8 @@ export function saveEmailConfig(organizacionId, config) {
     notificaciones_activas: config.notificaciones_activas !== false,
     pie_correo: config.pie_correo,
     leyenda_correo: config.leyenda_correo?.trim() || null,
+    correo_fecha_entrega: config.correo_fecha_entrega?.trim() || null,
+    correo_horario_entrega: config.correo_horario_entrega?.trim() || null,
     gmail_smtp_user: config.gmail_smtp_user?.trim() || config.correo_remitente?.trim(),
   };
   if (nuevaPass) {

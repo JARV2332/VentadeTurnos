@@ -435,7 +435,7 @@ export default function ConfigSaaS() {
           </SeccionTurno>
 
           <SeccionTurno
-            titulo="Brazos y precios base"
+            titulo="Brazos y ofrendas base"
             descripcion="Aplica a salida, entrada y turnos ordinarios. Los extraordinarios pueden tener otro total de brazos."
           >
             <div className="form-row">
@@ -445,7 +445,7 @@ export default function ConfigSaaS() {
                 onChange={(v) => setConfigField('brazosDefault', v)}
               />
               <label>
-                Precio salida (turno 1) Q
+                Ofrenda salida (turno 1) Q
                 <input
                   type="number"
                   min={0}
@@ -454,7 +454,7 @@ export default function ConfigSaaS() {
                 />
               </label>
               <label>
-                Precio entrada (turno {ultimoTurno}) Q
+                Ofrenda entrada (turno {ultimoTurno}) Q
                 <input
                   type="number"
                   min={0}
@@ -463,7 +463,7 @@ export default function ConfigSaaS() {
                 />
               </label>
               <label>
-                Precio ordinario Q
+                Ofrenda ordinario Q
                 <input
                   type="number"
                   min={0}
@@ -480,7 +480,7 @@ export default function ConfigSaaS() {
           >
             <div className="form-row">
               <label>
-                Precio extraordinario Q
+                Ofrenda extraordinario Q
                 <input
                   type="number"
                   min={0}

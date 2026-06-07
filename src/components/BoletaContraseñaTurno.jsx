@@ -208,7 +208,7 @@ export default function BoletaContraseñaTurno({
             </div>
             {cfg.mostrar_precio !== false && (
               <div className="boleta-formal__precio-caja">
-                <span>Precio:</span>
+                <span>Ofrenda:</span>
                 <strong>{precioUnitario}</strong>
               </div>
             )}

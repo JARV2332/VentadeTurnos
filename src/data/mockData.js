@@ -2,7 +2,11 @@
  * Datos de demostración — estructura real de turnos (Izq + Der).
  */
 import { crearBrazosParaTurno } from '../utils/turnoUtils';
-import { LEYENDA_CORREO_DEFAULT } from '../utils/emailTemplateUtils';
+import {
+  LEYENDA_CORREO_DEFAULT,
+  CORREO_FECHA_ENTREGA_DEFAULT,
+  CORREO_HORARIO_ENTREGA_DEFAULT,
+} from '../utils/emailTemplateUtils';
 
 const ORG_A = 'org-demo-001';
 const ORG_B = 'org-demo-002';
@@ -202,6 +206,8 @@ export const DEMO_EMAIL_CONFIG = {
     notificaciones_activas: true,
     pie_correo: 'Gracias por su participación en nuestros eventos.',
     leyenda_correo: LEYENDA_CORREO_DEFAULT,
+    correo_fecha_entrega: CORREO_FECHA_ENTREGA_DEFAULT,
+    correo_horario_entrega: CORREO_HORARIO_ENTREGA_DEFAULT,
   },
 };
 

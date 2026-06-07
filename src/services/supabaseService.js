@@ -650,7 +650,7 @@ export async function getDashboardMetrics(organizacionId) {
 }
 
 const EMAIL_CONFIG_PUBLIC =
-  'id, organizacion_id, correo_remitente, nombre_remitente, correo_respuesta, notificaciones_activas, pie_correo, leyenda_correo, gmail_smtp_user, gmail_password_configurada, created_at, updated_at';
+  'id, organizacion_id, correo_remitente, nombre_remitente, correo_respuesta, notificaciones_activas, pie_correo, leyenda_correo, correo_fecha_entrega, correo_horario_entrega, gmail_smtp_user, gmail_password_configurada, created_at, updated_at';
 
 export async function getEmailConfig(organizacionId) {
   const { data } = await supabase
@@ -670,6 +670,8 @@ export async function saveEmailConfig(organizacionId, config) {
     notificaciones_activas: config.notificaciones_activas !== false,
     pie_correo: config.pie_correo || null,
     leyenda_correo: config.leyenda_correo?.trim() || null,
+    correo_fecha_entrega: config.correo_fecha_entrega?.trim() || null,
+    correo_horario_entrega: config.correo_horario_entrega?.trim() || null,
     gmail_smtp_user: config.gmail_smtp_user?.trim() || config.correo_remitente?.trim() || null,
   };
 

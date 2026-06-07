@@ -191,7 +191,7 @@ export default function CajaSaaS() {
                 <th>Boleta</th>
                 <th>Pago</th>
                 <th>Comprobante</th>
-                <th>Monto</th>
+                <th>Ofrenda</th>
               </tr>
             </thead>
             <tbody>

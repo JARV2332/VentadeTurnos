@@ -5,9 +5,13 @@
 
 import { MOCK_MODE, supabase } from '../config/supabaseClient';
 import { getEmailConfig, registrarCorreoEnviado } from './dataService';
-import { formatPrecio } from '../utils/boletaUtils';
+import { formatPrecio, formatFechaDiaMes, anioDeFecha } from '../utils/boletaUtils';
 import { construirLineasRecibo, codigoReciboDisplay } from '../utils/compraUtils';
-import { aplicarLeyendaCorreo } from '../utils/emailTemplateUtils';
+import {
+  aplicarLeyendaCorreo,
+  CORREO_FECHA_ENTREGA_DEFAULT,
+  CORREO_HORARIO_ENTREGA_DEFAULT,
+} from '../utils/emailTemplateUtils';
 
 const APP_URL = process.env.REACT_APP_APP_URL || 'https://ventadeturnos.com';
 const EMAIL_WEBHOOK_URL =
@@ -43,7 +47,8 @@ export function construirCuerpoBoleta({
   const codigoRecibo = codigoReciboDisplay(compra, brazosLista);
   const enlaceBoleta = `${APP_URL}/boleta/${brazosLista[0]?.codigo_boleta_qr || codigoRecibo}`;
 
-  const nombre = cargador?.nombre_completo?.split(' ')[0] || 'devoto';
+  const nombre = cargador?.nombre_completo?.split(' ')[0] || 'devoto(a)';
+  const nombreCompleto = cargador?.nombre_completo?.trim() || 'Devoto(a)';
   const lineasTexto = lineas
     .map(
       (l) =>
@@ -51,22 +56,28 @@ export function construirCuerpoBoleta({
     )
     .join('\n');
 
+  const turnosBloque = lineas.length
+    ? `Turnos adquiridos:\n${lineasTexto}\n\nTotal ofrenda: ${totalFmt}\n`
+    : '';
+
   const cuerpoBase = aplicarLeyendaCorreo(emailConfig?.leyenda_correo, {
     nombre,
-    nombre_completo: cargador?.nombre_completo?.trim() || '',
-    evento: cortejo?.nombre_evento || 'Procesión',
+    nombre_completo: nombreCompleto,
+    evento: cortejo?.nombre_evento || 'Festivo Rezado de Nuestra Señora de la Asunción',
+    anio: anioDeFecha(cortejo?.fecha),
+    fecha_procesion: formatFechaDiaMes(cortejo?.fecha) || '15 de agosto',
+    turnos_bloque: turnosBloque,
     turnos: lineasTexto,
     total: totalFmt,
     codigo: codigoRecibo,
     enlace: enlaceBoleta,
-    organizacion: organizacion?.nombre_oficial || '',
+    fecha_entrega: emailConfig?.correo_fecha_entrega?.trim() || CORREO_FECHA_ENTREGA_DEFAULT,
+    horario_entrega: emailConfig?.correo_horario_entrega?.trim() || CORREO_HORARIO_ENTREGA_DEFAULT,
+    organizacion: organizacion?.nombre_oficial || emailConfig?.nombre_remitente || '',
   });
 
   const pie = emailConfig?.pie_correo?.trim();
-  const firma = emailConfig?.nombre_remitente || organizacion?.nombre_oficial || '';
-  const cuerpo = pie
-    ? `${cuerpoBase}\n\n${pie}\n\n— ${firma}`
-    : `${cuerpoBase}\n\n— ${firma}`;
+  const cuerpo = pie ? `${cuerpoBase}\n\n${pie}` : cuerpoBase;
 
   return {
     cuerpo,

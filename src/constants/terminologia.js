@@ -3,3 +3,4 @@
 export const TERMINO_DEVOTO = 'Devoto(a)';
 export const TERMINO_DEVOTO_ARTICULO = 'del devoto(a)';
 export const TERMINO_DEVOTO_A = 'al devoto(a)';
+export const TERMINO_OFRENDA = 'Ofrenda';

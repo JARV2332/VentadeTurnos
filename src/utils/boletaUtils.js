@@ -42,3 +42,18 @@ export function formatFechaEvento(fecha) {
   if (Number.isNaN(d.getTime())) return '';
   return d.toLocaleDateString('es-GT', { day: 'numeric', month: 'long', year: 'numeric' });
 }
+
+/** Día y mes: "15 de agosto" */
+export function formatFechaDiaMes(fecha) {
+  if (!fecha) return '';
+  const d = new Date(`${String(fecha).slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('es-GT', { day: 'numeric', month: 'long' });
+}
+
+export function anioDeFecha(fecha) {
+  if (!fecha) return String(new Date().getFullYear());
+  const d = new Date(`${String(fecha).slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return String(new Date().getFullYear());
+  return String(d.getFullYear());
+}

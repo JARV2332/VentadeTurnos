@@ -24,7 +24,12 @@ import {
 
 import { construirDatosBoletaEmail } from '../services/emailService';
 
-import { LEYENDA_CORREO_DEFAULT, LEYENDA_CORREO_PLACEHOLDERS } from '../utils/emailTemplateUtils';
+import {
+  LEYENDA_CORREO_DEFAULT,
+  LEYENDA_CORREO_PLACEHOLDERS,
+  CORREO_FECHA_ENTREGA_DEFAULT,
+  CORREO_HORARIO_ENTREGA_DEFAULT,
+} from '../utils/emailTemplateUtils';
 
 import { MOCK_MODE } from '../config/supabaseClient';
 
@@ -55,6 +60,10 @@ const DEFAULT_CONFIG = {
   pie_correo: 'Gracias por su participación en nuestros eventos.',
 
   leyenda_correo: LEYENDA_CORREO_DEFAULT,
+
+  correo_fecha_entrega: CORREO_FECHA_ENTREGA_DEFAULT,
+
+  correo_horario_entrega: CORREO_HORARIO_ENTREGA_DEFAULT,
 
 };
 
@@ -423,6 +432,27 @@ export default function ConfigCorreo() {
 
               </label>
 
+              <div className="config-grid">
+                <label>
+                  Fecha de entrega de cartulina ({'{fecha_entrega}'})
+                  <input
+                    type="text"
+                    value={config.correo_fecha_entrega ?? CORREO_FECHA_ENTREGA_DEFAULT}
+                    onChange={(e) => setConfig({ ...config, correo_fecha_entrega: e.target.value })}
+                    placeholder={CORREO_FECHA_ENTREGA_DEFAULT}
+                  />
+                </label>
+                <label>
+                  Horario de entrega ({'{horario_entrega}'})
+                  <input
+                    type="text"
+                    value={config.correo_horario_entrega ?? CORREO_HORARIO_ENTREGA_DEFAULT}
+                    onChange={(e) => setConfig({ ...config, correo_horario_entrega: e.target.value })}
+                    placeholder={CORREO_HORARIO_ENTREGA_DEFAULT}
+                  />
+                </label>
+              </div>
+
               <div className="correo-placeholders">
 
                 <p className="correo-placeholders__titulo">Marcadores disponibles</p>
@@ -448,9 +478,12 @@ export default function ConfigCorreo() {
                   className="btn btn--ghost btn--sm"
 
                   onClick={() =>
-
-                    setConfig({ ...config, leyenda_correo: LEYENDA_CORREO_DEFAULT })
-
+                    setConfig({
+                      ...config,
+                      leyenda_correo: LEYENDA_CORREO_DEFAULT,
+                      correo_fecha_entrega: CORREO_FECHA_ENTREGA_DEFAULT,
+                      correo_horario_entrega: CORREO_HORARIO_ENTREGA_DEFAULT,
+                    })
                   }
 
                 >
