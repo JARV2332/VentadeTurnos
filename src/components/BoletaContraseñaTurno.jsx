@@ -53,7 +53,9 @@ export default function BoletaContraseñaTurno({
   const cfg = mergeReciboConfig(configProp ?? configGuardada);
   const codigo = codigoReciboDisplay(compra, brazosLista);
   const esMulti = items.length > 1;
-  const qrSize = cfg.qr_tamano_px || 56;
+  const numFilas = lineas.length;
+  const qrSize =
+    numFilas >= 8 ? 44 : numFilas >= 5 ? 50 : cfg.qr_tamano_px || 56;
 
   const tituloOrg =
     cfg.titulo_personalizado?.trim() ||
@@ -84,8 +86,27 @@ export default function BoletaContraseñaTurno({
     operadorNombreProp,
   });
 
+  const claseDensidad =
+    numFilas >= 8
+      ? 'boleta-contraseña--densidad-alta'
+      : numFilas >= 5
+        ? 'boleta-contraseña--densidad-media'
+        : numFilas >= 2
+          ? 'boleta-contraseña--densidad-baja'
+          : '';
+
   return (
-    <article className="boleta-contraseña boleta-contraseña--media-carta boleta-contraseña--formal">
+    <article
+      className={[
+        'boleta-contraseña',
+        'boleta-contraseña--media-carta',
+        'boleta-contraseña--formal',
+        esMulti ? 'boleta-contraseña--multi' : '',
+        claseDensidad,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       {/* Encabezado institucional (sin saludo — va sobre el nombre) */}
       <header className="boleta-formal__head">
         <div className="boleta-formal__head-centro">
@@ -142,7 +163,7 @@ export default function BoletaContraseñaTurno({
             )}
           </div>
           <div className="boleta-formal__boleta-nums">
-            {brazoPrincipal?.numero_turno != null && (
+            {!esMulti && brazoPrincipal?.numero_turno != null && (
               <p>
                 <span>No. Turno:</span> <strong>{brazoPrincipal.numero_turno}</strong>
               </p>

@@ -2411,6 +2411,156 @@ body {
   font-size: 0.72rem;
 }
 
+.boleta-contraseña--multi {
+  justify-content: flex-start;
+  gap: 0.18rem;
+}
+
+.boleta-contraseña--multi .boleta-formal__cuerpo {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+.boleta-contraseña--multi .boleta-formal__head {
+  padding-bottom: 0.3rem;
+}
+
+.boleta-contraseña--multi .boleta-formal__devoto-row {
+  padding: 0.22rem 0 0.15rem;
+}
+
+.boleta-contraseña--multi .boleta-formal__constancia {
+  margin: 0.2rem 0 0.15rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.boleta-contraseña--multi .boleta-formal__seccion-label {
+  margin: 0 0 0.12rem;
+}
+
+.boleta-contraseña--multi .boleta-formal__tabla-wrap {
+  overflow: visible;
+}
+
+.boleta-contraseña--multi .boleta-turnos-tabla {
+  margin-top: 0;
+}
+
+.boleta-contraseña--multi .boleta-turnos-tabla th,
+.boleta-contraseña--multi .boleta-turnos-tabla td {
+  padding: 0.16rem 0.32rem;
+  line-height: 1.2;
+  vertical-align: top;
+}
+
+.boleta-contraseña--multi .boleta-turnos-tabla th {
+  padding-top: 0.12rem;
+  padding-bottom: 0.12rem;
+}
+
+.boleta-contraseña--multi .boleta-turnos-tabla td:nth-child(3) {
+  word-break: break-word;
+}
+
+.boleta-contraseña--multi .boleta-turnos-tabla tfoot td {
+  padding-top: 0.22rem;
+  padding-bottom: 0.12rem;
+}
+
+.boleta-contraseña--multi .boleta-turnos-tabla__total-valor {
+  font-size: 0.88rem;
+}
+
+.boleta-contraseña--multi .boleta-formal__fecha-emision {
+  margin: 0.15rem 0 0.1rem;
+  font-size: 0.68rem;
+}
+
+.boleta-contraseña--multi .boleta-formal__pie {
+  margin-top: 0.2rem;
+  padding: 0.38rem 0.45rem;
+  font-size: 0.62rem;
+  line-height: 1.3;
+}
+
+.boleta-contraseña--multi .boleta-formal__operador {
+  margin-top: 0.15rem;
+  font-size: 0.52rem;
+}
+
+.boleta-contraseña--densidad-media .boleta-formal__parroquia {
+  font-size: 0.88rem;
+}
+
+.boleta-contraseña--densidad-media .boleta-formal__devoto-nombre strong {
+  font-size: 0.95rem;
+}
+
+.boleta-contraseña--densidad-media .boleta-turnos-tabla--formal {
+  font-size: 0.66rem;
+}
+
+.boleta-contraseña--densidad-media .boleta-turnos-tabla th,
+.boleta-contraseña--densidad-media .boleta-turnos-tabla td {
+  padding: 0.12rem 0.28rem;
+}
+
+.boleta-contraseña--densidad-alta .boleta-formal__head {
+  padding-bottom: 0.2rem;
+}
+
+.boleta-contraseña--densidad-alta .boleta-formal__parroquia {
+  font-size: 0.82rem;
+  line-height: 1.15;
+}
+
+.boleta-contraseña--densidad-alta .boleta-formal__pastoral,
+.boleta-contraseña--densidad-alta .boleta-formal__inscripcion,
+.boleta-contraseña--densidad-alta .boleta-formal__fecha-evento {
+  font-size: 0.64rem;
+  margin-top: 0.06rem;
+}
+
+.boleta-contraseña--densidad-alta .boleta-formal__logo {
+  max-height: 2.4rem !important;
+}
+
+.boleta-contraseña--densidad-alta .boleta-formal__qr-mini svg {
+  width: 44px !important;
+  height: 44px !important;
+}
+
+.boleta-contraseña--densidad-alta .boleta-formal__devoto-nombre strong {
+  font-size: 0.88rem;
+}
+
+.boleta-contraseña--densidad-alta .boleta-formal__dpi {
+  font-size: 0.68rem;
+  margin-top: 0.1rem;
+}
+
+.boleta-contraseña--densidad-alta .boleta-formal__constancia {
+  margin: 0.12rem 0 0.08rem;
+  font-size: 0.66rem;
+}
+
+.boleta-contraseña--densidad-alta .boleta-turnos-tabla--formal {
+  font-size: 0.6rem;
+}
+
+.boleta-contraseña--densidad-alta .boleta-turnos-tabla th,
+.boleta-contraseña--densidad-alta .boleta-turnos-tabla td {
+  padding: 0.08rem 0.22rem;
+}
+
+.boleta-contraseña--densidad-alta .boleta-formal__pie {
+  padding: 0.28rem 0.35rem;
+  font-size: 0.58rem;
+  gap: 0.4rem;
+}
+
 .boleta-formal__fecha-emision {
   margin: 0.35rem 0 0.25rem;
   text-align: center;
@@ -3711,11 +3861,30 @@ body {
     width: 8.5in !important;
     max-width: 8.5in !important;
     min-height: 5.5in !important;
-    height: 5.5in !important;
+    height: auto !important;
+    max-height: none !important;
     padding: 0.3in 0.35in !important;
     box-sizing: border-box !important;
+    overflow: visible !important;
     page-break-inside: avoid;
     break-inside: avoid;
+  }
+
+  .boleta-contraseña--multi.boleta-contraseña--media-carta,
+  .boleta-contraseña--multi.boleta-contraseña.boleta-contraseña--media-carta {
+    min-height: auto !important;
+    justify-content: flex-start !important;
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+
+  .boleta-contraseña--multi .boleta-formal__cuerpo,
+  .boleta-contraseña--multi .boleta-formal__tabla-wrap {
+    overflow: visible !important;
+  }
+
+  .boleta-contraseña--densidad-alta.boleta-contraseña--media-carta {
+    padding: 0.22in 0.28in !important;
   }
 
   @page {
