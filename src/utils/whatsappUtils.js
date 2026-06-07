@@ -37,9 +37,14 @@ export function construirMensajeBoletaWhatsapp({
   const codigo = codigoReciboDisplay(compra, brazosLista);
   const enlace = `${getAppBaseUrl()}/boleta/${compra?.codigo_recibo || brazosLista[0]?.codigo_boleta_qr || codigo}`;
 
-  const lineasMsg = lineas.map(
-    (l) => `• ${l.cantidad}× Turno #${l.numero_turno} (${l.etiqueta}) — ${formatPrecio(l.ofrenda)}`
-  );
+  const lineasMsg = lineas.map((l) => {
+    const unit = formatPrecio(l.ofrenda);
+    const total = l.ofrendaTotalFmt || formatPrecio(l.subtotal);
+    if (l.cantidad > 1) {
+      return `• ${l.cantidad}× Turno #${l.numero_turno} (${l.etiqueta}) — ${unit} c/u → ${total}`;
+    }
+    return `• Turno #${l.numero_turno} (${l.etiqueta}) — ${total}`;
+  });
 
   return [
     `Hola ${nombre},`,

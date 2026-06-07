@@ -50,10 +50,14 @@ export function construirCuerpoBoleta({
   const nombre = cargador?.nombre_completo?.split(' ')[0] || 'devoto(a)';
   const nombreCompleto = cargador?.nombre_completo?.trim() || 'Devoto(a)';
   const lineasTexto = lineas
-    .map(
-      (l) =>
-        `  • ${l.cantidad} × Turno #${l.numero_turno} (${l.etiqueta}) — ${formatPrecio(l.ofrenda)}`
-    )
+    .map((l) => {
+      const unit = formatPrecio(l.ofrenda);
+      const total = l.ofrendaTotalFmt || formatPrecio(l.subtotal);
+      if (l.cantidad > 1) {
+        return `  • ${l.cantidad} × Turno #${l.numero_turno} (${l.etiqueta}) — ${unit} c/u → ${total}`;
+      }
+      return `  • Turno #${l.numero_turno} (${l.etiqueta}) — ${total}`;
+    })
     .join('\n');
 
   const turnosBloque = lineas.length

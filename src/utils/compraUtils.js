@@ -28,7 +28,13 @@ export function construirLineasRecibo(items) {
     }
   });
 
-  const lineas = [...map.values()];
+  const lineas = [...map.values()].map((l) => ({
+    ...l,
+    ofrendaUnitaria: l.ofrenda,
+    ofrendaTotal: l.subtotal,
+    ofrendaUnitariaFmt: formatPrecio(l.ofrenda),
+    ofrendaTotalFmt: formatPrecio(l.subtotal),
+  }));
   const total = lineas.reduce((sum, l) => sum + l.subtotal, 0);
   return { lineas, total, totalFmt: formatPrecio(total) };
 }

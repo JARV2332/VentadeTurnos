@@ -195,7 +195,8 @@ export default function BoletaContraseñaTurno({
                   <th>Cant.</th>
                   <th>Nº turno</th>
                   <th>Honor / tipo</th>
-                  <th>Ofrenda</th>
+                  <th className="boleta-turnos-tabla__monto">Ofrenda unit.</th>
+                  <th className="boleta-turnos-tabla__monto">Ofrenda total</th>
                 </tr>
               </thead>
               <tbody>
@@ -204,16 +205,21 @@ export default function BoletaContraseñaTurno({
                     <td>{linea.cantidad}</td>
                     <td>#{linea.numero_turno}</td>
                     <td>{linea.etiqueta}</td>
-                    <td>{formatPrecio(linea.ofrenda)}</td>
+                    <td className="boleta-turnos-tabla__monto">
+                      {linea.ofrendaUnitariaFmt || formatPrecio(linea.ofrenda)}
+                    </td>
+                    <td className="boleta-turnos-tabla__monto boleta-turnos-tabla__monto--total">
+                      <strong>{linea.ofrendaTotalFmt || formatPrecio(linea.subtotal)}</strong>
+                    </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={3} className="boleta-turnos-tabla__total-label">
+                  <td colSpan={4} className="boleta-turnos-tabla__total-label">
                     Total ofrenda
                   </td>
-                  <td className="boleta-turnos-tabla__total-valor">
+                  <td className="boleta-turnos-tabla__total-valor boleta-turnos-tabla__monto">
                     <strong>{totalFmt}</strong>
                   </td>
                 </tr>

@@ -2872,6 +2872,19 @@ body {
   font-size: 1rem;
 }
 
+.boleta-turnos-tabla__monto {
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+.boleta-turnos-tabla__monto--total strong {
+  font-weight: 700;
+}
+
+.boleta-turnos-tabla th.boleta-turnos-tabla__monto {
+  text-align: right !important;
+}
+
 .boleta-contraseña__turno-datos--tabla {
   flex: 1;
   min-width: 0;

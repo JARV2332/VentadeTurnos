@@ -76,7 +76,8 @@ export default function VentaExitoModal({ venta, organizacion, onCerrar }) {
                 <tr>
                   <th>Cant.</th>
                   <th>Turno</th>
-                  <th>Ofrenda</th>
+                  <th className="boleta-turnos-tabla__monto">Ofrenda unit.</th>
+                  <th className="boleta-turnos-tabla__monto">Ofrenda total</th>
                 </tr>
               </thead>
               <tbody>
@@ -86,14 +87,21 @@ export default function VentaExitoModal({ venta, organizacion, onCerrar }) {
                     <td>
                       #{l.numero_turno} {l.etiqueta}
                     </td>
-                    <td>{formatPrecio(l.ofrenda)}</td>
+                    <td className="boleta-turnos-tabla__monto">
+                      {l.ofrendaUnitariaFmt || formatPrecio(l.ofrenda)}
+                    </td>
+                    <td className="boleta-turnos-tabla__monto">
+                      <strong>{l.ofrendaTotalFmt || formatPrecio(l.subtotal)}</strong>
+                    </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={2}>Total ofrenda</td>
-                  <td><strong>{totalFmt}</strong></td>
+                  <td colSpan={3}>Total ofrenda</td>
+                  <td className="boleta-turnos-tabla__monto">
+                    <strong>{totalFmt}</strong>
+                  </td>
                 </tr>
               </tfoot>
             </table>
