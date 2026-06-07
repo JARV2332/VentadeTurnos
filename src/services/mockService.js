@@ -38,6 +38,10 @@ export function getBrazosByOrg(organizacionId) {
   return store.brazos.filter((b) => b.organizacion_id === organizacionId);
 }
 
+export function getBrazosVendidosByOrg(organizacionId) {
+  return store.brazos.filter((b) => b.organizacion_id === organizacionId && b.estado === 'vendido');
+}
+
 export function getCortejosByOrg(organizacionId, { incluirInactivas = false } = {}) {
   return store.cortejos.filter((c) => {
     if (c.organizacion_id !== organizacionId) return false;
@@ -274,9 +278,45 @@ export function getCorreosEnviadosMock(organizacionId) {
   return store.correosEnviados?.[organizacionId] || [];
 }
 
-/** Busca boleta vendida por código QR (solo organización activa del usuario). */
+/** Busca boleta vendida por código QR o recibo VR- (solo organización activa del usuario). */
 export function buscarBoletaPorCodigo(organizacionId, codigo) {
-  const codigoLimpio = codigo.trim().toUpperCase();
+  const codigoLimpio =
+    String(codigo || '')
+      .trim()
+      .toUpperCase()
+      .match(/V[RT]-[A-Z0-9]+/)?.[0] || String(codigo || '').trim().toUpperCase();
+
+  if (!codigoLimpio) {
+    return { error: 'Código de boleta inválido.' };
+  }
+
+  if (/^VR-[A-Z0-9]+$/.test(codigoLimpio)) {
+    const compra = (store.compras || []).find(
+      (c) => c.organizacion_id === organizacionId && c.codigo_recibo === codigoLimpio
+    );
+    if (!compra) {
+      return { error: 'Boleta no encontrada o no corresponde a esta organización.' };
+    }
+    const brazos = store.brazos.filter(
+      (b) => b.compra_id === compra.id && b.estado === 'vendido'
+    );
+    if (!brazos.length) {
+      return { error: 'Boleta no encontrada o no corresponde a esta organización.' };
+    }
+    const brazo = brazos[0];
+    const turno = store.turnos.find((t) => t.id === brazo.turno_id);
+    const cortejo = store.cortejos.find((c) => c.id === turno?.cortejo_id);
+    const cargador = store.cargadores.find((c) => c.id === brazo.cargador_id);
+    if (cortejo?.estado === 'inactiva') {
+      return { error: 'La procesión de esta boleta está inactiva.' };
+    }
+    const items = brazos.map((b) => ({
+      brazo: b,
+      turno: store.turnos.find((t) => t.id === b.turno_id),
+    }));
+    return { brazo, brazos, compra, turno, cortejo, cargador, items };
+  }
+
   const brazo = store.brazos.find(
     (b) =>
       b.organizacion_id === organizacionId &&
@@ -288,6 +328,16 @@ export function buscarBoletaPorCodigo(organizacionId, codigo) {
     return { error: 'Boleta no encontrada o no corresponde a esta organización.' };
   }
 
+  let brazos = [brazo];
+  let compra = null;
+  if (brazo.compra_id) {
+    compra = (store.compras || []).find((c) => c.id === brazo.compra_id) || null;
+    const delCompra = store.brazos.filter(
+      (b) => b.compra_id === brazo.compra_id && b.estado === 'vendido'
+    );
+    if (delCompra.length) brazos = delCompra;
+  }
+
   const turno = store.turnos.find((t) => t.id === brazo.turno_id);
   const cortejo = store.cortejos.find((c) => c.id === turno?.cortejo_id);
   const cargador = store.cargadores.find((c) => c.id === brazo.cargador_id);
@@ -296,7 +346,12 @@ export function buscarBoletaPorCodigo(organizacionId, codigo) {
     return { error: 'La procesión de esta boleta está inactiva.' };
   }
 
-  return { brazo, turno, cortejo, cargador };
+  const items = brazos.map((b) => ({
+    brazo: b,
+    turno: store.turnos.find((t) => t.id === b.turno_id),
+  }));
+
+  return { brazo, brazos, compra, turno, cortejo, cargador, items };
 }
 
 /** Marca el turno físico como entregado tras validar QR. */

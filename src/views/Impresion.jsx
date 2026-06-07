@@ -5,17 +5,19 @@ import BoletaContraseñaTurno from '../components/BoletaContraseñaTurno';
 import StatusBadge from '../components/StatusBadge';
 import { useAuth } from '../context/AuthContext';
 import {
-  getBrazosByOrg,
+  getBrazosVendidosByOrg,
   getComprasByOrg,
   getCortejosByOrg,
   getCargadoresByOrg,
   getTurnoById,
+  buscarBoletaPorCodigo,
   subscribeData,
 } from '../services/dataService';
 import { enviarBoletaPorCorreo } from '../services/emailService';
 import { construirEnlaceBoletaWhatsapp } from '../utils/whatsappUtils';
 import { localDigitsFromGtPhone } from '../utils/phoneGtUtils';
 import { codigoReciboDisplay } from '../utils/compraUtils';
+import { extraerCodigoBoleta } from '../utils/boletaUtils';
 import { TERMINO_DEVOTO } from '../constants/terminologia';
 
 function agruparRecibos(vendidos, comprasPorId) {
@@ -36,7 +38,8 @@ function agruparRecibos(vendidos, comprasPorId) {
 
 function filtrarRecibos(recibos, cargadoresPorId, busqueda) {
   const q = normalizarBusqueda(busqueda);
-  if (!q) return recibos;
+  const qCodigo = normalizarBusqueda(extraerCodigoBoleta(busqueda));
+  if (!q && !qCodigo) return recibos;
   return recibos.filter((r) => {
     const cargador = cargadoresPorId[r.brazos[0]?.cargador_id];
     const nombre = normalizarBusqueda(cargador?.nombre_completo);
@@ -45,13 +48,25 @@ function filtrarRecibos(recibos, cargadoresPorId, busqueda) {
       codigoReciboDisplay(r.compra, r.brazos)
     );
     const codigos = r.brazos.map((b) => normalizarBusqueda(b.codigo_boleta_qr)).join(' ');
+    const consulta = q || qCodigo;
     return (
-      nombre.includes(q) ||
-      cui.includes(q) ||
-      codigoRecibo.includes(q) ||
-      codigos.includes(q)
+      nombre.includes(consulta) ||
+      cui.includes(consulta) ||
+      codigoRecibo.includes(consulta) ||
+      (qCodigo && codigoRecibo.includes(qCodigo)) ||
+      codigos.includes(consulta) ||
+      (qCodigo && codigos.includes(qCodigo))
     );
   });
+}
+
+function reciboDesdeBusqueda(res) {
+  if (!res?.brazos?.length) return null;
+  return {
+    id: res.compra?.id || `solo-${res.brazos[0].id}`,
+    compra: res.compra || null,
+    brazos: res.brazos,
+  };
 }
 
 function etiquetaRecibo(recibo, cargadoresPorId) {
@@ -85,14 +100,16 @@ export default function Impresion() {
   });
   const [enviandoCorreo, setEnviandoCorreo] = useState(false);
   const [msgReenvio, setMsgReenvio] = useState(null);
+  const [reciboPorCodigo, setReciboPorCodigo] = useState(null);
+  const [buscandoCodigo, setBuscandoCodigo] = useState(false);
 
   const refresh = useCallback(async () => {
     const [brazos, cargadores, compras] = await Promise.all([
-      getBrazosByOrg(organizacionId),
+      getBrazosVendidosByOrg(organizacionId),
       getCargadoresByOrg(organizacionId),
       getComprasByOrg(organizacionId),
     ]);
-    const vendidos = (Array.isArray(brazos) ? brazos : []).filter((b) => b.estado === 'vendido');
+    const vendidos = Array.isArray(brazos) ? brazos : [];
     const map = {};
     (Array.isArray(cargadores) ? cargadores : []).forEach((c) => {
       map[c.id] = c;
@@ -110,9 +127,42 @@ export default function Impresion() {
     return subscribeData(organizacionId, refresh);
   }, [organizacionId, refresh]);
 
+  useEffect(() => {
+    const codigo = extraerCodigoBoleta(busqueda);
+    if (!/^V[RT]-[A-Z0-9]+$/i.test(codigo)) {
+      setReciboPorCodigo(null);
+      return undefined;
+    }
+
+    let cancelado = false;
+    setBuscandoCodigo(true);
+    (async () => {
+      const res = await buscarBoletaPorCodigo(organizacionId, codigo);
+      if (cancelado) return;
+      setBuscandoCodigo(false);
+      if (res.error) {
+        setReciboPorCodigo(null);
+        return;
+      }
+      const recibo = reciboDesdeBusqueda(res);
+      setReciboPorCodigo(recibo);
+      if (recibo) setSelectedId(recibo.id);
+    })();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [busqueda, organizacionId]);
+
+  const recibosLista = useMemo(() => {
+    if (!reciboPorCodigo) return recibos;
+    if (recibos.some((r) => r.id === reciboPorCodigo.id)) return recibos;
+    return [reciboPorCodigo, ...recibos];
+  }, [recibos, reciboPorCodigo]);
+
   const recibosFiltrados = useMemo(
-    () => filtrarRecibos(recibos, cargadoresPorId, busqueda),
-    [recibos, cargadoresPorId, busqueda]
+    () => filtrarRecibos(recibosLista, cargadoresPorId, busqueda),
+    [recibosLista, cargadoresPorId, busqueda]
   );
 
   const reciboSel = useMemo(
@@ -157,6 +207,10 @@ export default function Impresion() {
   }, [reciboSel, organizacionId, cargadoresPorId]);
 
   const { cargador, cortejo, items, compra } = detalle;
+
+  const codigoBoletaPublica = reciboSel
+    ? codigoReciboDisplay(reciboSel.compra, reciboSel.brazos)
+    : null;
 
   const enlaceWhatsapp =
     reciboSel && cargador
@@ -224,11 +278,13 @@ export default function Impresion() {
             type="search"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Nombre, CUI o código de boleta…"
+            placeholder="Nombre, CUI o código VR- / VT-…"
             autoComplete="off"
           />
           <small className="field-hint">
-            {recibosFiltrados.length} de {recibos.length} recibo(s)
+            {buscandoCodigo
+              ? 'Buscando por código…'
+              : `${recibosFiltrados.length} de ${recibosLista.length} recibo(s)`}
           </small>
         </label>
 
@@ -261,6 +317,16 @@ export default function Impresion() {
           >
             Imprimir boleta
           </button>
+          {codigoBoletaPublica && (
+            <Link
+              to={`/boleta/${codigoBoletaPublica}`}
+              className="btn btn--ghost"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Ver boleta digital
+            </Link>
+          )}
           {(hasPermiso('config_recibo') || hasPermiso('config_correo')) && (
             <Link to="/config/recibo" className="btn btn--ghost">
               Diseño del recibo

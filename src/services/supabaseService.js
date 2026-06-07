@@ -434,6 +434,30 @@ export async function getBrazosByOrg(organizacionId) {
   return data || [];
 }
 
+/** Solo ventas confirmadas, paginado (Impresión / finanzas). */
+export async function getBrazosVendidosByOrg(organizacionId) {
+  const PAGE = 500;
+  const all = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('brazos')
+      .select('*')
+      .eq('organizacion_id', organizacionId)
+      .eq('estado', 'vendido')
+      .order('updated_at', { ascending: false })
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    if (!data?.length) break;
+    all.push(...data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+
+  return all;
+}
+
 export async function getTurnosAgrupados(cortejoId, organizacionId) {
   const turnos = await getTurnosByCortejo(cortejoId);
   const brazos = await getBrazosByCortejo(cortejoId, organizacionId);
@@ -680,7 +704,61 @@ async function confirmarVentaCompraDirecto(brazoIds, cargador, precios, orgId, p
 }
 
 export async function buscarBoletaPorCodigo(organizacionId, codigo) {
-  const codigoLimpio = codigo.trim().toUpperCase();
+  const codigoLimpio = String(codigo || '')
+    .trim()
+    .toUpperCase()
+    .match(/V[RT]-[A-Z0-9]+/)?.[0] || String(codigo || '').trim().toUpperCase();
+
+  if (!codigoLimpio) {
+    return { error: 'Código de boleta inválido.' };
+  }
+
+  const esVR = /^VR-[A-Z0-9]+$/.test(codigoLimpio);
+
+  if (esVR) {
+    const { data: compra, error: errCompra } = await supabase
+      .from('compras')
+      .select('*')
+      .eq('organizacion_id', organizacionId)
+      .eq('codigo_recibo', codigoLimpio)
+      .maybeSingle();
+
+    if (errCompra) return err(errCompra);
+    if (!compra) {
+      return { error: 'Boleta no encontrada o no corresponde a esta organización.' };
+    }
+
+    const { data: brazos, error: errBrazos } = await supabase
+      .from('brazos')
+      .select('*')
+      .eq('compra_id', compra.id)
+      .eq('estado', 'vendido')
+      .order('numero_turno', { ascending: true });
+
+    if (errBrazos) return err(errBrazos);
+    if (!brazos?.length) {
+      return { error: 'Boleta no encontrada o no corresponde a esta organización.' };
+    }
+
+    const brazo = brazos[0];
+    const { data: turno } = await supabase.from('turnos').select('*').eq('id', brazo.turno_id).single();
+    const { data: cortejo } = turno?.cortejo_id
+      ? await supabase.from('cortejos').select('*').eq('id', turno.cortejo_id).single()
+      : { data: null };
+    if (cortejo?.estado === 'inactiva') {
+      return { error: 'La procesión de esta boleta está inactiva.' };
+    }
+    const cargador = brazo.cargador_id ? await getCargadorById(brazo.cargador_id) : null;
+    const items = await Promise.all(
+      brazos.map(async (b) => ({
+        brazo: b,
+        turno: b.turno_id === turno?.id ? turno : await getTurnoById(b.turno_id),
+      }))
+    );
+
+    return { brazo, brazos, compra, turno, cortejo, cargador, items };
+  }
+
   const { data: brazo, error } = await supabase
     .from('brazos')
     .select('*')
@@ -692,13 +770,39 @@ export async function buscarBoletaPorCodigo(organizacionId, codigo) {
   if (error) return err(error);
   if (!brazo) return { error: 'Boleta no encontrada o no corresponde a esta organización.' };
 
+  let brazos = [brazo];
+  let compra = null;
+
+  if (brazo.compra_id) {
+    const [{ data: compraData }, { data: brazosCompra }] = await Promise.all([
+      supabase.from('compras').select('*').eq('id', brazo.compra_id).maybeSingle(),
+      supabase
+        .from('brazos')
+        .select('*')
+        .eq('compra_id', brazo.compra_id)
+        .eq('estado', 'vendido')
+        .order('numero_turno', { ascending: true }),
+    ]);
+    compra = compraData || null;
+    if (brazosCompra?.length) brazos = brazosCompra;
+  }
+
   const { data: turno } = await supabase.from('turnos').select('*').eq('id', brazo.turno_id).single();
-  const { data: cortejo } = await supabase.from('cortejos').select('*').eq('id', turno.cortejo_id).single();
+  const { data: cortejo } = turno?.cortejo_id
+    ? await supabase.from('cortejos').select('*').eq('id', turno.cortejo_id).single()
+    : { data: null };
   if (cortejo?.estado === 'inactiva') {
     return { error: 'La procesión de esta boleta está inactiva.' };
   }
   const cargador = brazo.cargador_id ? await getCargadorById(brazo.cargador_id) : null;
-  return { brazo, turno, cortejo, cargador };
+  const items = await Promise.all(
+    brazos.map(async (b) => ({
+      brazo: b,
+      turno: b.turno_id === turno?.id ? turno : await getTurnoById(b.turno_id),
+    }))
+  );
+
+  return { brazo, brazos, compra, turno, cortejo, cargador, items };
 }
 
 export async function marcarEntregado(brazoId) {

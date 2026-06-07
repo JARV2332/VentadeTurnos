@@ -20,6 +20,11 @@ export const getBrazosByOrg = (organizacionId) =>
     ? sb.getBrazosByOrg(organizacionId)
     : Promise.resolve(mock.getBrazosByOrg(organizacionId));
 
+export const getBrazosVendidosByOrg = (organizacionId) =>
+  useSb()
+    ? sb.getBrazosVendidosByOrg(organizacionId)
+    : Promise.resolve(mock.getBrazosVendidosByOrg(organizacionId));
+
 export const getTurnoById = (turnoId) =>
   useSb()
     ? sb.getTurnoById(turnoId)
