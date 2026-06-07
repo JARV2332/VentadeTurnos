@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -28,7 +29,9 @@ export default function ConfigImportReservas() {
   const [resultadoImport, setResultadoImport] = useState(null);
   const [error, setError] = useState('');
   const [okMsg, setOkMsg] = useState('');
-  const [procesando, setProcesando] = useState(false);
+  const [leyendo, setLeyendo] = useState(false);
+  const [aplicando, setAplicando] = useState(false);
+  const [aplicacionOk, setAplicacionOk] = useState(null);
 
   const refresh = useCallback(async () => {
     if (!organizacionId) return;
@@ -58,9 +61,10 @@ export default function ConfigImportReservas() {
     if (!file) return;
     setError('');
     setResultadoImport(null);
+    setAplicacionOk(null);
     setAdvertenciasImport([]);
     setFilasOmitidas([]);
-    setProcesando(true);
+    setLeyendo(true);
     try {
       const parsed = await parseArchivoImport(file);
       if (parsed.error) {
@@ -90,14 +94,15 @@ export default function ConfigImportReservas() {
           : '';
       setOkMsg(
         parsed.formato === 'listado'
-          ? `${stats.personas} persona(s) · ${stats.espacios} espacio(s) listos.${omitMsg}${advMsg} Revise y confirme.`
-          : `${parsed.filas.length} fila(s) leídas.${omitMsg} Revise y confirme.`
+          ? `Archivo leído: ${stats.personas} persona(s) · ${stats.espacios} espacio(s) en vista previa.${omitMsg}${advMsg} Revise abajo y pulse «Aplicar apartados» — todavía NO se guarda en Taquilla.`
+          : `${parsed.filas.length} fila(s) leídas.${omitMsg} Revise y pulse «Aplicar apartados».`
       );
-      setTimeout(() => setOkMsg(''), 6000);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       setError(err.message || 'Error al leer el archivo');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
-      setProcesando(false);
+      setLeyendo(false);
     }
   };
 
@@ -111,25 +116,31 @@ export default function ConfigImportReservas() {
       return;
     }
     setError('');
-    setProcesando(true);
+    setOkMsg('');
+    setAplicacionOk(null);
+    setAplicando(true);
     try {
       const res = await aplicarImportApartados(cortejoId, organizacionId, preview, {
         usuarioId: user?.id,
       });
       setResultadoImport(res);
-      setOkMsg(
-        `Importación lista: ${res.ok} espacio(s) apartado(s), ${res.omitidos} omitido(s).`
-      );
+      setAplicacionOk({
+        apartados: res.ok,
+        omitidos: res.omitidos,
+        total: res.total,
+      });
+      setOkMsg('');
       setPreview([]);
       setFormatoImport(null);
       setAdvertenciasImport([]);
       setFilasOmitidas([]);
       setResumen(await getResumenApartados(cortejoId, organizacionId));
-      setTimeout(() => setOkMsg(''), 6000);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       setError(err.message || 'Error al aplicar apartados');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
-      setProcesando(false);
+      setAplicando(false);
     }
   };
 
@@ -141,7 +152,21 @@ export default function ConfigImportReservas() {
       title="Apartados por Excel"
       subtitle="Listado de devotos con turno apartado — se muestran en Taquilla con su nombre"
     >
-      {okMsg && <div className="alert alert--success">{okMsg}</div>}
+      {aplicacionOk && (
+        <div className="alert alert--success">
+          <strong>¡Apartados aplicados correctamente!</strong>
+          <br />
+          Se marcaron <strong>{aplicacionOk.apartados}</strong> espacio(s) en la procesión
+          {aplicacionOk.omitidos > 0 && (
+            <> · <strong>{aplicacionOk.omitidos}</strong> omitido(s)</>
+          )}
+          . Ya puede verlos en Taquilla (amarillo/ámbar con el nombre del devoto).
+          <Link to="/taquilla" className="alert__link"> Ir a Taquilla →</Link>
+        </div>
+      )}
+      {okMsg && !aplicacionOk && (
+        <div className="alert alert--info">{okMsg}</div>
+      )}
       {error && <div className="alert alert--error">{error}</div>}
 
       <div className="import-toolbar panel">
@@ -163,12 +188,12 @@ export default function ConfigImportReservas() {
             Plantilla por brazo (legacy)
           </button>
           <label className="btn btn--primary import-upload-btn">
-            {procesando ? 'Leyendo…' : 'Subir Excel / CSV'}
+            {leyendo ? 'Leyendo archivo…' : 'Subir Excel / CSV'}
             <input
               type="file"
               accept=".csv,.txt,.xlsx,.xls"
               onChange={handleArchivo}
-              disabled={procesando}
+              disabled={leyendo || aplicando}
             />
           </label>
         </div>
@@ -245,11 +270,17 @@ export default function ConfigImportReservas() {
               type="button"
               className="btn btn--primary"
               onClick={handleAplicar}
-              disabled={procesando}
+              disabled={leyendo || aplicando}
             >
-              {procesando ? 'Aplicando…' : 'Aplicar apartados a la procesión'}
+              {aplicando ? 'Aplicando apartados…' : 'Aplicar apartados a la procesión'}
             </button>
           </div>
+          {aplicando && (
+            <p className="text-muted config-hint import-aplicando-hint">
+              Guardando apartados en la procesión… con muchas filas puede tardar un minuto. No cierre
+              esta página hasta ver el mensaje verde de confirmación arriba.
+            </p>
+          )}
           {(advertenciasImport.length > 0 || filasOmitidas.length > 0) && (
             <div className="import-avisos">
               {filasOmitidas.length > 0 && (

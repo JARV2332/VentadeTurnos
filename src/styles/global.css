@@ -1516,6 +1516,7 @@ body {
 }
 
 .alert--success { background: var(--success-bg); color: var(--success); border: 1px solid #a7f3d0; }
+.alert--info { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
 .alert--error { background: var(--danger-bg); color: var(--danger); border: 1px solid #fecaca; }
 .alert__close { background: none; border: none; font-size: 1.25rem; cursor: pointer; color: inherit; }
 .alert__sub { display: block; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 400; }
