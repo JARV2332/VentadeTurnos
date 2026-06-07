@@ -93,12 +93,34 @@ function repertorioDeTurno(repertorioPorTurno, numero) {
   return { son, alabado };
 }
 
-/** Lista { tipo, texto } para mostrar en UI (son / alabado) */
+/** Todas las melodías del turno (Excel multi-fila, son + alabado persistidos). */
+export function melodiasDeTurno(turno) {
+  if (turno?.melodias?.length) {
+    return turno.melodias.map((m) => String(m).trim()).filter(Boolean);
+  }
+  const lista = [];
+  if (turno?.son?.trim()) lista.push(turno.son.trim());
+  if (turno?.alabado?.trim()) {
+    turno.alabado
+      .split(/\s·\s|\n| \/ /)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .forEach((m) => lista.push(m));
+  }
+  return lista;
+}
+
+/** Lista { tipo, texto } para mostrar en UI — una entrada por melodía. */
 export function repertorioTurnoLista(turno) {
-  const items = [];
-  if (turno?.son?.trim()) items.push({ tipo: 'Son', texto: turno.son.trim() });
-  if (turno?.alabado?.trim()) items.push({ tipo: 'Alabado', texto: turno.alabado.trim() });
-  return items;
+  const melodias = melodiasDeTurno(turno);
+  if (melodias.length === 0) return [];
+  if (melodias.length === 1) {
+    return [{ tipo: 'Melodía', texto: melodias[0] }];
+  }
+  return melodias.map((texto, i) => ({
+    tipo: `Melodía ${i + 1}`,
+    texto,
+  }));
 }
 
 export function tieneRepertorio(turno) {
@@ -195,8 +217,6 @@ export function etiquetaHonorTurno(turno) {
 
 /** Son y alabado unidos para la boleta impresa */
 export function textoMelodiaTurno(turno) {
-  const partes = [];
-  if (turno?.son?.trim()) partes.push(turno.son.trim());
-  if (turno?.alabado?.trim()) partes.push(turno.alabado.trim());
-  return partes.join(' / ');
+  const melodias = melodiasDeTurno(turno);
+  return melodias.join(' / ');
 }

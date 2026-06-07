@@ -8,6 +8,7 @@ import {
   crearBrazosParaTurno,
 } from '../utils/turnoUtils';
 import { normalizarLado } from '../utils/importReservasUtils';
+import { aplicarAsignacionBrazos } from '../utils/aplicarAsignacionBrazos';
 import { PERMISOS_ADMIN_COMPLETO } from '../config/permisos';
 
 function err(error) {
@@ -932,7 +933,10 @@ export async function deleteRol(rolId, organizacionId) {
 }
 
 export async function generarProcesion(cortejo, configProcesion, organizacionId) {
-  const turnosPlan = construirTurnosConfig(configProcesion);
+  const turnosPlan =
+    configProcesion?.turnosPlan?.length > 0
+      ? configProcesion.turnosPlan
+      : construirTurnosConfig(configProcesion);
   const { data: nuevoCortejo, error: cErr } = await supabase
     .from('cortejos')
     .insert({
@@ -970,13 +974,16 @@ export async function generarProcesion(cortejo, configProcesion, organizacionId)
 
     turnosCreados.push(turno);
 
-    const brazos = crearBrazosParaTurno({
-      turnoId: turno.id,
-      numeroTurno: turno.numero_turno,
-      totalBrazos: cfg.total_brazos,
-      organizacionId,
-      idPrefix: 'brazo',
-    }).map(({ id, ...b }) => b);
+    const brazos = aplicarAsignacionBrazos(
+      crearBrazosParaTurno({
+        turnoId: turno.id,
+        numeroTurno: turno.numero_turno,
+        totalBrazos: cfg.total_brazos,
+        organizacionId,
+        idPrefix: 'brazo',
+      }),
+      cfg.asignacion
+    ).map(({ id, ...b }) => b);
 
     brazosCreados.push(...brazos);
   }

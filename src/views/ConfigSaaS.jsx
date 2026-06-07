@@ -20,6 +20,12 @@ import {
   turnosElegiblesExtraordinarios,
   repertorioTurnoLista,
 } from '../utils/turnoUtils';
+import {
+  parseArchivoProcesionExcel,
+  descargarPlantillaProcesionExcel,
+  etiquetaAsignacion,
+} from '../utils/importProcesionUtils';
+import { melodiasDeTurno } from '../utils/turnoUtils';
 
 const DEFAULT = {
   totalTurnos: 20,
@@ -86,8 +92,15 @@ export default function ConfigSaaS() {
   const [verCortejoId, setVerCortejoId] = useState(null);
   const [error, setError] = useState('');
   const [okMsg, setOkMsg] = useState('');
+  const [modoCreacion, setModoCreacion] = useState('manual');
+  const [excelImport, setExcelImport] = useState(null);
 
-  const preview = useMemo(() => construirTurnosConfig(config), [config]);
+  const preview = useMemo(() => {
+    if (modoCreacion === 'excel' && excelImport?.turnosPlan?.length) {
+      return [...excelImport.turnosPlan].sort((a, b) => a.numero_turno - b.numero_turno);
+    }
+    return construirTurnosConfig(config);
+  }, [modoCreacion, excelImport, config]);
   const elegiblesExtra = useMemo(
     () => turnosElegiblesExtraordinarios(config.totalTurnos),
     [config.totalTurnos]
@@ -167,6 +180,47 @@ export default function ConfigSaaS() {
     });
   };
 
+  const handleExcelFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setError('');
+    const parsed = await parseArchivoProcesionExcel(file, {
+      brazosDefault: config.brazosDefault,
+    });
+
+    if (parsed.error) {
+      setError(parsed.error);
+      setExcelImport(null);
+      return;
+    }
+
+    if (parsed.errores?.length) {
+      setError(parsed.errores.join(' '));
+      setExcelImport(null);
+      return;
+    }
+
+    setExcelImport(parsed);
+
+    if (parsed.meta?.nombre_evento) {
+      setCortejo((prev) => ({
+        ...prev,
+        nombre_evento: parsed.meta.nombre_evento,
+      }));
+    }
+    if (parsed.meta?.fecha) {
+      setCortejo((prev) => ({ ...prev, fecha: parsed.meta.fecha }));
+    }
+
+    setOkMsg(
+      `Excel cargado: ${parsed.turnosPlan.length} turnos detectados.${
+        parsed.advertencias?.length ? ` (${parsed.advertencias.length} aviso(s))` : ''
+      }`
+    );
+  };
+
   const handleGenerar = async (e) => {
     e.preventDefault();
     setError('');
@@ -187,26 +241,42 @@ export default function ConfigSaaS() {
       return;
     }
 
-    if (config.totalTurnos < 2) {
-      setError('Debe haber al menos 2 turnos (salida + entrada).');
-      return;
-    }
+    if (modoCreacion === 'excel') {
+      if (!excelImport?.turnosPlan?.length) {
+        setError('Suba un archivo Excel con los turnos antes de crear la procesión.');
+        return;
+      }
+    } else {
+      if (config.totalTurnos < 2) {
+        setError('Debe haber al menos 2 turnos (salida + entrada).');
+        return;
+      }
 
-    if (!validarBrazosPares(Number(config.brazosDefault))) {
-      setError('El total de brazos por turno debe ser par (mitad izquierda, mitad derecha).');
-      return;
-    }
+      if (!validarBrazosPares(Number(config.brazosDefault))) {
+        setError('El total de brazos por turno debe ser par (mitad izquierda, mitad derecha).');
+        return;
+      }
 
-    if (
-      (config.turnosExtraordinarios?.length || 0) > 0 &&
-      !validarBrazosPares(Number(config.brazosExtraordinario))
-    ) {
-      setError('Los brazos de los turnos extraordinarios también deben ser par.');
-      return;
+      if (
+        (config.turnosExtraordinarios?.length || 0) > 0 &&
+        !validarBrazosPares(Number(config.brazosExtraordinario))
+      ) {
+        setError('Los brazos de los turnos extraordinarios también deben ser par.');
+        return;
+      }
     }
 
     try {
-      const res = await generarProcesion(cortejo, config, organizacionId);
+      const configEnvio =
+        modoCreacion === 'excel'
+          ? {
+              ...config,
+              turnosPlan: excelImport.turnosPlan,
+              fuente: 'excel',
+            }
+          : config;
+
+      const res = await generarProcesion(cortejo, configEnvio, organizacionId);
       if (res.error) {
         setError(res.error);
         return;
@@ -215,6 +285,7 @@ export default function ConfigSaaS() {
       setOkMsg(
         `¡Procesión "${res.cortejo.nombre_evento}" creada con ${res.turnos.length} turnos y ${res.brazos.length} espacios!`
       );
+      if (modoCreacion === 'excel') setExcelImport(null);
       refreshLista();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
@@ -409,6 +480,119 @@ export default function ConfigSaaS() {
             />
           </label>
 
+          <div className="modo-creacion-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={modoCreacion === 'manual'}
+              className={`modo-creacion-tab ${modoCreacion === 'manual' ? 'modo-creacion-tab--active' : ''}`}
+              onClick={() => setModoCreacion('manual')}
+            >
+              Diseño manual
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={modoCreacion === 'excel'}
+              className={`modo-creacion-tab ${modoCreacion === 'excel' ? 'modo-creacion-tab--active' : ''}`}
+              onClick={() => setModoCreacion('excel')}
+            >
+              Importar Excel
+            </button>
+          </div>
+
+          {modoCreacion === 'excel' ? (
+            <SeccionTurno
+              titulo="Programa de turnos (Excel)"
+              descripcion={
+                <>
+                  Columnas: <strong>Turno</strong>, <strong>Melodía</strong>,{' '}
+                  <strong>Asignacion de turno</strong>, <strong>Ofrenda</strong>. Varias filas con
+                  la misma columna Turno = varias melodías. Asignación: disponible, reservado (no
+                  vender) o mixto (ej. reservado 20 brazos, venta 26).
+                </>
+              }
+            >
+              <div className="import-toolbar">
+                <label className="btn btn--ghost import-upload-btn">
+                  Subir Excel (.xlsx)
+                  <input type="file" accept=".xlsx,.xls,.csv" onChange={handleExcelFile} hidden />
+                </label>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => descargarPlantillaProcesionExcel()}
+                >
+                  Descargar plantilla
+                </button>
+              </div>
+
+              <label>
+                Brazos por turno (si el Excel no indica cantidad)
+                <input
+                  type="number"
+                  min={2}
+                  step={2}
+                  value={config.brazosDefault}
+                  onChange={(e) => setConfigField('brazosDefault', Number(e.target.value))}
+                />
+                <small className="field-hint">
+                  Se usa cuando la asignación dice solo &quot;Disponible para la venta&quot; o
+                  &quot;Reservado, no vender&quot;.
+                </small>
+              </label>
+
+              {excelImport?.advertencias?.length > 0 && (
+                <ul className="import-advertencias">
+                  {excelImport.advertencias.map((a) => (
+                    <li key={a}>{a}</li>
+                  ))}
+                </ul>
+              )}
+
+              {excelImport?.turnosPlan?.length > 0 && (
+                <div className="table-wrap import-preview-table">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Turno</th>
+                        <th>Tipo</th>
+                        <th>Melodía(s)</th>
+                        <th>Asignación</th>
+                        <th>Brazos</th>
+                        <th>Ofrenda</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {excelImport.turnosPlan.map((t) => (
+                        <tr key={`${t.numero_turno}-${t.etiqueta}`}>
+                          <td>{t.numero_turno}</td>
+                          <td>{t.etiqueta}</td>
+                          <td>{t.tipo_turno}</td>
+                          <td className="import-cell-melodia">
+                            {melodiasDeTurno(t).length > 0 ? (
+                              <ul className="import-melodias-lista">
+                                {melodiasDeTurno(t).map((m) => (
+                                  <li key={`${t.numero_turno}-${m}`}>{m}</li>
+                                ))}
+                              </ul>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                          <td>{etiquetaAsignacion(t.asignacion)}</td>
+                          <td>{t.total_brazos}</td>
+                          <td>Q{t.precio}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </SeccionTurno>
+          ) : (
+            <>
           <SeccionTurno
             titulo="Cantidad de turnos"
             descripcion={`Con ${config.totalTurnos} turnos: #1 Salida · #${ultimoTurno} Entrada · ${elegiblesExtra.length} posiciones intermedias.`}
@@ -579,6 +763,8 @@ export default function ConfigSaaS() {
               </table>
             </div>
           </SeccionTurno>
+            </>
+          )}
 
           <button type="submit" className="btn btn--primary btn--block">
             Crear procesión
@@ -589,8 +775,13 @@ export default function ConfigSaaS() {
           <h3 className="panel__title">Vista previa antes de crear</h3>
           <p className="text-muted preview-summary">
             {preview.length} turnos ·{' '}
-            {preview.reduce((s, t) => s + t.total_brazos, 0)} espacios totales ·{' '}
-            {config.turnosExtraordinarios.length} extraordinario(s)
+            {preview.reduce((s, t) => s + t.total_brazos, 0)} espacios totales
+            {modoCreacion === 'manual' && (
+              <> · {config.turnosExtraordinarios.length} extraordinario(s)</>
+            )}
+            {modoCreacion === 'excel' && excelImport?.turnosPlan?.length > 0 && (
+              <> · desde Excel</>
+            )}
           </p>
           <div className="preview-turnos">
             {preview.map((t) => (
@@ -614,6 +805,11 @@ export default function ConfigSaaS() {
                         <strong>{r.tipo}:</strong> {r.texto}
                       </span>
                     ))}
+                  </div>
+                )}
+                {t.asignacion && (
+                  <div className="preview-turno__asignacion text-muted">
+                    {etiquetaAsignacion(t.asignacion)}
                   </div>
                 )}
               </div>

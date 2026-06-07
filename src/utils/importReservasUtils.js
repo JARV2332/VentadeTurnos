@@ -125,14 +125,15 @@ export async function parseArchivoImport(file) {
   }
 
   if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
-    return {
-      error:
-        'Para subir desde Excel: Archivo → Guardar como → CSV UTF-8 (.csv) y súbalo aquí. También puede usar la plantilla CSV.',
-      filas: [],
-    };
+    const XLSX = await import('xlsx');
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { type: 'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    return parseFilasTabla(rows);
   }
 
-  return { error: 'Formato no soportado. Use .csv (desde Excel: Guardar como CSV)', filas: [] };
+  return { error: 'Formato no soportado. Use .xlsx o .csv', filas: [] };
 }
 
 export function generarCSVPlantilla() {

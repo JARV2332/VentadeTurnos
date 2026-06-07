@@ -3854,6 +3854,56 @@ body {
   overflow: auto;
 }
 
+.import-cell-melodia {
+  max-width: 220px;
+  font-size: 0.8rem;
+  white-space: normal;
+}
+
+.import-melodias-lista {
+  margin: 0;
+  padding-left: 1.1rem;
+  list-style: disc;
+}
+
+.import-melodias-lista li {
+  margin: 0.15rem 0;
+}
+
+.import-advertencias {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+  font-size: 0.85rem;
+  color: var(--warning);
+}
+
+.modo-creacion-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.modo-creacion-tab {
+  flex: 1;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.modo-creacion-tab--active {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.preview-turno__asignacion {
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+}
+
 .data-table--compact td,
 .data-table--compact th {
   padding: 0.35rem 0.5rem;

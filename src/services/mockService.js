@@ -5,6 +5,7 @@ import {
   agruparTurnosConBrazos,
 } from '../utils/turnoUtils';
 import { normalizarLado } from '../utils/importReservasUtils';
+import { aplicarAsignacionBrazos } from '../utils/aplicarAsignacionBrazos';
 
 let store = crearStoreInicial();
 const listeners = new Set();
@@ -473,7 +474,10 @@ export function getComprasByOrgMock(organizacionId) {
 
 /** Genera procesión: turno 1 salida, último entrada, extraordinarios en posiciones elegidas */
 export function generarProcesionMock(cortejo, configProcesion, organizacionId) {
-  const turnosPlan = construirTurnosConfig(configProcesion);
+  const turnosPlan =
+    configProcesion?.turnosPlan?.length > 0
+      ? configProcesion.turnosPlan
+      : construirTurnosConfig(configProcesion);
   const ts = Date.now();
 
   const nuevoCortejo = {
@@ -502,13 +506,16 @@ export function generarProcesionMock(cortejo, configProcesion, organizacionId) {
       alabado: cfg.alabado || null,
     });
 
-    const brazos = crearBrazosParaTurno({
-      turnoId,
-      numeroTurno: cfg.numero_turno,
-      totalBrazos: cfg.total_brazos,
-      organizacionId,
-      idPrefix: `brazo-${ts}`,
-    });
+    const brazos = aplicarAsignacionBrazos(
+      crearBrazosParaTurno({
+        turnoId,
+        numeroTurno: cfg.numero_turno,
+        totalBrazos: cfg.total_brazos,
+        organizacionId,
+        idPrefix: `brazo-${ts}`,
+      }),
+      cfg.asignacion
+    );
     nuevosBrazos.push(...brazos);
   });
 
