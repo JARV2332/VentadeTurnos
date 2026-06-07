@@ -2726,6 +2726,17 @@ body {
   vertical-align: top;
 }
 
+.venta-carrito-tabla td:nth-child(2) {
+  min-width: 9rem;
+  line-height: 1.35;
+}
+
+.venta-carrito-tabla td:nth-child(2) .text-muted {
+  display: block;
+  margin-top: 0.15rem;
+  white-space: normal;
+}
+
 .venta-carrito-tabla th {
   font-size: 0.65rem;
   text-transform: uppercase;

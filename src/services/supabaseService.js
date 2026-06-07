@@ -47,23 +47,62 @@ function sinCamposApartado(brazos) {
   return brazos.map(({ reserva_apartado, apartado_notas, ...b }) => b);
 }
 
-const BRAZOS_INSERT_LOTE = 40;
+const BRAZOS_INSERT_LOTE = 100;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function esErrorRed(error) {
+  if (!error) return false;
+  const msg = String(error.message || error);
+  return /failed to fetch|networkerror|load failed|network request failed|aborted/i.test(msg);
+}
+
+function filaBrazoParaInsert(b) {
+  const fila = {
+    organizacion_id: b.organizacion_id,
+    turno_id: b.turno_id,
+    numero_turno: b.numero_turno,
+    numero_brazo: b.numero_brazo,
+    lado: b.lado,
+    estado: b.estado || 'disponible',
+  };
+  if (b.reserva_apartado) {
+    fila.reserva_apartado = true;
+    if (b.asignado_nombre) fila.asignado_nombre = b.asignado_nombre;
+    if (b.apartado_notas) fila.apartado_notas = b.apartado_notas;
+    if (b.cargador_id) fila.cargador_id = b.cargador_id;
+  }
+  return fila;
+}
 
 async function insertarBrazosEnLotes(brazos, { sinApartado = false } = {}) {
-  const filas = sinApartado ? sinCamposApartado(brazos) : brazos;
+  const filas = (sinApartado ? sinCamposApartado(brazos) : brazos).map(filaBrazoParaInsert);
   for (let i = 0; i < filas.length; i += BRAZOS_INSERT_LOTE) {
     const lote = filas.slice(i, i + BRAZOS_INSERT_LOTE);
-    const { error } = await supabase.from('brazos').insert(lote);
-    if (!error) continue;
+    let lastError = null;
 
-    if (
-      !sinApartado &&
-      (isMissingColumn(error, 'reserva_apartado') || isMissingColumn(error, 'apartado_notas'))
-    ) {
-      return insertarBrazosEnLotes(brazos, { sinApartado: true });
+    for (let intento = 0; intento < 4; intento += 1) {
+      const { error } = await supabase.from('brazos').insert(lote);
+      if (!error) {
+        lastError = null;
+        break;
+      }
+      lastError = error;
+
+      if (
+        !sinApartado &&
+        (isMissingColumn(error, 'reserva_apartado') || isMissingColumn(error, 'apartado_notas'))
+      ) {
+        return insertarBrazosEnLotes(brazos, { sinApartado: true });
+      }
+
+      if (!esErrorRed(error)) break;
+      await sleep(500 * (intento + 1));
     }
 
-    return error;
+    if (lastError) return lastError;
   }
   return null;
 }
@@ -1200,6 +1239,7 @@ export async function duplicarProcesion(cortejoOrigenId, datos, organizacionId) 
   const brazosCreados = [];
 
   try {
+    const turnosInsert = [];
     for (const turnoOrigen of turnosOrigen) {
       const totalBrazos = Number(turnoOrigen.total_brazos) || 0;
       if (!totalBrazos || totalBrazos % 2 !== 0) {
@@ -1208,32 +1248,39 @@ export async function duplicarProcesion(cortejoOrigenId, datos, organizacionId) 
           error: `Turno "${turnoOrigen.etiqueta || turnoOrigen.numero_turno}": total de brazos inválido.`,
         };
       }
+      turnosInsert.push({
+        organizacion_id: organizacionId,
+        cortejo_id: nuevoCortejo.id,
+        numero_turno: turnoOrigen.numero_turno,
+        tipo_turno: turnoOrigen.tipo_turno,
+        etiqueta: turnoOrigen.etiqueta,
+        total_brazos: totalBrazos,
+        precio: turnoOrigen.precio ?? 0,
+        son: turnoOrigen.son,
+        alabado: turnoOrigen.alabado,
+      });
+    }
 
-      const { data: turno, error: tErr } = await supabase
-        .from('turnos')
-        .insert({
-          organizacion_id: organizacionId,
-          cortejo_id: nuevoCortejo.id,
-          numero_turno: turnoOrigen.numero_turno,
-          tipo_turno: turnoOrigen.tipo_turno,
-          etiqueta: turnoOrigen.etiqueta,
-          total_brazos: totalBrazos,
-          precio: turnoOrigen.precio ?? 0,
-          son: turnoOrigen.son,
-          alabado: turnoOrigen.alabado,
-        })
-        .select()
-        .single();
-      if (tErr) {
-        await rollbackCortejo();
-        return err(tErr);
-      }
+    const { data: turnosNuevos, error: tErr } = await supabase
+      .from('turnos')
+      .insert(turnosInsert)
+      .select();
+    if (tErr) {
+      await rollbackCortejo();
+      return err(tErr);
+    }
 
-      turnosCreados.push(turno);
+    turnosCreados.push(...(turnosNuevos || []));
+    const turnoIdPorNumero = Object.fromEntries(
+      turnosCreados.map((t) => [t.numero_turno, t.id])
+    );
 
+    for (const turnoOrigen of turnosOrigen) {
+      const turnoId = turnoIdPorNumero[turnoOrigen.numero_turno];
+      const totalBrazos = Number(turnoOrigen.total_brazos) || 0;
       const brazosTurno = crearBrazosParaTurno({
-        turnoId: turno.id,
-        numeroTurno: turno.numero_turno,
+        turnoId,
+        numeroTurno: turnoOrigen.numero_turno,
         totalBrazos,
         organizacionId,
         idPrefix: 'brazo',
@@ -1241,16 +1288,15 @@ export async function duplicarProcesion(cortejoOrigenId, datos, organizacionId) 
         const origenBrazo = brazosPorClave.get(claveBrazo(b));
         return { ...b, ...camposApartadoCopiados(origenBrazo) };
       });
-
-      const bErr = await insertarBrazosEnLotes(brazosTurno);
-      if (bErr) {
-        await rollbackCortejo();
-        return {
-          error: `Error al copiar brazos del turno "${turnoOrigen.etiqueta || turnoOrigen.numero_turno}": ${bErr.message || bErr}`,
-        };
-      }
-
       brazosCreados.push(...brazosTurno);
+    }
+
+    const bErr = await insertarBrazosEnLotes(brazosCreados);
+    if (bErr) {
+      await rollbackCortejo();
+      return {
+        error: `Error al copiar los espacios (brazos): ${bErr.message || bErr}. Intente de nuevo; si persiste, verifique su conexión.`,
+      };
     }
   } catch (e) {
     await rollbackCortejo();

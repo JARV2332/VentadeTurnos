@@ -203,16 +203,17 @@ export function etiquetaTurno(turno) {
   return turno.tipo_turno;
 }
 
-/** Etiqueta de honor/tipo para boleta impresa (Salida → Honor Salida, etc.) */
+/** Etiqueta de honor/tipo para boleta y carrito (usa etiqueta completa del turno si existe). */
 export function etiquetaHonorTurno(turno) {
+  const etiqueta = turno?.etiqueta?.trim();
+  if (etiqueta) return etiqueta;
+
   const tipo = turno?.tipo_turno || '';
   if (tipo === 'Salida') return 'Honor Salida';
   if (tipo === 'Entrada') return 'Honor Entrada';
   if (tipo === 'Extraordinario') return 'Extraordinario';
-  if (tipo === 'Ordinario') {
-    return turno?.etiqueta?.trim() || 'Ordinario';
-  }
-  return turno?.etiqueta?.trim() || tipo || 'Turno';
+  if (tipo === 'Ordinario') return 'Ordinario';
+  return tipo || 'Turno';
 }
 
 /** Son y alabado unidos para la boleta impresa */

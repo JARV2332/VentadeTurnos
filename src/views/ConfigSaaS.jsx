@@ -400,6 +400,7 @@ export default function ConfigSaaS() {
     if (fecha === null) return;
 
     setError('');
+    setOkMsg('Copiando procesión… en procesiones grandes puede tardar hasta un minuto.');
     setDuplicandoId(p.id);
     try {
       const res = await duplicarProcesion(
