@@ -24,6 +24,7 @@ import {
   parseArchivoProcesionExcel,
   descargarPlantillaProcesionExcel,
   etiquetaAsignacion,
+  reconstruirTurnosPlanExcel,
 } from '../utils/importProcesionUtils';
 import { melodiasDeTurno } from '../utils/turnoUtils';
 
@@ -94,13 +95,21 @@ export default function ConfigSaaS() {
   const [okMsg, setOkMsg] = useState('');
   const [modoCreacion, setModoCreacion] = useState('manual');
   const [excelImport, setExcelImport] = useState(null);
+  const [generando, setGenerando] = useState(false);
+
+  const turnosPlanExcel = useMemo(() => {
+    if (modoCreacion !== 'excel' || !excelImport?.bloques?.length) return [];
+    const { turnosPlan, errores } = reconstruirTurnosPlanExcel(excelImport, config.brazosDefault);
+    if (errores?.length) return excelImport.turnosPlan || [];
+    return [...turnosPlan].sort((a, b) => a.numero_turno - b.numero_turno);
+  }, [modoCreacion, excelImport, config.brazosDefault]);
 
   const preview = useMemo(() => {
-    if (modoCreacion === 'excel' && excelImport?.turnosPlan?.length) {
-      return [...excelImport.turnosPlan].sort((a, b) => a.numero_turno - b.numero_turno);
+    if (modoCreacion === 'excel' && turnosPlanExcel.length) {
+      return turnosPlanExcel;
     }
     return construirTurnosConfig(config);
-  }, [modoCreacion, excelImport, config]);
+  }, [modoCreacion, turnosPlanExcel, config]);
   const elegiblesExtra = useMemo(
     () => turnosElegiblesExtraordinarios(config.totalTurnos),
     [config.totalTurnos]
@@ -242,8 +251,17 @@ export default function ConfigSaaS() {
     }
 
     if (modoCreacion === 'excel') {
-      if (!excelImport?.turnosPlan?.length) {
+      if (!excelImport?.bloques?.length) {
         setError('Suba un archivo Excel con los turnos antes de crear la procesión.');
+        return;
+      }
+      if (!validarBrazosPares(Number(config.brazosDefault))) {
+        setError('Indique un total de brazos por turno par (ej. 20, 40, 46).');
+        return;
+      }
+      const rebuilt = reconstruirTurnosPlanExcel(excelImport, config.brazosDefault);
+      if (rebuilt.errores?.length) {
+        setError(rebuilt.errores.join(' '));
         return;
       }
     } else {
@@ -267,29 +285,43 @@ export default function ConfigSaaS() {
     }
 
     try {
-      const configEnvio =
-        modoCreacion === 'excel'
-          ? {
-              ...config,
-              turnosPlan: excelImport.turnosPlan,
-              fuente: 'excel',
-            }
-          : config;
+      setGenerando(true);
+
+      let configEnvio = config;
+      if (modoCreacion === 'excel') {
+        const rebuilt = reconstruirTurnosPlanExcel(excelImport, config.brazosDefault);
+        configEnvio = {
+          ...config,
+          turnosPlan: rebuilt.turnosPlan,
+          fuente: 'excel',
+        };
+      }
 
       const res = await generarProcesion(cortejo, configEnvio, organizacionId);
       if (res.error) {
         setError(res.error);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      if (!res.brazos?.length) {
+        setError(
+          'La procesión se creó sin espacios (brazos). Verifique el total de brazos por turno e intente de nuevo.'
+        );
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
       setResultado(res);
+      setVerCortejoId(res.cortejo.id);
       setOkMsg(
-        `¡Procesión "${res.cortejo.nombre_evento}" creada con ${res.turnos.length} turnos y ${res.brazos.length} espacios!`
+        `¡Procesión "${res.cortejo.nombre_evento}" creada con ${res.turnos.length} turnos y ${res.brazos.length} espacios (brazos)!`
       );
-      if (modoCreacion === 'excel') setExcelImport(null);
+      setExcelImport(null);
       refreshLista();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       setError(err.message || 'Error al crear la procesión.');
+    } finally {
+      setGenerando(false);
     }
   };
 
@@ -528,7 +560,7 @@ export default function ConfigSaaS() {
               </div>
 
               <label>
-                Brazos por turno (si el Excel no indica cantidad)
+                Brazos por turno (aplica a todos los turnos del Excel)
                 <input
                   type="number"
                   min={2}
@@ -537,8 +569,8 @@ export default function ConfigSaaS() {
                   onChange={(e) => setConfigField('brazosDefault', Number(e.target.value))}
                 />
                 <small className="field-hint">
-                  Se usa cuando la asignación dice solo &quot;Disponible para la venta&quot; o
-                  &quot;Reservado, no vender&quot;.
+                  Este valor define cuántos brazos tiene cada turno. Si el Excel indica reservados
+                  (ej. 20 reservados), se reparten dentro de este total; el resto queda en venta.
                 </small>
               </label>
 
@@ -550,7 +582,7 @@ export default function ConfigSaaS() {
                 </ul>
               )}
 
-              {excelImport?.turnosPlan?.length > 0 && (
+              {turnosPlanExcel.length > 0 && (
                 <div className="table-wrap import-preview-table">
                   <table className="data-table">
                     <thead>
@@ -565,7 +597,7 @@ export default function ConfigSaaS() {
                       </tr>
                     </thead>
                     <tbody>
-                      {excelImport.turnosPlan.map((t) => (
+                      {turnosPlanExcel.map((t) => (
                         <tr key={`${t.numero_turno}-${t.etiqueta}`}>
                           <td>{t.numero_turno}</td>
                           <td>{t.etiqueta}</td>
@@ -766,8 +798,8 @@ export default function ConfigSaaS() {
             </>
           )}
 
-          <button type="submit" className="btn btn--primary btn--block">
-            Crear procesión
+          <button type="submit" className="btn btn--primary btn--block" disabled={generando}>
+            {generando ? 'Creando procesión…' : 'Crear procesión'}
           </button>
         </form>
 
@@ -779,8 +811,8 @@ export default function ConfigSaaS() {
             {modoCreacion === 'manual' && (
               <> · {config.turnosExtraordinarios.length} extraordinario(s)</>
             )}
-            {modoCreacion === 'excel' && excelImport?.turnosPlan?.length > 0 && (
-              <> · desde Excel</>
+            {modoCreacion === 'excel' && turnosPlanExcel.length > 0 && (
+              <> · desde Excel · {config.brazosDefault} brazos/turno</>
             )}
           </p>
           <div className="preview-turnos">

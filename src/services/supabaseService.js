@@ -28,6 +28,39 @@ function isMissingRpc(error) {
   );
 }
 
+function isMissingColumn(error, column) {
+  if (!error) return false;
+  const msg = error.message || '';
+  return (
+    error.code === 'PGRST204' ||
+    (msg.includes(column) && /column|Could not find/i.test(msg))
+  );
+}
+
+function sinCamposApartado(brazos) {
+  return brazos.map(({ reserva_apartado, apartado_notas, ...b }) => b);
+}
+
+async function insertarBrazosEnLotes(brazos) {
+  for (let i = 0; i < brazos.length; i += 80) {
+    const lote = brazos.slice(i, i + 80);
+    const { error } = await supabase.from('brazos').insert(lote);
+    if (!error) continue;
+
+    if (
+      isMissingColumn(error, 'reserva_apartado') ||
+      isMissingColumn(error, 'apartado_notas')
+    ) {
+      const { error: retryErr } = await supabase.from('brazos').insert(sinCamposApartado(lote));
+      if (retryErr) return retryErr;
+      continue;
+    }
+
+    return error;
+  }
+  return null;
+}
+
 function generarCodigoBoletaCliente() {
   const bytes = new Uint8Array(5);
   if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
@@ -937,6 +970,13 @@ export async function generarProcesion(cortejo, configProcesion, organizacionId)
     configProcesion?.turnosPlan?.length > 0
       ? configProcesion.turnosPlan
       : construirTurnosConfig(configProcesion);
+
+  const configGuardado = {
+    fuente: configProcesion?.fuente || 'manual',
+    brazosDefault: configProcesion?.brazosDefault,
+    totalTurnos: turnosPlan.length,
+  };
+
   const { data: nuevoCortejo, error: cErr } = await supabase
     .from('cortejos')
     .insert({
@@ -945,52 +985,73 @@ export async function generarProcesion(cortejo, configProcesion, organizacionId)
       fecha: cortejo.fecha,
       descripcion: cortejo.descripcion,
       estado: 'activa',
-      config_procesion: configProcesion,
+      config_procesion: configGuardado,
     })
     .select()
     .single();
   if (cErr) return err(cErr);
 
+  const rollbackCortejo = async () => {
+    await supabase.from('cortejos').delete().eq('id', nuevoCortejo.id);
+  };
+
   const turnosCreados = [];
   const brazosCreados = [];
 
-  for (const cfg of turnosPlan) {
-    const { data: turno, error: tErr } = await supabase
-      .from('turnos')
-      .insert({
-        organizacion_id: organizacionId,
-        cortejo_id: nuevoCortejo.id,
-        numero_turno: cfg.numero_turno,
-        tipo_turno: cfg.tipo_turno,
-        etiqueta: cfg.etiqueta,
-        total_brazos: cfg.total_brazos,
-        precio: cfg.precio,
-        son: cfg.son,
-        alabado: cfg.alabado,
-      })
-      .select()
-      .single();
-    if (tErr) return err(tErr);
+  try {
+    for (const cfg of turnosPlan) {
+      const totalBrazos = Number(cfg.total_brazos) || 0;
+      if (!totalBrazos || totalBrazos % 2 !== 0) {
+        await rollbackCortejo();
+        return {
+          error: `Turno "${cfg.etiqueta || cfg.numero_turno}": total de brazos inválido (${totalBrazos}). Debe ser par y mayor que 0.`,
+        };
+      }
 
-    turnosCreados.push(turno);
+      const { data: turno, error: tErr } = await supabase
+        .from('turnos')
+        .insert({
+          organizacion_id: organizacionId,
+          cortejo_id: nuevoCortejo.id,
+          numero_turno: cfg.numero_turno,
+          tipo_turno: cfg.tipo_turno,
+          etiqueta: cfg.etiqueta,
+          total_brazos: totalBrazos,
+          precio: cfg.precio ?? 0,
+          son: cfg.son,
+          alabado: cfg.alabado,
+        })
+        .select()
+        .single();
+      if (tErr) {
+        await rollbackCortejo();
+        return err(tErr);
+      }
 
-    const brazos = aplicarAsignacionBrazos(
-      crearBrazosParaTurno({
-        turnoId: turno.id,
-        numeroTurno: turno.numero_turno,
-        totalBrazos: cfg.total_brazos,
-        organizacionId,
-        idPrefix: 'brazo',
-      }),
-      cfg.asignacion
-    ).map(({ id, ...b }) => b);
+      turnosCreados.push(turno);
 
-    brazosCreados.push(...brazos);
-  }
+      const brazos = aplicarAsignacionBrazos(
+        crearBrazosParaTurno({
+          turnoId: turno.id,
+          numeroTurno: turno.numero_turno,
+          totalBrazos,
+          organizacionId,
+          idPrefix: 'brazo',
+        }),
+        cfg.asignacion
+      ).map(({ id, ...b }) => b);
 
-  for (let i = 0; i < brazosCreados.length; i += 80) {
-    const { error: bErr } = await supabase.from('brazos').insert(brazosCreados.slice(i, i + 80));
-    if (bErr) return err(bErr);
+      brazosCreados.push(...brazos);
+    }
+
+    const bErr = await insertarBrazosEnLotes(brazosCreados);
+    if (bErr) {
+      await rollbackCortejo();
+      return err(bErr);
+    }
+  } catch (e) {
+    await rollbackCortejo();
+    return { error: e.message || String(e) };
   }
 
   try {

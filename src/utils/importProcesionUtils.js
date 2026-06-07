@@ -36,37 +36,42 @@ function parseOfrenda(valor) {
   return Number.isFinite(n) ? n : null;
 }
 
+function normalizarBrazosDefault(brazosDefault) {
+  let n = Number(brazosDefault) || 20;
+  if (n < 2) n = 2;
+  if (n % 2 !== 0) n += 1;
+  return n;
+}
+
 /** @returns {{ tipo: 'disponible'|'reservado_total'|'mixto', totalBrazos: number, reservados: number, disponibles: number }} */
 export function parseAsignacionTurno(texto, brazosDefault = 20) {
   const t = norm(texto);
-  const fallback = Number(brazosDefault) || 20;
+  const total = normalizarBrazosDefault(brazosDefault);
 
   if (!t) {
-    return { tipo: 'disponible', totalBrazos: fallback, reservados: 0, disponibles: fallback };
+    return { tipo: 'disponible', totalBrazos: total, reservados: 0, disponibles: total };
   }
 
-  if (
-    /no\s*vender/.test(t) ||
-    (/reservado/.test(t) && !/disponible/.test(t) && !/venta/.test(t))
-  ) {
-    return { tipo: 'reservado_total', totalBrazos: fallback, reservados: fallback, disponibles: 0 };
+  if (/no\s*vender/.test(t)) {
+    return { tipo: 'reservado_total', totalBrazos: total, reservados: total, disponibles: 0 };
   }
 
-  const mRes = t.match(/reservad[^\d]*(\d+)[^\d]*brazo/);
-  const mDis = t.match(/disponible[^\d]*(?:para\s*la\s*venta\s*)?(\d+)/);
+  const mRes = t.match(/reservad[^\d]*(\d+)/);
+  const tieneDisponible = /disponible/.test(t) && /venta/.test(t);
 
-  if (mRes && mDis) {
-    const reservados = Number(mRes[1]);
-    const disponibles = Number(mDis[1]);
-    const totalBrazos = reservados + disponibles;
-    return { tipo: 'mixto', totalBrazos, reservados, disponibles };
+  if (mRes && tieneDisponible) {
+    let reservados = Math.min(Number(mRes[1]) || 0, total);
+    if (reservados % 2 !== 0) reservados -= 1;
+    if (reservados < 0) reservados = 0;
+    const disponibles = total - reservados;
+    return { tipo: 'mixto', totalBrazos: total, reservados, disponibles };
   }
 
-  if (/disponible/.test(t) && /venta/.test(t)) {
-    return { tipo: 'disponible', totalBrazos: fallback, reservados: 0, disponibles: fallback };
+  if (/reservado/.test(t) && !tieneDisponible) {
+    return { tipo: 'reservado_total', totalBrazos: total, reservados: total, disponibles: 0 };
   }
 
-  return { tipo: 'disponible', totalBrazos: fallback, reservados: 0, disponibles: fallback };
+  return { tipo: 'disponible', totalBrazos: total, reservados: 0, disponibles: total };
 }
 
 export function detectarTipoTurno(etiqueta) {
@@ -145,20 +150,20 @@ function inferirMeta(rows, headerIdx) {
 
 function asignarNumerosTurno(bloques) {
   let ultimoNumero = 0;
+  const usados = new Set();
 
   return bloques.map((bloque) => {
     let numero = extraerNumeroTurno(bloque.etiqueta);
     const tipo = detectarTipoTurno(bloque.etiqueta);
 
     if (numero === null) {
-      if (tipo === 'Salida' && ultimoNumero === 0) numero = 1;
+      if (tipo === 'Salida' && !usados.has(1)) numero = 1;
       else numero = ultimoNumero + 1;
     }
 
-    if (numero <= ultimoNumero && !(tipo === 'Salida' && numero === 1 && ultimoNumero === 0)) {
-      numero = ultimoNumero + 1;
-    }
+    while (usados.has(numero)) numero += 1;
 
+    usados.add(numero);
     ultimoNumero = Math.max(ultimoNumero, numero);
     return { ...bloque, numero_turno: numero, tipo_turno: tipo };
   });
@@ -261,6 +266,7 @@ export function construirTurnosPlanDesdeBloques(bloques, { brazosDefault = 20 } 
       son,
       alabado,
       asignacion,
+      asignacionTexto: bloque.asignacionTexto || '',
       filaExcel: bloque.filaExcel,
     };
   });
@@ -308,7 +314,7 @@ export function parseFilasProcesionExcel(rows, { brazosDefault = 20 } = {}) {
     brazosDefault,
   });
 
-  return { turnosPlan, meta, advertencias, errores, error: null };
+  return { turnosPlan, meta, advertencias, errores, bloques, error: null };
 }
 
 export async function parseArchivoProcesionExcel(file, { brazosDefault = 20 } = {}) {
@@ -342,11 +348,21 @@ export async function parseArchivoProcesionExcel(file, { brazosDefault = 20 } = 
 
 export function etiquetaAsignacion(asignacion) {
   if (!asignacion) return '—';
-  if (asignacion.tipo === 'reservado_total') return 'Reservado (no vender)';
-  if (asignacion.tipo === 'mixto') {
-    return `Reservado ${asignacion.reservados} · Venta ${asignacion.disponibles}`;
+  if (asignacion.tipo === 'reservado_total') {
+    return `Reservado (no vender) · ${asignacion.totalBrazos} brazos`;
   }
-  return 'Disponible para venta';
+  if (asignacion.tipo === 'mixto') {
+    return `Reservado ${asignacion.reservados} · Venta ${asignacion.disponibles} (${asignacion.totalBrazos} total)`;
+  }
+  return `Disponible para venta · ${asignacion.totalBrazos} brazos`;
+}
+
+/** Reconstruye el plan con el brazosDefault actual del formulario. */
+export function reconstruirTurnosPlanExcel(excelImport, brazosDefault) {
+  if (!excelImport?.bloques?.length) {
+    return { turnosPlan: excelImport?.turnosPlan || [], errores: [], advertencias: [] };
+  }
+  return construirTurnosPlanDesdeBloques(excelImport.bloques, { brazosDefault });
 }
 
 export function descargarPlantillaProcesionExcel() {
