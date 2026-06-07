@@ -2140,16 +2140,16 @@ body {
 
 .boleta-formal__head {
   display: grid;
-  grid-template-columns: minmax(5rem, 1fr) 2.2fr minmax(4.5rem, auto);
-  gap: 0.5rem 0.65rem;
+  grid-template-columns: 1fr auto;
+  gap: 0.65rem;
   align-items: start;
   padding-bottom: 0.45rem;
   border-bottom: 1px solid #cbd5e1;
 }
 
-.boleta-formal__saludo {
-  margin: 0;
-  font-size: 0.62rem;
+.boleta-formal__saludo-devoto {
+  margin: 0 0 0.2rem;
+  font-size: 0.68rem;
   font-style: italic;
   color: #475569;
   line-height: 1.35;

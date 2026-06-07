@@ -78,10 +78,8 @@ export default function BoletaContraseñaTurno({
 
   return (
     <article className="boleta-contraseña boleta-contraseña--media-carta boleta-contraseña--formal">
-      {/* Encabezado */}
+      {/* Encabezado institucional (sin saludo — va sobre el nombre) */}
       <header className="boleta-formal__head">
-        <p className="boleta-formal__saludo">{cfg.encabezado_saludo}</p>
-
         <div className="boleta-formal__head-centro">
           {tituloOrg && <p className="boleta-formal__parroquia">{tituloOrg}</p>}
           {cfg.linea_pastoral?.trim() && (
@@ -118,15 +116,20 @@ export default function BoletaContraseñaTurno({
       </header>
 
       {/* Datos del devoto */}
-      {(cfg.mostrar_cargador !== false && nombreDevoto) || dpiDevoto ? (
+      {(cfg.mostrar_saludo_devoto !== false && cfg.encabezado_saludo?.trim()) ||
+      (cfg.mostrar_cargador !== false && nombreDevoto) ||
+      dpiDevoto ? (
         <section className="boleta-formal__devoto-row">
           <div className="boleta-formal__devoto-nombre">
+            {cfg.mostrar_saludo_devoto !== false && cfg.encabezado_saludo?.trim() && (
+              <p className="boleta-formal__saludo-devoto">{cfg.encabezado_saludo.trim()}</p>
+            )}
             {cfg.mostrar_cargador !== false && nombreDevoto && (
               <strong>{nombreDevoto}</strong>
             )}
             {dpiDevoto && (
               <p className="boleta-formal__dpi">
-                <span>DPI:</span> {dpiDevoto}
+                <span>{cfg.etiqueta_dpi || 'DPI:'}</span> {dpiDevoto}
               </p>
             )}
           </div>
@@ -154,7 +157,9 @@ export default function BoletaContraseñaTurno({
       <section className="boleta-formal__cuerpo">
         {esMulti ? (
           <div className="boleta-formal__tabla-wrap">
-            <p className="boleta-formal__seccion-label">Turnos adquiridos</p>
+            <p className="boleta-formal__seccion-label">
+              {cfg.titulo_tabla_turnos?.trim() || 'Turnos adquiridos'}
+            </p>
             <table className="boleta-turnos-tabla boleta-turnos-tabla--formal">
               <thead>
                 <tr>

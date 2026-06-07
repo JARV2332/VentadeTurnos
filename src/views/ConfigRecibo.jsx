@@ -247,11 +247,41 @@ export default function ConfigRecibo() {
               Estilo de inscripción procesional. El logo se sube arriba. Sin dirección, De: ni Autor:.
             </p>
             <label>
-              Saludo superior
+              Saludo sobre el nombre del devoto(a)
               <input
                 type="text"
                 value={diseño.encabezado_saludo || ''}
                 onChange={(e) => setCampo('encabezado_saludo', e.target.value)}
+                placeholder="Señor (a) / Devoto (a) / Presente"
+              />
+              <small className="field-hint">
+                Aparece justo encima del nombre en la boleta impresa.
+              </small>
+            </label>
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={diseño.mostrar_saludo_devoto !== false}
+                onChange={(e) => setCampo('mostrar_saludo_devoto', e.target.checked)}
+              />
+              Mostrar saludo sobre el nombre
+            </label>
+            <label>
+              Etiqueta DPI / identificación
+              <input
+                type="text"
+                value={diseño.etiqueta_dpi || ''}
+                onChange={(e) => setCampo('etiqueta_dpi', e.target.value)}
+                placeholder="DPI:"
+              />
+            </label>
+            <label>
+              Título tabla (varios turnos)
+              <input
+                type="text"
+                value={diseño.titulo_tabla_turnos || ''}
+                onChange={(e) => setCampo('titulo_tabla_turnos', e.target.value)}
+                placeholder="Turnos adquiridos"
               />
             </label>
             <label>

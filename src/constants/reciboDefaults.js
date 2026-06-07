@@ -27,8 +27,11 @@ export const DEFAULT_RECIBO_CONFIG = {
   editor_visual: true,
   /* Contraseña formal (media carta — estilo inscripción) */
   encabezado_saludo: 'Señor (a) / Devoto (a) / Presente',
+  mostrar_saludo_devoto: true,
   linea_pastoral: 'Pastoral de Religiosidad Popular',
   titulo_inscripcion: '',
+  titulo_tabla_turnos: 'Turnos adquiridos',
+  etiqueta_dpi: 'DPI:',
   texto_constancia:
     'Por este medio hago constar su inscripción para llevar en hombros a nuestra Señora de la Asunción',
   ciudad_lugar: 'Guatemala de la Asunción',
