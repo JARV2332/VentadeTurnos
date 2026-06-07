@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getSupabaseConfig } from './verifyCaller.js';
 
 const BRAZO_FIELDS =
-  'id, numero_turno, numero_brazo, lado, precio_pagado, codigo_boleta_qr, estado, estado_entrega, turno_id, cargador_id, organizacion_id, compra_id';
+  'id, numero_turno, numero_brazo, lado, precio_pagado, codigo_boleta_qr, estado, estado_entrega, turno_id, cargador_id, organizacion_id, compra_id, operador_nombre, vendedor_id';
 
 const TURNO_FIELDS =
   'id, numero_turno, etiqueta, tipo_turno, precio, cortejo_id, son, alabado';
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
   if (esVR) {
     const { data: compraData, error: errCompra } = await admin
       .from('compras')
-      .select('id, codigo_recibo, total_pagado, organizacion_id, cargador_id')
+      .select('id, codigo_recibo, total_pagado, organizacion_id, cargador_id, operador_nombre, vendedor_id')
       .eq('codigo_recibo', codigo)
       .maybeSingle();
 
@@ -106,7 +106,7 @@ export default async function handler(req, res) {
       const [{ data: compraData }, { data: brazosCompra }] = await Promise.all([
         admin
           .from('compras')
-          .select('id, codigo_recibo, total_pagado, organizacion_id, cargador_id')
+          .select('id, codigo_recibo, total_pagado, organizacion_id, cargador_id, operador_nombre, vendedor_id')
           .eq('id', brazo.compra_id)
           .maybeSingle(),
         admin

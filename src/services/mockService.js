@@ -589,6 +589,9 @@ export function confirmarVentaCompraMock(
     metodo_pago: pagoData?.metodo_pago || 'efectivo',
     comprobante_url: pagoData?.comprobante_url || null,
     pago_confirmado_en: new Date().toISOString(),
+    vendedor_id: pagoData?.vendedor_id || null,
+    mesa_id: pagoData?.mesa_id || null,
+    operador_nombre: (pagoData?.operador_nombre || '').trim() || null,
   };
   store.compras = store.compras || [];
   store.compras.push(compra);
@@ -612,6 +615,9 @@ export function confirmarVentaCompraMock(
       metodo_pago: pagoData?.metodo_pago || 'efectivo',
       comprobante_url: pagoData?.comprobante_url || null,
       pago_confirmado_en: compra.pago_confirmado_en,
+      vendedor_id: pagoData?.vendedor_id || null,
+      mesa_id: pagoData?.mesa_id || null,
+      operador_nombre: compra.operador_nombre,
     };
   });
 
@@ -737,14 +743,35 @@ export function getFinanzasByOrg(organizacionId) {
 
   const porVendedor = {};
   const porMetodo = { efectivo: 0, transferencia: 0, tarjeta: 0 };
+  const mapaUsuarios = {};
+  store.usuarios
+    .filter((u) => u.organizacion_id === organizacionId)
+    .forEach((u) => {
+      const nombre = u.nombre?.trim() || u.email?.trim() || '';
+      if (nombre) mapaUsuarios[u.id] = nombre;
+    });
+
   vendidos.forEach((b) => {
     const key = b.vendedor_id || 'sin-asignar';
-    if (!porVendedor[key]) porVendedor[key] = { ventas: 0, total: 0 };
+    const nombre =
+      b.operador_nombre?.trim() ||
+      (key !== 'sin-asignar' ? mapaUsuarios[key] : '') ||
+      'Sin asignar';
+    if (!porVendedor[key]) porVendedor[key] = { ventas: 0, total: 0, nombre };
+    if (!porVendedor[key].nombre && nombre) porVendedor[key].nombre = nombre;
     porVendedor[key].ventas += 1;
     porVendedor[key].total += Number(b.precio_pagado || 0);
     const metodo = b.metodo_pago || 'efectivo';
     if (porMetodo[metodo] !== undefined) porMetodo[metodo] += Number(b.precio_pagado || 0);
   });
+
+  const ventasEnriquecidas = vendidos.map((b) => ({
+    ...b,
+    operador_nombre:
+      b.operador_nombre?.trim() ||
+      (b.vendedor_id ? mapaUsuarios[b.vendedor_id] : '') ||
+      '',
+  }));
 
   return {
     totalBrazos: brazos.length,
@@ -757,7 +784,8 @@ export function getFinanzasByOrg(organizacionId) {
     porMesa,
     porVendedor,
     porMetodo,
-    ventas: vendidos,
+    ventas: ventasEnriquecidas,
+    mapaUsuarios,
   };
 }
 

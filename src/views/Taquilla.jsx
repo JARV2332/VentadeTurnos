@@ -448,6 +448,7 @@ export default function Taquilla() {
           comprobante_url: pago.comprobante_url,
           mesa_id: mesaActiva?.id,
           vendedor_id: vendedorAuthId,
+          operador_nombre: user?.nombre?.trim() || '',
         }
       );
 

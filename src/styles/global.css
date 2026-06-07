@@ -2455,6 +2455,14 @@ body {
   color: #64748b;
 }
 
+.boleta-formal__operador {
+  margin: 0.35rem 0 0;
+  font-size: 0.58rem;
+  text-align: center;
+  color: #94a3b8;
+  letter-spacing: 0.01em;
+}
+
 .recibo-preview-stage--formal {
   overflow: auto;
   padding: 0.5rem;

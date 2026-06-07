@@ -5,12 +5,6 @@ import { useAuth } from '../context/AuthContext';
 import { getFinanzasByOrg, subscribeData } from '../services/dataService';
 import { labelMetodoPago } from '../utils/pagoUtils';
 
-const VENDEDOR_NOMBRES = {
-  'user-vendedor-001': 'Carlos Vendedor',
-  'user-vendedor-002': 'Mesa Lateral',
-  'user-admin-001': 'María Administradora',
-};
-
 export default function CajaSaaS() {
   const { organizacionId } = useAuth();
   const [finanzas, setFinanzas] = useState(null);
@@ -120,7 +114,9 @@ export default function CajaSaaS() {
           <select value={filtroVendedor} onChange={(e) => setFiltroVendedor(e.target.value)}>
             <option value="all">Todos los vendedores</option>
             {Object.keys(finanzas.porVendedor || {}).map((vid) => (
-              <option key={vid} value={vid}>{VENDEDOR_NOMBRES[vid] || vid}</option>
+              <option key={vid} value={vid}>
+                {finanzas.porVendedor[vid]?.nombre || vid}
+              </option>
             ))}
           </select>
         </label>
@@ -170,7 +166,7 @@ export default function CajaSaaS() {
               <tbody>
                 {Object.entries(finanzas.porVendedor || {}).map(([vid, data]) => (
                   <tr key={vid}>
-                    <td><strong>{VENDEDOR_NOMBRES[vid] || vid}</strong></td>
+                    <td><strong>{data.nombre || vid}</strong></td>
                     <td>{data.ventas}</td>
                     <td>{formatQ(data.total)}</td>
                   </tr>
@@ -189,6 +185,7 @@ export default function CajaSaaS() {
               <tr>
                 <th>Turno</th>
                 <th>Boleta</th>
+                <th>Operador</th>
                 <th>Pago</th>
                 <th>Comprobante</th>
                 <th>Ofrenda</th>
@@ -199,6 +196,7 @@ export default function CajaSaaS() {
                 <tr key={v.id}>
                   <td>#{v.numero_turno}</td>
                   <td><code>{v.codigo_boleta_qr}</code></td>
+                  <td>{v.operador_nombre || '—'}</td>
                   <td>{labelMetodoPago(v.metodo_pago)}</td>
                   <td>
                     {v.comprobante_url ? (

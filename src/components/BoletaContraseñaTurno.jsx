@@ -6,6 +6,7 @@ import { mergeReciboConfig } from '../constants/reciboDefaults';
 import { getQrPayload, formatPrecio, formatFechaLarga, formatFechaEvento } from '../utils/boletaUtils';
 import { construirLineasRecibo, codigoReciboDisplay } from '../utils/compraUtils';
 import { etiquetaHonorTurno, textoMelodiaTurno } from '../utils/turnoUtils';
+import { resolverOperadorNombre } from '../utils/operadorVentaUtils';
 
 /**
  * Contraseña / recibo formal — media carta horizontal (8.5" × 5.5").
@@ -20,6 +21,7 @@ export default function BoletaContraseñaTurno({
   items: itemsProp,
   compra,
   config: configProp,
+  operadorNombre: operadorNombreProp,
 }) {
   const { organizacionId } = useAuth();
   const [configGuardada, setConfigGuardada] = useState(null);
@@ -75,6 +77,12 @@ export default function BoletaContraseñaTurno({
   const precioUnitario = formatPrecio(
     brazoPrincipal?.precio_pagado ?? turnoPrincipal?.precio ?? lineas[0]?.ofrenda ?? 0
   );
+
+  const operadorNombre = resolverOperadorNombre({
+    compra,
+    brazo: brazoPrincipal,
+    operadorNombreProp,
+  });
 
   return (
     <article className="boleta-contraseña boleta-contraseña--media-carta boleta-contraseña--formal">
@@ -251,6 +259,10 @@ export default function BoletaContraseñaTurno({
 
       {cfg.pie_texto?.trim() && (
         <p className="boleta-formal__nota-extra">{cfg.pie_texto.trim()}</p>
+      )}
+
+      {operadorNombre && (
+        <p className="boleta-formal__operador">Operado por: {operadorNombre}</p>
       )}
     </article>
   );

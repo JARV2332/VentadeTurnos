@@ -220,8 +220,38 @@ async function reservarBrazoDirecto(brazoId, mesaId, vendedorId) {
   return { data };
 }
 
+async function sincronizarOperadorVenta(compraId, brazoIds, pagoData = {}) {
+  const operadorNombre = (pagoData.operador_nombre || '').trim() || null;
+  const patch = {
+    vendedor_id: pagoData.vendedor_id || null,
+    mesa_id: pagoData.mesa_id || null,
+    operador_nombre: operadorNombre,
+  };
+
+  const actualizar = async (table, builder) => {
+    let q = builder(supabase.from(table).update(patch));
+    let { error } = await q;
+    if (error?.code === '42703') {
+      const { operador_nombre: _omit, ...sinOperador } = patch;
+      q = builder(supabase.from(table).update(sinOperador));
+      ({ error } = await q);
+    }
+    return error;
+  };
+
+  const tareas = [];
+  if (compraId) {
+    tareas.push(actualizar('compras', (q) => q.eq('id', compraId)));
+  }
+  if (brazoIds?.length) {
+    tareas.push(actualizar('brazos', (q) => q.in('id', brazoIds)));
+  }
+  await Promise.all(tareas);
+}
+
 async function confirmarVentaDirecto(brazoId, cargador, precioPagado, pagoData = {}) {
   const codigo = generarCodigoBoletaCliente();
+  const operadorNombre = (pagoData.operador_nombre || '').trim() || null;
   const payload = {
     estado: 'vendido',
     cargador_id: cargador.id,
@@ -233,6 +263,9 @@ async function confirmarVentaDirecto(brazoId, cargador, precioPagado, pagoData =
     pago_confirmado_en: new Date().toISOString(),
     estado_entrega: 'pendiente',
     reserva_apartado: false,
+    vendedor_id: pagoData.vendedor_id || null,
+    mesa_id: pagoData.mesa_id || null,
+    operador_nombre: operadorNombre,
   };
 
   const { data: brazo, error } = await supabase
@@ -638,6 +671,7 @@ export async function confirmarVentaCompra(brazoIds, cargadorData, precios, pago
     p_comprobante_url: pagoData.comprobante_url || null,
     p_mesa_id: pagoData.mesa_id || null,
     p_vendedor_id: pagoData.vendedor_id || null,
+    p_operador_nombre: (pagoData.operador_nombre || '').trim() || null,
   });
 
   if (error) {
@@ -649,12 +683,30 @@ export async function confirmarVentaCompra(brazoIds, cargadorData, precios, pago
 
   const compra = data?.compra;
   const brazos = Array.isArray(data?.brazos) ? data.brazos : [];
+  await sincronizarOperadorVenta(compra?.id, ids, pagoData);
+
+  const operadorNombre = (pagoData.operador_nombre || '').trim() || null;
+  const compraFinal = compra
+    ? {
+        ...compra,
+        operador_nombre: compra.operador_nombre || operadorNombre,
+        vendedor_id: compra.vendedor_id || pagoData.vendedor_id || null,
+        mesa_id: compra.mesa_id ?? pagoData.mesa_id ?? null,
+      }
+    : null;
+  const brazosFinal = brazos.map((b) => ({
+    ...b,
+    operador_nombre: b.operador_nombre || operadorNombre,
+    vendedor_id: b.vendedor_id || pagoData.vendedor_id || null,
+    mesa_id: b.mesa_id ?? pagoData.mesa_id ?? null,
+  }));
+
   return {
-    compra,
-    brazos,
+    compra: compraFinal,
+    brazos: brazosFinal,
     cargador,
-    codigo: compra?.codigo_recibo,
-    data: brazos[0] || null,
+    codigo: compraFinal?.codigo_recibo,
+    data: brazosFinal[0] || null,
   };
 }
 
@@ -665,6 +717,7 @@ async function confirmarVentaCompraDirecto(brazoIds, cargador, precios, orgId, p
   const total = precios.reduce((s, p) => s + Number(p || 0), 0);
   const codigoRecibo = `VR-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
 
+  const operadorNombre = (pagoData.operador_nombre || '').trim() || null;
   const { data: compra, error: compraErr } = await supabase
     .from('compras')
     .insert({
@@ -674,6 +727,9 @@ async function confirmarVentaCompraDirecto(brazoIds, cargador, precios, orgId, p
       total_pagado: total,
       metodo_pago: pagoData.metodo_pago || 'efectivo',
       comprobante_url: pagoData.comprobante_url || null,
+      vendedor_id: pagoData.vendedor_id || null,
+      mesa_id: pagoData.mesa_id || null,
+      operador_nombre: operadorNombre,
     })
     .select()
     .single();
@@ -828,12 +884,25 @@ export async function marcarEntregado(brazoId) {
 }
 
 export async function getFinanzasByOrg(organizacionId) {
-  const { data: brazos, error } = await supabase
-    .from('brazos')
-    .select('*')
-    .eq('organizacion_id', organizacionId)
-    .eq('estado', 'vendido');
+  const [{ data: brazos, error }, { data: compras }, usuarios] = await Promise.all([
+    supabase
+      .from('brazos')
+      .select('*')
+      .eq('organizacion_id', organizacionId)
+      .eq('estado', 'vendido'),
+    supabase.from('compras').select('id, vendedor_id, operador_nombre').eq('organizacion_id', organizacionId),
+    getUsuariosByOrg(organizacionId),
+  ]);
   if (error) throw error;
+
+  const comprasMap = Object.fromEntries((compras || []).map((c) => [c.id, c]));
+  const mapaUsuarios = {};
+  for (const u of usuarios || []) {
+    const nombre = u.nombre?.trim() || u.email?.trim() || '';
+    if (!nombre) continue;
+    if (u.auth_user_id) mapaUsuarios[u.auth_user_id] = nombre;
+    if (u.id) mapaUsuarios[u.id] = nombre;
+  }
 
   const { data: turnos } = await supabase
     .from('turnos')
@@ -847,11 +916,21 @@ export async function getFinanzasByOrg(organizacionId) {
 
   const recaudado = (brazos || []).reduce((s, b) => s + Number(b.precio_pagado || 0), 0);
 
-  const ventas = (brazos || []).map((b) => ({
-    ...b,
-    vendedor_id: b.vendedor_id,
-    mesa_id: b.mesa_id,
-  }));
+  const ventas = (brazos || []).map((b) => {
+    const compra = b.compra_id ? comprasMap[b.compra_id] : null;
+    const operador_nombre =
+      b.operador_nombre?.trim() ||
+      compra?.operador_nombre?.trim() ||
+      mapaUsuarios[b.vendedor_id] ||
+      mapaUsuarios[compra?.vendedor_id] ||
+      '';
+    return {
+      ...b,
+      vendedor_id: b.vendedor_id || compra?.vendedor_id || null,
+      mesa_id: b.mesa_id,
+      operador_nombre,
+    };
+  });
 
   const mesas = await getMesasByOrg(organizacionId);
   const porMesa = (mesas || []).map((mesa) => {
@@ -867,7 +946,12 @@ export async function getFinanzasByOrg(organizacionId) {
   const porMetodo = { efectivo: 0, transferencia: 0, tarjeta: 0 };
   ventas.forEach((b) => {
     const vid = b.vendedor_id || 'sin-asignar';
-    if (!porVendedor[vid]) porVendedor[vid] = { ventas: 0, total: 0 };
+    const nombre =
+      b.operador_nombre?.trim() ||
+      (vid !== 'sin-asignar' ? mapaUsuarios[vid] : '') ||
+      'Sin asignar';
+    if (!porVendedor[vid]) porVendedor[vid] = { ventas: 0, total: 0, nombre };
+    if (!porVendedor[vid].nombre && nombre) porVendedor[vid].nombre = nombre;
     porVendedor[vid].ventas += 1;
     porVendedor[vid].total += Number(b.precio_pagado || 0);
     const metodo = b.metodo_pago || 'efectivo';
@@ -884,6 +968,7 @@ export async function getFinanzasByOrg(organizacionId) {
     porMesa,
     porVendedor,
     porMetodo,
+    mapaUsuarios,
   };
 }
 
