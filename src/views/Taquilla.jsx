@@ -222,16 +222,19 @@ export default function Taquilla() {
       }
     } else if (brazo.reserva_apartado && brazo.estado === 'reservado') {
       const cargador = brazo.cargador_id ? await getCargadorById(brazo.cargador_id) : null;
+      const dpiMatch = brazo.apartado_notas?.match(/DPI\s*(\d{13})/);
       agregarAlCarrito(brazo);
       if (carrito.length === 0) {
         setPago({ metodo_pago: 'efectivo', comprobante_url: null, comprobante_nombre: '' });
-        setForm(devotoToForm(cargador) || {
-          nombre_completo: brazo.asignado_nombre || '',
-          whatsapp: '',
-          correo: '',
-          cui_o_identificacion: '',
-          telefono_emergencia: '',
-        });
+        setForm(
+          devotoToForm(cargador) || {
+            nombre_completo: brazo.asignado_nombre || brazo.cargador?.nombre_completo || '',
+            whatsapp: '',
+            correo: '',
+            cui_o_identificacion: dpiMatch?.[1] || '',
+            telefono_emergencia: '',
+          }
+        );
       }
     } else if (brazo.vendedor_id === vendedorAuthId) {
       agregarAlCarrito(brazo);

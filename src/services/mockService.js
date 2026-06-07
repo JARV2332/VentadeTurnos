@@ -4,7 +4,13 @@ import {
   crearBrazosParaTurno,
   agruparTurnosConBrazos,
 } from '../utils/turnoUtils';
-import { normalizarLado } from '../utils/importReservasUtils';
+import {
+  normalizarLado,
+  brazosElegiblesParaApartado,
+  combinarNombreDevoto,
+  resolverTurnoEnLista,
+} from '../utils/importReservasUtils';
+import { isValidCui, normalizarCui } from '../utils/cuiUtils';
 import { aplicarAsignacionBrazos } from '../utils/aplicarAsignacionBrazos';
 
 let store = crearStoreInicial();
@@ -99,7 +105,14 @@ export function getTurnosAgrupados(cortejoId, organizacionId) {
   const brazos = getBrazosByOrg(organizacionId).filter((b) =>
     turnos.some((t) => t.id === b.turno_id)
   );
-  return agruparTurnosConBrazos(turnos, brazos);
+  const cargadoresPorId = Object.fromEntries(
+    getCargadoresByOrg(organizacionId).map((c) => [c.id, c])
+  );
+  const brazosEnriquecidos = brazos.map((b) => ({
+    ...b,
+    cargador: cargadoresPorId[b.cargador_id] || null,
+  }));
+  return agruparTurnosConBrazos(turnos, brazosEnriquecidos);
 }
 
 export function getCargadoresByOrg(organizacionId) {
@@ -792,46 +805,74 @@ function buscarBrazoPorCoordenadas(cortejoId, organizacionId, numeroTurno, numer
   );
 }
 
-function upsertCargadorParcial(organizacionId, datos) {
-  const cui = String(datos.cui || '').replace(/\D/g, '');
-  const whatsapp = datos.whatsapp?.replace(/\D/g, '');
+function whatsappPlaceholderDesdeCui(cui) {
+  const d = normalizarCui(cui);
+  if (!isValidCui(d)) return '';
+  return `502${d.slice(-8)}`;
+}
 
-  let cargador = cui.length === 13 ? buscarCargadorPorCui(organizacionId, cui) : null;
-  if (!cargador && whatsapp && whatsapp.length >= 11) {
+function upsertCargadorParcial(organizacionId, datos) {
+  const cui = normalizarCui(datos.cui || datos.dpi || '');
+  const whatsappRaw = datos.whatsapp?.replace(/\D/g, '') || '';
+  const whatsapp =
+    whatsappRaw.length >= 11 ? whatsappRaw : whatsappPlaceholderDesdeCui(cui);
+  const nombreCompleto =
+    datos.nombre_completo?.trim() ||
+    combinarNombreDevoto(datos.apellido, datos.nombre) ||
+    datos.nombre?.trim() ||
+    'Sin nombre';
+
+  let cargador = isValidCui(cui) ? buscarCargadorPorCui(organizacionId, cui) : null;
+  if (!cargador && whatsapp.length >= 11) {
     cargador = buscarCargadorPorWhatsapp(organizacionId, whatsapp);
   }
 
-  if (whatsapp && whatsapp.length >= 11) {
-    if (!cargador) {
-      cargador = {
-        id: `carg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        organizacion_id: organizacionId,
-        nombre_completo: datos.nombre?.trim() || 'Sin nombre',
-        whatsapp,
-        correo: datos.correo?.trim() || '',
-        cui_o_identificacion: cui || '',
-        telefono_emergencia: datos.telefono_emergencia?.trim() || '',
-      };
-      store.cargadores.push(cargador);
-    } else {
-      cargador = {
-        ...cargador,
-        nombre_completo: datos.nombre?.trim() || cargador.nombre_completo,
-        correo: datos.correo?.trim() || cargador.correo,
-        cui_o_identificacion: cui || cargador.cui_o_identificacion,
-        telefono_emergencia:
-          datos.telefono_emergencia?.trim() || cargador.telefono_emergencia,
-        whatsapp: whatsapp || cargador.whatsapp,
-      };
-      store.cargadores = store.cargadores.map((c) =>
-        c.id === cargador.id ? cargador : c
-      );
-    }
+  const campos = {
+    nombre_completo: nombreCompleto,
+    cui_o_identificacion: cui || cargador?.cui_o_identificacion || '',
+    whatsapp: whatsapp || cargador?.whatsapp || '',
+    correo: datos.correo?.trim() || cargador?.correo || '',
+    telefono_emergencia:
+      datos.telefono_emergencia?.trim() || cargador?.telefono_emergencia || '',
+  };
+
+  if (!cargador && campos.whatsapp) {
+    cargador = {
+      id: `carg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      organizacion_id: organizacionId,
+      ...campos,
+    };
+    store.cargadores.push(cargador);
     return cargador;
   }
 
-  if (cargador) return cargador;
+  if (cargador) {
+    cargador = { ...cargador, ...campos };
+    store.cargadores = store.cargadores.map((c) => (c.id === cargador.id ? cargador : c));
+    return cargador;
+  }
+
   return null;
+}
+
+function marcarBrazoApartadoMock(brazo, fila, cargador, usuarioId) {
+  const nombreSolo =
+    fila.nombre_completo?.trim() || fila.nombre?.trim() || cargador?.nombre_completo || null;
+  const dpi = normalizarCui(fila.dpi || fila.cui || '');
+  const notasBase = fila.notas?.trim() || '';
+  const notasDpi = !cargador && isValidCui(dpi) ? `DPI ${dpi}` : '';
+  const apartadoNotas = [notasBase, notasDpi].filter(Boolean).join(' · ') || null;
+  return {
+    ...brazo,
+    estado: 'reservado',
+    reserva_apartado: true,
+    bloqueado_hasta: null,
+    cargador_id: cargador?.id || null,
+    asignado_nombre: cargador ? null : nombreSolo,
+    apartado_notas: apartadoNotas,
+    vendedor_id: usuarioId || null,
+    mesa_id: null,
+  };
 }
 
 export function getResumenApartados(cortejoId, organizacionId) {
@@ -873,7 +914,62 @@ export function aplicarImportApartadosMock(cortejoId, organizacionId, filas, { u
   let ok = 0;
   let omitidos = 0;
 
+  const turnos = store.turnos.filter(
+    (t) => t.cortejo_id === cortejoId && t.organizacion_id === organizacionId
+  );
+  const brazosApartadosIds = new Set();
+
   filas.forEach((fila) => {
+    if (fila.modo === 'listado' || (!fila.brazo && fila.cantidad)) {
+      const turno = resolverTurnoEnLista(turnos, fila.turno);
+      if (!turno) {
+        resultados.push({
+          fila: fila.filaExcel,
+          ok: false,
+          mensaje: `No se encontró el turno "${fila.turno}"`,
+        });
+        omitidos += 1;
+        return;
+      }
+
+      const cargador = upsertCargadorParcial(organizacionId, fila);
+      const pool = store.brazos
+        .filter((b) => b.turno_id === turno.id)
+        .filter((b) => !brazosApartadosIds.has(b.id));
+      const elegibles = brazosElegiblesParaApartado(pool);
+      const cantidad = Number(fila.cantidad) || 0;
+
+      if (elegibles.length < cantidad) {
+        resultados.push({
+          fila: fila.filaExcel,
+          ok: false,
+          mensaje: `Turno ${turno.numero_turno}: solo hay ${elegibles.length} espacio(s) libre(s), se pidieron ${cantidad}`,
+        });
+        omitidos += 1;
+        return;
+      }
+
+      const asignados = elegibles.slice(0, cantidad);
+      let filaOk = 0;
+
+      asignados.forEach((brazo) => {
+        const actualizado = marcarBrazoApartadoMock(brazo, fila, cargador, usuarioId);
+        store.brazos = store.brazos.map((b) => (b.id === brazo.id ? actualizado : b));
+        brazosApartadosIds.add(brazo.id);
+        filaOk += 1;
+        ok += 1;
+      });
+
+      if (filaOk > 0) {
+        resultados.push({
+          fila: fila.filaExcel,
+          ok: true,
+          mensaje: `${fila.nombre_completo}: ${filaOk} espacio(s) apartado(s) en turno ${turno.numero_turno}`,
+        });
+      }
+      return;
+    }
+
     const numeroTurno = parseInt(fila.turno, 10);
     const numeroBrazo = parseInt(fila.brazo, 10);
     const lado = normalizarLado(fila.lado);
@@ -917,20 +1013,7 @@ export function aplicarImportApartadosMock(cortejoId, organizacionId, filas, { u
     }
 
     const cargador = upsertCargadorParcial(organizacionId, fila);
-    const nombreSolo = fila.nombre?.trim() || null;
-
-    const actualizado = {
-      ...brazo,
-      estado: 'reservado',
-      reserva_apartado: true,
-      bloqueado_hasta: null,
-      cargador_id: cargador?.id || null,
-      asignado_nombre: cargador ? null : nombreSolo,
-      apartado_notas: fila.notas?.trim() || null,
-      vendedor_id: usuarioId || null,
-      mesa_id: null,
-    };
-
+    const actualizado = marcarBrazoApartadoMock(brazo, fila, cargador, usuarioId);
     store.brazos = store.brazos.map((b) => (b.id === brazo.id ? actualizado : b));
     resultados.push({
       fila: fila.filaExcel,

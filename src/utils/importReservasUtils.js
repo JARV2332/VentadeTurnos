@@ -1,7 +1,20 @@
 /**
- * Plantilla e importación de apartados (Excel / CSV).
- * Columnas mínimas: turno, brazo, lado. El resto es opcional (como en taquilla).
+ * Importación de apartados (Excel / CSV).
+ *
+ * Formato listado (recomendado): DPI | APELLIDO | NOMBRE | CANTIDAD | TURNO
+ * Formato coordenadas (legacy): Turno | Brazo | Lado | …
  */
+
+import * as XLSX from 'xlsx';
+import { isValidCui, normalizarCui } from './cuiUtils';
+
+export const PLANTILLA_LISTADO_COLUMNAS = [
+  { key: 'dpi', label: 'DPI', obligatorio: true, ejemplo: '1234567890101' },
+  { key: 'apellido', label: 'Apellido', obligatorio: true, ejemplo: 'Pérez' },
+  { key: 'nombre', label: 'Nombre', obligatorio: true, ejemplo: 'Juan Carlos' },
+  { key: 'cantidad', label: 'Cantidad', obligatorio: true, ejemplo: '2' },
+  { key: 'turno', label: 'Turno', obligatorio: true, ejemplo: '7' },
+];
 
 export const PLANTILLA_COLUMNAS = [
   { key: 'turno', label: 'Turno', obligatorio: true, ejemplo: '7' },
@@ -16,10 +29,13 @@ export const PLANTILLA_COLUMNAS = [
 ];
 
 const HEADER_MAP = {
+  dpi: ['dpi', 'cui', 'identificacion', 'identificación', 'cedula', 'cédula'],
+  apellido: ['apellido', 'apellidos'],
+  nombre: ['nombre', 'nombres', 'nombre_cargador', 'nombre completo', 'cargador', 'asignado', 'persona'],
+  cantidad: ['cantidad', 'cant', 'qty', 'numero', 'número', 'num', 'espacios', 'brazos'],
   turno: ['turno', 'numero_turno', 'n_turno', '# turno'],
   brazo: ['brazo', 'numero_brazo', 'n_brazo', '# brazo', 'no brazo'],
   lado: ['lado', 'columna', 'izq/der'],
-  nombre: ['nombre', 'nombre_cargador', 'nombre completo', 'cargador', 'asignado', 'persona'],
   whatsapp: ['whatsapp', 'wa', 'telefono', 'teléfono', 'celular'],
   correo: ['correo', 'email', 'e-mail'],
   cui: ['cui', 'identificacion', 'identificación', 'dpi'],
@@ -61,26 +77,88 @@ function filaAVacio(cells) {
   return cells.every((c) => !String(c ?? '').trim());
 }
 
-export function parseFilasTabla(rows) {
-  if (!rows?.length) return { error: 'El archivo está vacío.', filas: [] };
+export function combinarNombreDevoto(apellido, nombre) {
+  const a = String(apellido || '').trim();
+  const n = String(nombre || '').trim();
+  if (a && n) return `${a} ${n}`;
+  return a || n || '';
+}
 
-  let headerIdx = 0;
-  let colMap = mapHeaders(rows[0].map((c) => String(c ?? '').trim()));
+export function parseNumeroTurnoImport(texto) {
+  const t = String(texto || '').trim();
+  if (/^\d+$/.test(t)) return Number(t);
+  const m = t.match(/turno\s*(\d+)/i);
+  if (m) return Number(m[1]);
+  return null;
+}
 
-  if (colMap.turno === undefined || colMap.brazo === undefined || colMap.lado === undefined) {
-    headerIdx = 1;
-    colMap = mapHeaders((rows[1] || []).map((c) => String(c ?? '').trim()));
+export function resolverTurnoEnLista(turnos, turnoTexto) {
+  const lista = Array.isArray(turnos) ? turnos : [];
+  const texto = String(turnoTexto || '').trim();
+  if (!texto) return null;
+
+  const num = parseNumeroTurnoImport(texto);
+  if (num !== null) {
+    const porNumero = lista.find((t) => t.numero_turno === num);
+    if (porNumero) return porNumero;
   }
 
-  if (colMap.turno === undefined || colMap.brazo === undefined || colMap.lado === undefined) {
-    return {
-      error:
-        'Faltan columnas obligatorias: Turno, Brazo y Lado. Descargue la plantilla y úsela como guía.',
-      filas: [],
-    };
+  const tgt = normHeader(texto);
+  const exacta = lista.find((t) => normHeader(t.etiqueta) === tgt);
+  if (exacta) return exacta;
+
+  return (
+    lista.find((t) => {
+      const e = normHeader(t.etiqueta);
+      return e.includes(tgt) || tgt.includes(e);
+    }) || null
+  );
+}
+
+export function ordenarBrazosParaApartado(brazos) {
+  const ladoOrd = { Izquierda: 0, Derecha: 1 };
+  return [...(brazos || [])].sort((a, b) => {
+    if (a.numero_brazo !== b.numero_brazo) return a.numero_brazo - b.numero_brazo;
+    return (ladoOrd[a.lado] ?? 0) - (ladoOrd[b.lado] ?? 0);
+  });
+}
+
+/** Brazos libres o apartados vacíos (sin devoto asignado). */
+export function brazosElegiblesParaApartado(brazos) {
+  return ordenarBrazosParaApartado(brazos).filter((b) => {
+    if (b.estado === 'vendido') return false;
+    if (b.estado === 'disponible') return true;
+    if (
+      b.estado === 'reservado' &&
+      b.reserva_apartado &&
+      !b.cargador_id &&
+      !b.asignado_nombre
+    ) {
+      return true;
+    }
+    return false;
+  });
+}
+
+function detectarFormato(colMap) {
+  const tieneListado =
+    colMap.dpi !== undefined &&
+    colMap.cantidad !== undefined &&
+    colMap.turno !== undefined &&
+    (colMap.apellido !== undefined || colMap.nombre !== undefined);
+  if (tieneListado) return 'listado';
+
+  if (colMap.turno !== undefined && colMap.brazo !== undefined && colMap.lado !== undefined) {
+    return 'coordenadas';
   }
 
+  return null;
+}
+
+function parseFilasListado(rows, headerIdx, colMap) {
   const filas = [];
+  const errores = [];
+
   for (let i = headerIdx + 1; i < rows.length; i += 1) {
     const cells = rows[i].map((c) => String(c ?? '').trim());
     if (filaAVacio(cells)) continue;
@@ -90,21 +168,125 @@ export function parseFilasTabla(rows) {
       return idx !== undefined ? cells[idx]?.trim() || '' : '';
     };
 
+    const dpi = normalizarCui(get('dpi') || get('cui'));
+    const apellido = get('apellido');
+    const nombre = get('nombre');
+    const nombreCompleto = combinarNombreDevoto(apellido, nombre);
+    const cantidad = parseInt(get('cantidad'), 10);
+    const turno = get('turno');
+
+    if (!isValidCui(dpi)) {
+      errores.push(`Fila ${i + 1}: DPI inválido (debe tener 13 dígitos).`);
+      continue;
+    }
+    if (!nombreCompleto) {
+      errores.push(`Fila ${i + 1}: falta apellido o nombre del devoto(a).`);
+      continue;
+    }
+    if (!cantidad || cantidad < 1) {
+      errores.push(`Fila ${i + 1}: cantidad inválida (mínimo 1).`);
+      continue;
+    }
+    if (!turno) {
+      errores.push(`Fila ${i + 1}: falta el turno.`);
+      continue;
+    }
+
     filas.push({
+      modo: 'listado',
       filaExcel: i + 1,
-      turno: get('turno'),
-      brazo: get('brazo'),
-      lado: get('lado'),
-      nombre: get('nombre'),
+      dpi,
+      cui: dpi,
+      apellido,
+      nombre,
+      nombre_completo: nombreCompleto,
+      cantidad,
+      turno,
       whatsapp: get('whatsapp'),
       correo: get('correo'),
-      cui: get('cui'),
       telefono_emergencia: get('telefono_emergencia'),
       notas: get('notas'),
     });
   }
 
-  return { filas, colMap };
+  return { filas, errores };
+}
+
+function parseFilasCoordenadas(rows, headerIdx, colMap) {
+  const filas = [];
+
+  for (let i = headerIdx + 1; i < rows.length; i += 1) {
+    const cells = rows[i].map((c) => String(c ?? '').trim());
+    if (filaAVacio(cells)) continue;
+
+    const get = (key) => {
+      const idx = colMap[key];
+      return idx !== undefined ? cells[idx]?.trim() || '' : '';
+    };
+
+    const nombreCompleto = get('nombre') || combinarNombreDevoto(get('apellido'), '');
+
+    filas.push({
+      modo: 'coordenadas',
+      filaExcel: i + 1,
+      turno: get('turno'),
+      brazo: get('brazo'),
+      lado: get('lado'),
+      nombre: nombreCompleto,
+      nombre_completo: nombreCompleto,
+      cui: normalizarCui(get('cui') || get('dpi')),
+      whatsapp: get('whatsapp'),
+      correo: get('correo'),
+      telefono_emergencia: get('telefono_emergencia'),
+      notas: get('notas'),
+    });
+  }
+
+  return { filas, errores: [] };
+}
+
+export function parseFilasTabla(rows) {
+  if (!rows?.length) return { error: 'El archivo está vacío.', filas: [], formato: null, errores: [] };
+
+  let headerIdx = 0;
+  let colMap = mapHeaders(rows[0].map((c) => String(c ?? '').trim()));
+  let formato = detectarFormato(colMap);
+
+  if (!formato) {
+    headerIdx = 1;
+    colMap = mapHeaders((rows[1] || []).map((c) => String(c ?? '').trim()));
+    formato = detectarFormato(colMap);
+  }
+
+  if (!formato) {
+    return {
+      error:
+        'No se reconoció el formato. Use columnas DPI, Apellido, Nombre, Cantidad, Turno — o Turno, Brazo, Lado.',
+      filas: [],
+      formato: null,
+      errores: [],
+    };
+  }
+
+  const parsed =
+    formato === 'listado'
+      ? parseFilasListado(rows, headerIdx, colMap)
+      : parseFilasCoordenadas(rows, headerIdx, colMap);
+
+  if (parsed.errores?.length) {
+    return {
+      error: parsed.errores.join(' '),
+      filas: parsed.filas,
+      formato,
+      errores: parsed.errores,
+    };
+  }
+
+  if (!parsed.filas.length) {
+    return { error: 'No se encontraron filas de datos válidas.', filas: [], formato, errores: [] };
+  }
+
+  return { filas: parsed.filas, formato, errores: [], error: null };
 }
 
 export function parseCSVText(text) {
@@ -119,13 +301,12 @@ export function parseCSVText(text) {
 export async function parseArchivoImport(file) {
   const name = file.name.toLowerCase();
 
-  if (name.endsWith('.csv')) {
+  if (name.endsWith('.csv') || name.endsWith('.txt')) {
     const text = await file.text();
     return parseCSVText(text);
   }
 
   if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
-    const XLSX = await import('xlsx');
     const buffer = await file.arrayBuffer();
     const wb = XLSX.read(buffer, { type: 'array' });
     const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -133,7 +314,14 @@ export async function parseArchivoImport(file) {
     return parseFilasTabla(rows);
   }
 
-  return { error: 'Formato no soportado. Use .xlsx o .csv', filas: [] };
+  return { error: 'Formato no soportado. Use .xlsx o .csv', filas: [], formato: null, errores: [] };
+}
+
+export function generarCSVPlantillaListado() {
+  const header = PLANTILLA_LISTADO_COLUMNAS.map((c) => c.label).join(',');
+  const ejemplo1 = PLANTILLA_LISTADO_COLUMNAS.map((c) => c.ejemplo).join(',');
+  const ejemplo2 = ['9876543210101', 'López', 'María', '1', '8'].join(',');
+  return `${header}\n${ejemplo1}\n${ejemplo2}`;
 }
 
 export function generarCSVPlantilla() {
@@ -143,25 +331,59 @@ export function generarCSVPlantilla() {
   return `${header}\n${ejemplo}\n${ejemplo2}`;
 }
 
+export function descargarPlantillaListado() {
+  const ws = XLSX.utils.aoa_to_sheet([
+    PLANTILLA_LISTADO_COLUMNAS.map((c) => c.label),
+    PLANTILLA_LISTADO_COLUMNAS.map((c) => c.ejemplo),
+    ['9876543210101', 'López', 'María', '1', '8'],
+    ['1234567890101', 'Pérez', 'Juan Carlos', '2', 'Turno 7'],
+  ]);
+  ws['!cols'] = [{ wch: 16 }, { wch: 18 }, { wch: 18 }, { wch: 10 }, { wch: 14 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Apartados');
+  XLSX.writeFile(wb, 'plantilla_apartados_listado.xlsx');
+}
+
 export function descargarPlantilla() {
+  const csv = generarCSVPlantillaListado();
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'plantilla_apartados_listado.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** @deprecated usar descargarPlantillaListado */
+export function descargarPlantillaExcel() {
+  descargarPlantillaListado();
+}
+
+export function descargarPlantillaCoordenadas() {
   const csv = generarCSVPlantilla();
   const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'plantilla_apartados_turnos.csv';
+  a.download = 'plantilla_apartados_coordenadas.csv';
   a.click();
   URL.revokeObjectURL(url);
 }
 
-/** Abre la plantilla CSV (Excel la abre sin problema) */
-export function descargarPlantillaExcel() {
-  descargarPlantilla();
-}
-
 export function etiquetaAsignado(brazo, cargador) {
   if (cargador?.nombre_completo) return cargador.nombre_completo;
+  if (brazo?.cargador?.nombre_completo) return brazo.cargador.nombre_completo;
   if (brazo?.asignado_nombre) return brazo.asignado_nombre;
   if (brazo?.reserva_apartado) return 'Apartado';
   return null;
+}
+
+export function resumenFilasImport(filas, formato) {
+  if (formato === 'listado') {
+    const personas = filas.length;
+    const espacios = filas.reduce((s, f) => s + (Number(f.cantidad) || 0), 0);
+    return { personas, espacios };
+  }
+  return { personas: filas.length, espacios: filas.length };
 }

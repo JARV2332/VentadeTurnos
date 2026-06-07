@@ -11,7 +11,14 @@ const ESTADO_CLASS = {
 
 export default function EspacioBrazo({ brazo, selected, onClick, readOnly = false }) {
   const vendido = brazo.estado === 'vendido';
-  const asignado = etiquetaAsignado(brazo, null);
+  const asignado = etiquetaAsignado(brazo, brazo.cargador);
+  const esApartado = brazo.reserva_apartado && brazo.estado === 'reservado';
+  const displayNombre =
+    asignado && asignado !== 'Apartado'
+      ? asignado.split(' ').slice(0, 2).join(' ')
+      : esApartado
+        ? 'Apartado'
+        : null;
   const titleParts = [
     `Brazo ${brazo.numero_brazo} ${brazo.lado}`,
     brazo.estado,
@@ -32,8 +39,10 @@ export default function EspacioBrazo({ brazo, selected, onClick, readOnly = fals
       title={titleParts.join(' · ')}
     >
       <span className="espacio-brazo__num">{brazo.numero_brazo}</span>
-      {asignado && brazo.estado !== 'disponible' && (
-        <span className="espacio-brazo__asignado">{asignado.split(' ')[0]}</span>
+      {displayNombre && brazo.estado !== 'disponible' && (
+        <span className="espacio-brazo__asignado" title={asignado || undefined}>
+          {displayNombre}
+        </span>
       )}
     </button>
   );

@@ -7,7 +7,13 @@ import {
   construirTurnosConfig,
   crearBrazosParaTurno,
 } from '../utils/turnoUtils';
-import { normalizarLado } from '../utils/importReservasUtils';
+import {
+  normalizarLado,
+  brazosElegiblesParaApartado,
+  combinarNombreDevoto,
+  resolverTurnoEnLista,
+} from '../utils/importReservasUtils';
+import { isValidCui, normalizarCui } from '../utils/cuiUtils';
 import { aplicarAsignacionBrazos } from '../utils/aplicarAsignacionBrazos';
 import { PERMISOS_ADMIN_COMPLETO } from '../config/permisos';
 
@@ -357,7 +363,13 @@ export async function getBrazosByOrg(organizacionId) {
 export async function getTurnosAgrupados(cortejoId, organizacionId) {
   const turnos = await getTurnosByCortejo(cortejoId);
   const brazos = await getBrazosByCortejo(cortejoId, organizacionId);
-  return agruparTurnosConBrazos(turnos, brazos);
+  const cargadores = await getCargadoresByOrg(organizacionId);
+  const cargadoresPorId = Object.fromEntries(cargadores.map((c) => [c.id, c]));
+  const brazosEnriquecidos = brazos.map((b) => ({
+    ...b,
+    cargador: cargadoresPorId[b.cargador_id] || null,
+  }));
+  return agruparTurnosConBrazos(turnos, brazosEnriquecidos);
 }
 
 export async function getMesasByOrg(organizacionId) {
@@ -387,8 +399,6 @@ export async function getCargadoresByOrg(organizacionId) {
   if (error) throw error;
   return data || [];
 }
-
-import { normalizarCui, isValidCui } from '../utils/cuiUtils';
 
 export async function buscarCargadorPorCui(organizacionId, cui) {
   const limpio = normalizarCui(cui);
@@ -1162,35 +1172,52 @@ export async function getResumenApartados(cortejoId, organizacionId) {
   });
 }
 
-async function upsertCargadorParcialImport(organizacionId, datos) {
-  const cui = String(datos.cui || '').replace(/\D/g, '');
-  const whatsapp = datos.whatsapp?.replace(/\D/g, '');
+function whatsappPlaceholderDesdeCui(cui) {
+  const d = normalizarCui(cui);
+  if (!isValidCui(d)) return '';
+  return `502${d.slice(-8)}`;
+}
 
-  let cargador = cui.length === 13 ? await buscarCargadorPorCui(organizacionId, cui) : null;
-  if (!cargador && whatsapp && whatsapp.length >= 11) {
+async function upsertCargadorParcialImport(organizacionId, datos) {
+  const cui = normalizarCui(datos.cui || datos.dpi || '');
+  const whatsappRaw = datos.whatsapp?.replace(/\D/g, '') || '';
+  const whatsapp =
+    whatsappRaw.length >= 11 ? whatsappRaw : whatsappPlaceholderDesdeCui(cui);
+  const nombreCompleto =
+    datos.nombre_completo?.trim() ||
+    combinarNombreDevoto(datos.apellido, datos.nombre) ||
+    datos.nombre?.trim() ||
+    'Sin nombre';
+
+  let cargador = isValidCui(cui) ? await buscarCargadorPorCui(organizacionId, cui) : null;
+  if (!cargador && whatsapp.length >= 11) {
     cargador = await buscarCargadorPorWhatsapp(organizacionId, whatsapp);
   }
 
-  if (whatsapp && whatsapp.length >= 11) {
-    const campos = {
-      nombre_completo: datos.nombre?.trim() || cargador?.nombre_completo || 'Sin nombre',
-      whatsapp,
-      correo: datos.correo?.trim() || cargador?.correo || '',
-      cui_o_identificacion: cui || cargador?.cui_o_identificacion || '',
-      telefono_emergencia:
-        datos.telefono_emergencia?.trim() || cargador?.telefono_emergencia || '',
-    };
+  if (!isValidCui(cui) && !whatsapp) return null;
 
-    if (!cargador) {
-      const { data, error } = await supabase
-        .from('cargadores_organizacion')
-        .insert({ organizacion_id: organizacionId, ...campos })
-        .select()
-        .single();
-      if (error) return null;
-      return data;
+  const campos = {
+    nombre_completo: nombreCompleto,
+    cui_o_identificacion: cui || cargador?.cui_o_identificacion || '',
+    whatsapp: whatsapp || cargador?.whatsapp || '',
+    correo: datos.correo?.trim() || cargador?.correo || '',
+    telefono_emergencia:
+      datos.telefono_emergencia?.trim() || cargador?.telefono_emergencia || '',
+  };
+
+  if (!cargador && campos.whatsapp) {
+    const { data, error } = await supabase
+      .from('cargadores_organizacion')
+      .insert({ organizacion_id: organizacionId, ...campos })
+      .select()
+      .single();
+    if (!error) return data;
+    if (isValidCui(cui)) {
+      cargador = await buscarCargadorPorCui(organizacionId, cui);
     }
+  }
 
+  if (cargador) {
     const { data, error } = await supabase
       .from('cargadores_organizacion')
       .update(campos)
@@ -1201,7 +1228,32 @@ async function upsertCargadorParcialImport(organizacionId, datos) {
     return data;
   }
 
-  return cargador || null;
+  return null;
+}
+
+async function marcarBrazoApartado(brazo, fila, cargador, usuarioId) {
+  const nombreSolo =
+    fila.nombre_completo?.trim() || fila.nombre?.trim() || cargador?.nombre_completo || null;
+  const dpi = normalizarCui(fila.dpi || fila.cui || '');
+  const notasBase = fila.notas?.trim() || '';
+  const notasDpi = !cargador && isValidCui(dpi) ? `DPI ${dpi}` : '';
+  const apartadoNotas = [notasBase, notasDpi].filter(Boolean).join(' · ') || null;
+
+  const { error } = await supabase
+    .from('brazos')
+    .update({
+      estado: 'reservado',
+      reserva_apartado: true,
+      bloqueado_hasta: null,
+      cargador_id: cargador?.id || null,
+      asignado_nombre: cargador ? null : nombreSolo,
+      apartado_notas: apartadoNotas,
+      vendedor_id: usuarioId || null,
+      mesa_id: null,
+    })
+    .eq('id', brazo.id);
+
+  return error;
 }
 
 export async function aplicarImportApartados(cortejoId, organizacionId, filas, { usuarioId } = {}) {
@@ -1209,7 +1261,95 @@ export async function aplicarImportApartados(cortejoId, organizacionId, filas, {
   let ok = 0;
   let omitidos = 0;
 
+  const { data: turnosData } = await supabase
+    .from('turnos')
+    .select('*')
+    .eq('cortejo_id', cortejoId)
+    .eq('organizacion_id', organizacionId);
+  const turnos = turnosData || [];
+
+  const turnoIds = turnos.map((t) => t.id);
+  let brazosPorTurno = {};
+
+  if (turnoIds.length) {
+    const todosBrazos = await getBrazosByCortejo(cortejoId, organizacionId);
+    brazosPorTurno = todosBrazos.reduce((acc, b) => {
+      if (!acc[b.turno_id]) acc[b.turno_id] = [];
+      acc[b.turno_id].push(b);
+      return acc;
+    }, {});
+  }
+
+  const brazosApartadosIds = new Set();
+
   for (const fila of filas) {
+    if (fila.modo === 'listado' || (!fila.brazo && fila.cantidad)) {
+      const turno = resolverTurnoEnLista(turnos, fila.turno);
+      if (!turno) {
+        resultados.push({
+          fila: fila.filaExcel,
+          ok: false,
+          mensaje: `No se encontró el turno "${fila.turno}"`,
+        });
+        omitidos += 1;
+        continue;
+      }
+
+      const cargador = await upsertCargadorParcialImport(organizacionId, fila);
+      const pool = (brazosPorTurno[turno.id] || []).filter((b) => !brazosApartadosIds.has(b.id));
+      const elegibles = brazosElegiblesParaApartado(pool);
+      const cantidad = Number(fila.cantidad) || 0;
+
+      if (elegibles.length < cantidad) {
+        resultados.push({
+          fila: fila.filaExcel,
+          ok: false,
+          mensaje: `Turno ${turno.numero_turno}: solo hay ${elegibles.length} espacio(s) libre(s), se pidieron ${cantidad}`,
+        });
+        omitidos += 1;
+        continue;
+      }
+
+      const asignados = elegibles.slice(0, cantidad);
+      let filaOk = 0;
+
+      for (const brazo of asignados) {
+        const error = await marcarBrazoApartado(brazo, fila, cargador, usuarioId);
+        if (error) {
+          resultados.push({
+            fila: fila.filaExcel,
+            ok: false,
+            mensaje: `Error en brazo ${brazo.numero_brazo} ${brazo.lado}: ${error.message}`,
+          });
+          omitidos += 1;
+          continue;
+        }
+
+        brazosApartadosIds.add(brazo.id);
+        const idx = brazosPorTurno[turno.id].findIndex((b) => b.id === brazo.id);
+        if (idx >= 0) {
+          brazosPorTurno[turno.id][idx] = {
+            ...brazosPorTurno[turno.id][idx],
+            estado: 'reservado',
+            reserva_apartado: true,
+            cargador_id: cargador?.id || null,
+            asignado_nombre: cargador ? null : fila.nombre_completo,
+          };
+        }
+        filaOk += 1;
+        ok += 1;
+      }
+
+      if (filaOk > 0) {
+        resultados.push({
+          fila: fila.filaExcel,
+          ok: true,
+          mensaje: `${fila.nombre_completo}: ${filaOk} espacio(s) apartado(s) en turno ${turno.numero_turno}`,
+        });
+      }
+      continue;
+    }
+
     const numeroTurno = parseInt(fila.turno, 10);
     const numeroBrazo = parseInt(fila.brazo, 10);
     const lado = normalizarLado(fila.lado);
@@ -1224,13 +1364,7 @@ export async function aplicarImportApartados(cortejoId, organizacionId, filas, {
       continue;
     }
 
-    const { data: turno } = await supabase
-      .from('turnos')
-      .select('id')
-      .eq('cortejo_id', cortejoId)
-      .eq('numero_turno', numeroTurno)
-      .maybeSingle();
-
+    const turno = turnos.find((t) => t.numero_turno === numeroTurno);
     if (!turno) {
       resultados.push({
         fila: fila.filaExcel,
@@ -1241,13 +1375,9 @@ export async function aplicarImportApartados(cortejoId, organizacionId, filas, {
       continue;
     }
 
-    const { data: brazo } = await supabase
-      .from('brazos')
-      .select('*')
-      .eq('turno_id', turno.id)
-      .eq('numero_brazo', numeroBrazo)
-      .eq('lado', lado)
-      .maybeSingle();
+    const brazo = (brazosPorTurno[turno.id] || []).find(
+      (b) => b.numero_brazo === numeroBrazo && b.lado === lado
+    );
 
     if (!brazo) {
       resultados.push({
@@ -1270,21 +1400,7 @@ export async function aplicarImportApartados(cortejoId, organizacionId, filas, {
     }
 
     const cargador = await upsertCargadorParcialImport(organizacionId, fila);
-    const nombreSolo = fila.nombre?.trim() || null;
-
-    const { error } = await supabase
-      .from('brazos')
-      .update({
-        estado: 'reservado',
-        reserva_apartado: true,
-        bloqueado_hasta: null,
-        cargador_id: cargador?.id || null,
-        asignado_nombre: cargador ? null : nombreSolo,
-        apartado_notas: fila.notas?.trim() || null,
-        vendedor_id: usuarioId || null,
-        mesa_id: null,
-      })
-      .eq('id', brazo.id);
+    const error = await marcarBrazoApartado(brazo, fila, cargador, usuarioId);
 
     if (error) {
       resultados.push({
@@ -1296,6 +1412,7 @@ export async function aplicarImportApartados(cortejoId, organizacionId, filas, {
       continue;
     }
 
+    brazosApartadosIds.add(brazo.id);
     resultados.push({
       fila: fila.filaExcel,
       ok: true,
