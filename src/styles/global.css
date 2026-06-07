@@ -2114,14 +2114,143 @@ body {
 }
 
 .caja-filters label { font-size: 0.75rem; font-weight: 500; color: var(--text-muted); }
-.caja-filters select {
+.caja-filters select,
+.caja-filters input[type='date'] {
   display: block;
   margin-top: 0.25rem;
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--border);
   border-radius: 8px;
   font-family: inherit;
-  min-width: 180px;
+  min-width: 160px;
+  font-size: 0.85rem;
+}
+
+.caja-filters--reporte {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+}
+
+.caja-filters__clear {
+  align-self: flex-end;
+  margin-bottom: 0.15rem;
+}
+
+.caja-reporte__head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.caja-reporte__export {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.caja-reporte__charts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.caja-reporte__kpis {
+  margin-bottom: 1.25rem;
+}
+
+.caja-reporte__tabla-dias {
+  margin-top: 0.5rem;
+}
+
+.caja-chart__lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.caja-chart__fila {
+  display: grid;
+  grid-template-columns: minmax(80px, 120px) 1fr minmax(100px, 130px);
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.caja-chart__label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.caja-chart__track {
+  height: 12px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.caja-chart__bar {
+  height: 100%;
+  min-width: 4px;
+  background: linear-gradient(90deg, #3b82f6, #6366f1);
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}
+
+.caja-chart__meta {
+  text-align: right;
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+
+.caja-chart__meta strong {
+  display: block;
+}
+
+.caja-chart__meta small {
+  color: var(--text-muted);
+}
+
+.caja-chart__empty {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.caja-pago-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.caja-pago-bar__head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  margin-bottom: 0.25rem;
+}
+
+.caja-pago-bar__track {
+  height: 10px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.caja-pago-bar__fill {
+  height: 100%;
+  border-radius: 999px;
+  min-width: 2px;
+}
+
+.metrics-grid--4 {
+  grid-template-columns: repeat(4, 1fr);
 }
 
 .caja-filters__total {
@@ -4953,8 +5082,22 @@ body.taquilla-cobro-activo {
   }
 
   .metrics-grid,
-  .metrics-grid--3 {
+  .metrics-grid--3,
+  .metrics-grid--4 {
     grid-template-columns: 1fr;
+  }
+
+  .caja-reporte__charts {
+    grid-template-columns: 1fr;
+  }
+
+  .caja-chart__fila {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+  }
+
+  .caja-chart__meta {
+    text-align: left;
   }
 
   .form-row { grid-template-columns: 1fr; }

@@ -906,8 +906,10 @@ export async function getFinanzasByOrg(organizacionId) {
 
   const { data: turnos } = await supabase
     .from('turnos')
-    .select('id, precio, cortejo_id')
+    .select('id, precio, cortejo_id, numero_turno, tipo_turno, etiqueta')
     .eq('organizacion_id', organizacionId);
+
+  const turnosMap = Object.fromEntries((turnos || []).map((t) => [t.id, t]));
 
   const presupuestoTotal = (turnos || []).reduce((s, t) => {
     const delTurno = (brazos || []).filter((b) => b.turno_id === t.id);
@@ -918,6 +920,7 @@ export async function getFinanzasByOrg(organizacionId) {
 
   const ventas = (brazos || []).map((b) => {
     const compra = b.compra_id ? comprasMap[b.compra_id] : null;
+    const turno = turnosMap[b.turno_id];
     const operador_nombre =
       b.operador_nombre?.trim() ||
       compra?.operador_nombre?.trim() ||
@@ -929,6 +932,9 @@ export async function getFinanzasByOrg(organizacionId) {
       vendedor_id: b.vendedor_id || compra?.vendedor_id || null,
       mesa_id: b.mesa_id,
       operador_nombre,
+      tipo_turno: turno?.tipo_turno || null,
+      turno_etiqueta: turno?.etiqueta || turno?.tipo_turno || '',
+      numero_turno: b.numero_turno ?? turno?.numero_turno,
     };
   });
 

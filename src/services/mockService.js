@@ -765,13 +765,19 @@ export function getFinanzasByOrg(organizacionId) {
     if (porMetodo[metodo] !== undefined) porMetodo[metodo] += Number(b.precio_pagado || 0);
   });
 
-  const ventasEnriquecidas = vendidos.map((b) => ({
-    ...b,
-    operador_nombre:
-      b.operador_nombre?.trim() ||
-      (b.vendedor_id ? mapaUsuarios[b.vendedor_id] : '') ||
-      '',
-  }));
+  const ventasEnriquecidas = vendidos.map((b) => {
+    const turno = turnos.find((t) => t.id === b.turno_id);
+    return {
+      ...b,
+      operador_nombre:
+        b.operador_nombre?.trim() ||
+        (b.vendedor_id ? mapaUsuarios[b.vendedor_id] : '') ||
+        '',
+      tipo_turno: turno?.tipo_turno || null,
+      turno_etiqueta: turno?.etiqueta || turno?.tipo_turno || '',
+      numero_turno: b.numero_turno ?? turno?.numero_turno,
+    };
+  });
 
   return {
     totalBrazos: brazos.length,
