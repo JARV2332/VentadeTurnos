@@ -229,6 +229,14 @@ export function exportCajaExcel({ ventas, resumen, filtros = {}, orgNombre = '' 
   XLSX.writeFile(wb, `reporte_caja_${stamp}.xlsx`);
 }
 
+function escapeHtml(text) {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 function barChartHtml(items, maxTotal) {
   if (!items.length) return '<p>Sin datos para este período.</p>';
   const max = maxTotal || Math.max(...items.map((i) => i.total), 1);
@@ -236,7 +244,7 @@ function barChartHtml(items, maxTotal) {
     .map(
       (item) => `
     <div class="caja-print-bar">
-      <span class="caja-print-bar__label">${item.label}</span>
+      <span class="caja-print-bar__label">${escapeHtml(item.label)}</span>
       <div class="caja-print-bar__track">
         <div class="caja-print-bar__fill" style="width:${Math.round((item.total / max) * 100)}%"></div>
       </div>
@@ -246,25 +254,35 @@ function barChartHtml(items, maxTotal) {
     .join('');
 }
 
-export function imprimirReporteCaja({ ventas, resumen, filtros = {}, orgNombre = '' }) {
+function buildReporteCajaHtml({ ventas, resumen, filtros = {}, orgNombre = '' }) {
   const generado = new Intl.DateTimeFormat('es-GT', {
     dateStyle: 'long',
     timeStyle: 'short',
   }).format(new Date());
 
-  const maxV = Math.max(...resumen.porVendedor.map((x) => x.total), 1);
-  const maxT = Math.max(...resumen.porTipoTurno.map((x) => x.total), 1);
-  const maxD = Math.max(...resumen.porDia.map((x) => x.total), 1);
+  const maxV = Math.max(...(resumen.porVendedor || []).map((x) => x.total), 1);
+  const maxT = Math.max(...(resumen.porTipoTurno || []).map((x) => x.total), 1);
+  const maxD = Math.max(...(resumen.porDia || []).map((x) => x.total), 1);
+  const org = escapeHtml(orgNombre || 'Organización');
+  const filtrosLinea = escapeHtml(filtrosTexto(filtros));
 
-  const html = `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="utf-8"/>
-  <title>Reporte Caja — ${orgNombre || 'VentadeTurnos'}</title>
+  <title>Reporte Caja — ${org}</title>
   <style>
     body { font-family: 'Segoe UI', system-ui, sans-serif; color: #0f172a; margin: 24px; font-size: 12px; }
     h1 { font-size: 1.35rem; margin: 0 0 4px; }
     .meta { color: #64748b; margin-bottom: 20px; line-height: 1.5; }
+    .toolbar {
+      padding: 12px 14px; margin-bottom: 20px; background: #eff6ff;
+      border: 1px solid #bfdbfe; border-radius: 8px; line-height: 1.45;
+    }
+    .toolbar button {
+      margin-top: 8px; padding: 8px 14px; border: none; border-radius: 6px;
+      background: #2563eb; color: #fff; font-weight: 600; cursor: pointer;
+    }
     .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 24px; }
     .kpi { border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; background: #f8fafc; }
     .kpi span { display: block; font-size: 10px; text-transform: uppercase; color: #64748b; }
@@ -280,15 +298,24 @@ export function imprimirReporteCaja({ ventas, resumen, filtros = {}, orgNombre =
     table { width: 100%; border-collapse: collapse; font-size: 10px; }
     th, td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; }
     th { background: #f1f5f9; font-size: 9px; text-transform: uppercase; }
-    @media print { body { margin: 12px; } }
+    @media print {
+      body { margin: 12px; }
+      .toolbar { display: none !important; }
+    }
   </style>
 </head>
 <body>
+  <div class="toolbar">
+    <strong>Reporte listo</strong><br/>
+    Para guardar como PDF: pulse el botón o use <strong>Ctrl+P</strong> → Destino: <em>Guardar como PDF</em> → Guardar.
+    <br/>
+    <button type="button" onclick="window.print()">Imprimir / Guardar PDF</button>
+  </div>
   <h1>Reporte de ventas — Caja y Finanzas</h1>
   <p class="meta">
-    <strong>${orgNombre || 'Organización'}</strong><br/>
-    ${filtrosTexto(filtros)}<br/>
-    Generado: ${generado}
+    <strong>${org}</strong><br/>
+    ${filtrosLinea}<br/>
+    Generado: ${escapeHtml(generado)}
   </p>
   <div class="kpis">
     <div class="kpi"><span>Ventas</span><strong>${resumen.totalVentas}</strong></div>
@@ -310,12 +337,12 @@ export function imprimirReporteCaja({ ventas, resumen, filtros = {}, orgNombre =
           .slice(0, 500)
           .map(
             (v) => `<tr>
-          <td>${formatFechaReporte(fechaVentaKey(v))}</td>
-          <td>#${v.numero_turno ?? '—'}</td>
-          <td>${labelTipoTurno(v.tipo_turno)}</td>
-          <td>${v.codigo_boleta_qr || '—'}</td>
-          <td>${v.operador_nombre || '—'}</td>
-          <td>${labelMetodoPago(v.metodo_pago)}</td>
+          <td>${escapeHtml(formatFechaReporte(fechaVentaKey(v)))}</td>
+          <td>#${escapeHtml(v.numero_turno ?? '—')}</td>
+          <td>${escapeHtml(labelTipoTurno(v.tipo_turno))}</td>
+          <td>${escapeHtml(v.codigo_boleta_qr || '—')}</td>
+          <td>${escapeHtml(v.operador_nombre || '—')}</td>
+          <td>${escapeHtml(labelMetodoPago(v.metodo_pago))}</td>
           <td>${formatQ(v.precio_pagado)}</td>
         </tr>`
           )
@@ -324,15 +351,56 @@ export function imprimirReporteCaja({ ventas, resumen, filtros = {}, orgNombre =
     </table>
     ${ventas.length > 500 ? `<p><em>… y ${ventas.length - 500} filas más (exporte Excel para el listado completo).</em></p>` : ''}
   </div>
-  <script>window.onload=function(){window.print();}</script>
+  <script>
+    window.addEventListener('load', function () {
+      setTimeout(function () { window.print(); }, 450);
+    });
+  </script>
 </body>
 </html>`;
+}
 
-  const w = window.open('', '_blank', 'noopener,noreferrer');
-  if (!w) {
-    alert('Permita ventanas emergentes para exportar el PDF.');
+function imprimirEnIframe(html) {
+  let iframe = document.getElementById('caja-reporte-print-frame');
+  if (!iframe) {
+    iframe = document.createElement('iframe');
+    iframe.id = 'caja-reporte-print-frame';
+    iframe.title = 'Reporte caja';
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.style.cssText =
+      'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+    document.body.appendChild(iframe);
+  }
+
+  iframe.srcdoc = html;
+
+  const imprimir = () => {
+    try {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } catch (err) {
+      console.warn('Print iframe:', err);
+    }
+  };
+
+  iframe.onload = () => {
+    setTimeout(imprimir, 350);
+  };
+}
+
+export function imprimirReporteCaja({ ventas, resumen, filtros = {}, orgNombre = '' }) {
+  const html = buildReporteCajaHtml({ ventas, resumen, filtros, orgNombre });
+  const stamp = new Date().toISOString().slice(0, 10);
+
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+
+  const ventana = window.open(url, '_blank');
+  if (ventana) {
+    setTimeout(() => URL.revokeObjectURL(url), 120_000);
     return;
   }
-  w.document.write(html);
-  w.document.close();
+
+  URL.revokeObjectURL(url);
+  imprimirEnIframe(html);
 }

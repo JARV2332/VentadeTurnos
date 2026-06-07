@@ -3817,6 +3817,36 @@ body {
   margin: 1rem 0;
 }
 
+.modal-edit-turno {
+  background: white;
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  max-width: 480px;
+  width: 100%;
+  max-height: min(90vh, 640px);
+  overflow-y: auto;
+}
+
+.modal-edit-turno__titulo {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+}
+
+.modal-edit-turno__form {
+  margin-top: 1rem;
+}
+
+.modal-edit-turno__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.turno-cartulina__edit {
+  flex-shrink: 0;
+}
+
 .entrega-btn { margin-top: 1rem; }
 
 .entrega-scanner-off {

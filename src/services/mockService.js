@@ -198,6 +198,23 @@ export function getTurnosByCortejo(cortejoId) {
   return store.turnos.filter((t) => t.cortejo_id === cortejoId);
 }
 
+export function updateTurnoMock(organizacionId, turnoId, datos) {
+  const idx = store.turnos.findIndex(
+    (t) => t.id === turnoId && t.organizacion_id === organizacionId
+  );
+  if (idx === -1) return { error: 'Turno no encontrado.' };
+
+  const actualizado = {
+    ...store.turnos[idx],
+    etiqueta: datos.etiqueta?.trim() || null,
+    son: datos.son?.trim() || null,
+    alabado: datos.alabado?.trim() || null,
+  };
+  store.turnos[idx] = actualizado;
+  emit('turno:actualizado', { turno: actualizado });
+  return { data: actualizado };
+}
+
 export function getTurnosAgrupados(cortejoId, organizacionId) {
   const turnos = getTurnosByCortejo(cortejoId);
   const brazos = getBrazosByOrg(organizacionId).filter((b) =>

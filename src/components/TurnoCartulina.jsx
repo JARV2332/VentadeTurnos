@@ -56,6 +56,7 @@ export function TurnoCartulina({
   brazosDestacadosIds,
   onClickBrazo,
   readOnly = false,
+  onEdit,
 }) {
   const idsEnCarrito = Array.isArray(selectedBrazoIds) ? selectedBrazoIds : [];
   const idsDestacados = Array.isArray(brazosDestacadosIds) ? brazosDestacadosIds : [];
@@ -79,6 +80,15 @@ export function TurnoCartulina({
         <div className="turno-cartulina__meta">
           <StatusBadge status={turno.tipo_turno} />
           <span className="turno-cartulina__precio">{formatQ(turno.precio)}</span>
+          {onEdit && (
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm turno-cartulina__edit"
+              onClick={() => onEdit(turno)}
+            >
+              Editar
+            </button>
+          )}
         </div>
       </header>
 

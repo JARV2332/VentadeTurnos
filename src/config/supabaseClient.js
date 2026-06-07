@@ -47,6 +47,16 @@ function getBrazosHub(organizacionId) {
   const listeners = new Set();
   const channel = supabase.channel(`brazos:org:${organizacionId}`);
 
+  const notifyListeners = (payload) => {
+    listeners.forEach((fn) => {
+      try {
+        fn(payload);
+      } catch (e) {
+        console.error('subscribeBrazos listener:', e);
+      }
+    });
+  };
+
   channel
     .on(
       'postgres_changes',
@@ -56,15 +66,17 @@ function getBrazosHub(organizacionId) {
         table: 'brazos',
         filter: `organizacion_id=eq.${organizacionId}`,
       },
-      (payload) => {
-        listeners.forEach((fn) => {
-          try {
-            fn(payload);
-          } catch (e) {
-            console.error('subscribeBrazos listener:', e);
-          }
-        });
-      }
+      notifyListeners
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'turnos',
+        filter: `organizacion_id=eq.${organizacionId}`,
+      },
+      notifyListeners
     )
     .subscribe();
 

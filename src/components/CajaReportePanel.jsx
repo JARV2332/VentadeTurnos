@@ -83,8 +83,8 @@ export default function CajaReportePanel({
         <div>
           <h3 className="panel__title">Análisis y reportes</h3>
           <p className="text-muted config-hint">
-            Filtre arriba por día, vendedor, tipo de turno o mesa. Exporte a Excel (datos
-            completos) o PDF (resumen con gráficas para imprimir o guardar).
+            Filtre arriba por día, vendedor, tipo de turno o mesa. Excel descarga directo; PDF abre
+            el reporte y el diálogo de impresión (elija <strong>Guardar como PDF</strong>).
           </p>
         </div>
         <div className="caja-reporte__export">
@@ -92,7 +92,7 @@ export default function CajaReportePanel({
             Exportar Excel
           </button>
           <button type="button" className="btn btn--primary" onClick={handlePdf}>
-            Exportar PDF
+            Imprimir / Guardar PDF
           </button>
         </div>
       </div>

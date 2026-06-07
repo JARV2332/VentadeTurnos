@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { TurnoCartulina } from '../components/TurnoCartulina';
+import EditTurnoModal from '../components/EditTurnoModal';
 import { useAuth } from '../context/AuthContext';
 import {
   generarProcesion,
@@ -12,6 +13,7 @@ import {
   activarProcesion,
   eliminarProcesion,
   duplicarProcesion,
+  updateTurno,
 } from '../services/dataService';
 import StatusBadge from '../components/StatusBadge';
 import {
@@ -100,6 +102,8 @@ export default function ConfigSaaS() {
   const [excelImport, setExcelImport] = useState(null);
   const [generando, setGenerando] = useState(false);
   const [duplicandoId, setDuplicandoId] = useState(null);
+  const [turnoEditando, setTurnoEditando] = useState(null);
+  const [guardandoTurno, setGuardandoTurno] = useState(false);
 
   const turnosPlanExcel = useMemo(() => {
     if (modoCreacion !== 'excel' || !excelImport?.bloques?.length) return [];
@@ -488,6 +492,24 @@ export default function ConfigSaaS() {
   const procesionVer = procesiones.find((p) => p.id === verCortejoId);
   const ultimoTurno = config.totalTurnos;
 
+  const handleGuardarTurno = async (datos) => {
+    if (!turnoEditando || !organizacionId) return;
+    setError('');
+    setGuardandoTurno(true);
+    try {
+      const res = await updateTurno(organizacionId, turnoEditando.id, datos);
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      setTurnoEditando(null);
+      setOkMsg(`Turno #${turnoEditando.numero_turno} actualizado.`);
+      await refreshLista();
+    } finally {
+      setGuardandoTurno(false);
+    }
+  };
+
   return (
     <Layout title="Configuración" subtitle="Alta de procesión y estructura de turnos">
       {okMsg && (
@@ -529,7 +551,8 @@ export default function ConfigSaaS() {
           <div className="procesion-detalle">
             <h4>Turnos de: {procesionVer.nombre_evento}</h4>
             <p className="text-muted config-hint">
-              Orden del cortejo: turno 1 = salida del templo · último = entrada.
+              Orden del cortejo: turno 1 = salida del templo · último = entrada. Pulse{' '}
+              <strong>Editar</strong> en un turno para cambiar nombre, son o alabado.
             </p>
             <div className="turnos-lista turnos-lista--compact">
               {procesionVer.turnos.map((turno) => (
@@ -539,12 +562,20 @@ export default function ConfigSaaS() {
                   selectedBrazo={null}
                   onClickBrazo={() => {}}
                   readOnly
+                  onEdit={setTurnoEditando}
                 />
               ))}
             </div>
           </div>
         )}
       </section>
+
+      <EditTurnoModal
+        turno={turnoEditando}
+        guardando={guardandoTurno}
+        onGuardar={handleGuardarTurno}
+        onCerrar={() => !guardandoTurno && setTurnoEditando(null)}
+      />
 
       <div className="config-grid config-grid--wide">
         <form className="panel config-form" onSubmit={handleGenerar} noValidate>

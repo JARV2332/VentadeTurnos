@@ -448,6 +448,27 @@ export async function getTurnoById(turnoId) {
   return data;
 }
 
+export async function updateTurno(organizacionId, turnoId, datos) {
+  if (!turnoId) return { error: 'Turno no válido.' };
+
+  const payload = {
+    etiqueta: datos.etiqueta?.trim() || null,
+    son: datos.son?.trim() || null,
+    alabado: datos.alabado?.trim() || null,
+  };
+
+  const { data, error } = await supabase
+    .from('turnos')
+    .update(payload)
+    .eq('id', turnoId)
+    .eq('organizacion_id', organizacionId)
+    .select()
+    .single();
+
+  if (error) return err(error);
+  return { data };
+}
+
 export async function getTurnosByCortejo(cortejoId) {
   const { data, error } = await supabase
     .from('turnos')
