@@ -18,6 +18,7 @@ import { isValidCui, normalizarCui } from '../utils/cuiUtils';
 import { aplicarAsignacionBrazos } from '../utils/aplicarAsignacionBrazos';
 import { RESET_BRAZO_VENTA, normalizarCodigoBoleta } from '../utils/ventaAnulacionUtils';
 import { PERMISOS_ADMIN_COMPLETO } from '../config/permisos';
+import { normalizarHoraInput, calcularHoraTurno } from '../utils/turnoHorarioUtils';
 
 function err(error) {
   if (!error) return null;
@@ -458,8 +459,11 @@ export async function updateTurno(organizacionId, turnoId, datos) {
     son: datos.son?.trim() || null,
     alabado: datos.alabado?.trim() || null,
   };
+  if (datos.hora_estimada !== undefined) {
+    payload.hora_estimada = normalizarHoraInput(datos.hora_estimada);
+  }
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('turnos')
     .update(payload)
     .eq('id', turnoId)
@@ -467,8 +471,52 @@ export async function updateTurno(organizacionId, turnoId, datos) {
     .select()
     .single();
 
+  if (error && datos.hora_estimada !== undefined && isMissingColumn(error, 'hora_estimada')) {
+    delete payload.hora_estimada;
+    ({ data, error } = await supabase
+      .from('turnos')
+      .update(payload)
+      .eq('id', turnoId)
+      .eq('organizacion_id', organizacionId)
+      .select()
+      .single());
+  }
+
   if (error) return err(error);
   return { data };
+}
+
+export async function actualizarHorarioProcesion(organizacionId, cortejoId, { horaInicio, minutosEntreTurnos }) {
+  if (!horaInicio?.trim()) return { error: 'Indique la hora de inicio.' };
+  const gap = Math.max(1, Number(minutosEntreTurnos) || 5);
+
+  const turnos = await getTurnosByCortejo(cortejoId);
+  if (!turnos.length) return { error: 'No hay turnos en esta procesión.' };
+
+  const sorted = [...turnos].sort((a, b) => a.numero_turno - b.numero_turno);
+  const updates = sorted.map((t, i) => ({
+    id: t.id,
+    hora_estimada: calcularHoraTurno(horaInicio, gap, i),
+  }));
+
+  for (const u of updates) {
+    const { error } = await supabase
+      .from('turnos')
+      .update({ hora_estimada: u.hora_estimada })
+      .eq('id', u.id)
+      .eq('organizacion_id', organizacionId);
+    if (error) {
+      if (isMissingColumn(error, 'hora_estimada')) {
+        return {
+          error:
+            'Falta la columna hora_estimada. Ejecute supabase/019_horario_turno.sql en Supabase.',
+        };
+      }
+      return err(error);
+    }
+  }
+
+  return { data: { actualizados: updates.length } };
 }
 
 export async function agregarTurnoProcesion(organizacionId, cortejoId, datos) {
@@ -1110,7 +1158,7 @@ export async function marcarEntregado(brazoId) {
 }
 
 export async function getFinanzasByOrg(organizacionId) {
-  const [{ data: brazos, error }, { data: compras }, usuarios] = await Promise.all([
+  const [{ data: brazos, error }, { data: compras }, usuarios, cortejosRaw] = await Promise.all([
     supabase
       .from('brazos')
       .select('*')
@@ -1118,6 +1166,7 @@ export async function getFinanzasByOrg(organizacionId) {
       .eq('estado', 'vendido'),
     supabase.from('compras').select('id, vendedor_id, operador_nombre').eq('organizacion_id', organizacionId),
     getUsuariosByOrg(organizacionId),
+    getCortejosByOrg(organizacionId, { incluirInactivas: true }),
   ]);
   if (error) throw error;
 
@@ -1130,9 +1179,11 @@ export async function getFinanzasByOrg(organizacionId) {
     if (u.id) mapaUsuarios[u.id] = nombre;
   }
 
+  const cortejosMap = Object.fromEntries((cortejosRaw || []).map((c) => [c.id, c]));
+
   const { data: turnos } = await supabase
     .from('turnos')
-    .select('id, precio, cortejo_id, numero_turno, tipo_turno, etiqueta')
+    .select('id, precio, cortejo_id, numero_turno, tipo_turno, etiqueta, hora_estimada')
     .eq('organizacion_id', organizacionId);
 
   const turnosMap = Object.fromEntries((turnos || []).map((t) => [t.id, t]));
@@ -1161,6 +1212,9 @@ export async function getFinanzasByOrg(organizacionId) {
       tipo_turno: turno?.tipo_turno || null,
       turno_etiqueta: turno?.etiqueta || turno?.tipo_turno || '',
       numero_turno: b.numero_turno ?? turno?.numero_turno,
+      hora_estimada: turno?.hora_estimada || null,
+      fecha_evento: cortejosMap[turno?.cortejo_id]?.fecha || null,
+      cortejo_nombre: cortejosMap[turno?.cortejo_id]?.nombre_evento || null,
     };
   });
 
@@ -1714,6 +1768,7 @@ export async function duplicarProcesion(cortejoOrigenId, datos, organizacionId) 
           precio: turnoOrigen.precio ?? 0,
           son: turnoOrigen.son,
           alabado: turnoOrigen.alabado,
+          hora_estimada: turnoOrigen.hora_estimada || null,
         })
         .select()
         .single();

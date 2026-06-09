@@ -1,16 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { normalizarHoraInput } from '../utils/turnoHorarioUtils';
+
+function horaParaInput(hora) {
+  const n = normalizarHoraInput(hora);
+  if (!n) return '';
+  return n.slice(0, 5);
+}
 
 export default function EditTurnoModal({ turno, guardando, onGuardar, onCerrar }) {
   const [etiqueta, setEtiqueta] = useState('');
   const [son, setSon] = useState('');
   const [alabado, setAlabado] = useState('');
+  const [horaEstimada, setHoraEstimada] = useState('');
 
   useEffect(() => {
     if (!turno) return;
     setEtiqueta(turno.etiqueta || turno.tipo_turno || '');
     setSon(turno.son || '');
     setAlabado(turno.alabado || '');
+    setHoraEstimada(horaParaInput(turno.hora_estimada));
   }, [turno]);
 
   useEffect(() => {
@@ -26,7 +35,7 @@ export default function EditTurnoModal({ turno, guardando, onGuardar, onCerrar }
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onGuardar({ etiqueta, son, alabado });
+    onGuardar({ etiqueta, son, alabado, hora_estimada: horaEstimada || null });
   };
 
   return createPortal(
@@ -81,6 +90,16 @@ export default function EditTurnoModal({ turno, guardando, onGuardar, onCerrar }
               onChange={(e) => setAlabado(e.target.value)}
               placeholder="Melodías adicionales, separadas con · si hay varias"
             />
+          </label>
+
+          <label>
+            Hora estimada en procesión
+            <input
+              type="time"
+              value={horaEstimada}
+              onChange={(e) => setHoraEstimada(e.target.value)}
+            />
+            <small className="text-muted">Fecha del evento en la procesión; aquí solo la hora de paso.</small>
           </label>
 
           <div className="modal-edit-turno__actions">

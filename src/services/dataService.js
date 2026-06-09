@@ -35,6 +35,16 @@ export const getTurnosAgrupados = (cortejoId, organizacionId) =>
     ? sb.getTurnosAgrupados(cortejoId, organizacionId)
     : Promise.resolve(mock.getTurnosAgrupados(cortejoId, organizacionId));
 
+export const getTurnosByCortejo = (cortejoId) =>
+  useSb()
+    ? sb.getTurnosByCortejo(cortejoId)
+    : Promise.resolve(mock.getTurnosByCortejo(cortejoId));
+
+export const actualizarHorarioProcesion = (organizacionId, cortejoId, opts) =>
+  useSb()
+    ? sb.actualizarHorarioProcesion(organizacionId, cortejoId, opts)
+    : Promise.resolve(mock.actualizarHorarioProcesionMock(organizacionId, cortejoId, opts));
+
 export const updateTurno = (organizacionId, turnoId, datos) =>
   useSb()
     ? sb.updateTurno(organizacionId, turnoId, datos)

@@ -8,6 +8,7 @@ import {
   getCortejosByOrg,
   subscribeData,
 } from '../services/dataService';
+import HorarioTurnosPanel from '../components/HorarioTurnosPanel';
 
 export default function Dashboard() {
   const { organizacionId } = useAuth();
@@ -83,6 +84,8 @@ export default function Dashboard() {
           </table>
         </div>
       </section>
+
+      <HorarioTurnosPanel organizacionId={organizacionId} incluirInactivas />
 
       <section className="panel">
         <h3 className="panel__title">Estado de espacios</h3>

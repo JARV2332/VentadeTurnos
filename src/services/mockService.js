@@ -13,6 +13,7 @@ import {
 import { isValidCui, normalizarCui } from '../utils/cuiUtils';
 import { aplicarAsignacionBrazos } from '../utils/aplicarAsignacionBrazos';
 import { RESET_BRAZO_VENTA, normalizarCodigoBoleta } from '../utils/ventaAnulacionUtils';
+import { normalizarHoraInput, calcularHoraTurno } from '../utils/turnoHorarioUtils';
 
 let store = crearStoreInicial();
 const listeners = new Set();
@@ -166,6 +167,7 @@ export function duplicarProcesionMock(cortejoOrigenId, datos, organizacionId) {
       precio: turnoOrigen.precio,
       son: turnoOrigen.son,
       alabado: turnoOrigen.alabado,
+      hora_estimada: turnoOrigen.hora_estimada || null,
     });
 
     const brazos = crearBrazosParaTurno({
@@ -196,7 +198,9 @@ export function duplicarProcesionMock(cortejoOrigenId, datos, organizacionId) {
 }
 
 export function getTurnosByCortejo(cortejoId) {
-  return store.turnos.filter((t) => t.cortejo_id === cortejoId);
+  return store.turnos
+    .filter((t) => t.cortejo_id === cortejoId)
+    .sort((a, b) => a.numero_turno - b.numero_turno);
 }
 
 export function updateTurnoMock(organizacionId, turnoId, datos) {
@@ -211,9 +215,30 @@ export function updateTurnoMock(organizacionId, turnoId, datos) {
     son: datos.son?.trim() || null,
     alabado: datos.alabado?.trim() || null,
   };
+  if (datos.hora_estimada !== undefined) {
+    actualizado.hora_estimada = normalizarHoraInput(datos.hora_estimada);
+  }
   store.turnos[idx] = actualizado;
   emit('turno:actualizado', { turno: actualizado });
   return { data: actualizado };
+}
+
+export function actualizarHorarioProcesionMock(organizacionId, cortejoId, { horaInicio, minutosEntreTurnos }) {
+  if (!horaInicio?.trim()) return { error: 'Indique la hora de inicio.' };
+  const gap = Math.max(1, Number(minutosEntreTurnos) || 5);
+  const sorted = getTurnosByCortejo(cortejoId).filter((t) => t.organizacion_id === organizacionId);
+  if (!sorted.length) return { error: 'No hay turnos en esta procesión.' };
+
+  sorted.forEach((t, i) => {
+    const idx = store.turnos.findIndex((x) => x.id === t.id);
+    if (idx === -1) return;
+    store.turnos[idx] = {
+      ...store.turnos[idx],
+      hora_estimada: calcularHoraTurno(horaInicio, gap, i),
+    };
+  });
+  emit('turno:actualizado', { cortejoId });
+  return { data: { actualizados: sorted.length } };
 }
 
 export function agregarTurnoProcesionMock(organizacionId, cortejoId, datos) {
@@ -936,6 +961,7 @@ export function getFinanzasByOrg(organizacionId) {
 
   const ventasEnriquecidas = vendidos.map((b) => {
     const turno = turnos.find((t) => t.id === b.turno_id);
+    const cortejo = store.cortejos.find((c) => c.id === turno?.cortejo_id);
     return {
       ...b,
       operador_nombre:
@@ -945,6 +971,9 @@ export function getFinanzasByOrg(organizacionId) {
       tipo_turno: turno?.tipo_turno || null,
       turno_etiqueta: turno?.etiqueta || turno?.tipo_turno || '',
       numero_turno: b.numero_turno ?? turno?.numero_turno,
+      hora_estimada: turno?.hora_estimada || null,
+      fecha_evento: cortejo?.fecha || null,
+      cortejo_nombre: cortejo?.nombre_evento || null,
     };
   });
 

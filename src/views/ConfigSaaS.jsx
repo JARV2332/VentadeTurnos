@@ -16,6 +16,7 @@ import {
   duplicarProcesion,
   updateTurno,
   agregarTurnoProcesion,
+  actualizarHorarioProcesion,
 } from '../services/dataService';
 import StatusBadge from '../components/StatusBadge';
 import {
@@ -108,6 +109,9 @@ export default function ConfigSaaS() {
   const [guardandoTurno, setGuardandoTurno] = useState(false);
   const [agregarTurnoAbierto, setAgregarTurnoAbierto] = useState(false);
   const [guardandoNuevoTurno, setGuardandoNuevoTurno] = useState(false);
+  const [horaInicioBulk, setHoraInicioBulk] = useState('18:00');
+  const [minutosEntreBulk, setMinutosEntreBulk] = useState(5);
+  const [aplicandoHorario, setAplicandoHorario] = useState(false);
 
   const turnosPlanExcel = useMemo(() => {
     if (modoCreacion !== 'excel' || !excelImport?.bloques?.length) return [];
@@ -514,6 +518,26 @@ export default function ConfigSaaS() {
     }
   };
 
+  const handleAplicarHorario = async () => {
+    if (!procesionVer || !organizacionId) return;
+    setError('');
+    setAplicandoHorario(true);
+    try {
+      const res = await actualizarHorarioProcesion(organizacionId, procesionVer.id, {
+        horaInicio: horaInicioBulk,
+        minutosEntreTurnos: minutosEntreBulk,
+      });
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      setOkMsg(`Horario asignado a ${res.data?.actualizados || 0} turnos.`);
+      await refreshLista();
+    } finally {
+      setAplicandoHorario(false);
+    }
+  };
+
   const handleAgregarTurno = async (datos) => {
     if (!procesionVer || !organizacionId) return;
     setError('');
@@ -588,11 +612,40 @@ export default function ConfigSaaS() {
                 Agregar turno
               </button>
             </div>
+            <div className="horario-bulk config-form">
+              <label>
+                Hora inicio (turno 1)
+                <input
+                  type="time"
+                  value={horaInicioBulk}
+                  onChange={(e) => setHoraInicioBulk(e.target.value)}
+                />
+              </label>
+              <label>
+                Minutos entre turnos
+                <input
+                  type="number"
+                  min={1}
+                  max={120}
+                  value={minutosEntreBulk}
+                  onChange={(e) => setMinutosEntreBulk(Number(e.target.value) || 5)}
+                />
+              </label>
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                disabled={aplicandoHorario}
+                onClick={handleAplicarHorario}
+              >
+                {aplicandoHorario ? 'Calculando…' : 'Asignar horario a todos'}
+              </button>
+            </div>
             <div className="turnos-lista turnos-lista--compact">
               {procesionVer.turnos.map((turno) => (
                 <TurnoCartulina
                   key={turno.id}
                   turno={turno}
+                  fechaEvento={procesionVer.fecha}
                   selectedBrazo={null}
                   onClickBrazo={() => {}}
                   readOnly

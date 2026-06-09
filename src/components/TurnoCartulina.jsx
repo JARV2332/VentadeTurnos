@@ -1,6 +1,7 @@
 import React from 'react';
 import StatusBadge from './StatusBadge';
 import { repertorioTurnoLista } from '../utils/turnoUtils';
+import { combinarFechaHoraTurno } from '../utils/turnoHorarioUtils';
 import { etiquetaAsignado } from '../utils/importReservasUtils';
 import { resumenApartadosTurno } from '../utils/apartadosDisplayUtils';
 
@@ -57,6 +58,7 @@ export function TurnoCartulina({
   onClickBrazo,
   readOnly = false,
   onEdit,
+  fechaEvento,
 }) {
   const idsEnCarrito = Array.isArray(selectedBrazoIds) ? selectedBrazoIds : [];
   const idsDestacados = Array.isArray(brazosDestacadosIds) ? brazosDestacadosIds : [];
@@ -79,6 +81,11 @@ export function TurnoCartulina({
         </div>
         <div className="turno-cartulina__meta">
           <StatusBadge status={turno.tipo_turno} />
+          {(turno.hora_estimada || fechaEvento) && (
+            <span className="turno-cartulina__horario" title="Fecha y hora estimada">
+              {combinarFechaHoraTurno(fechaEvento, turno.hora_estimada)}
+            </span>
+          )}
           <span className="turno-cartulina__precio">{formatQ(turno.precio)}</span>
           {onEdit && (
             <button

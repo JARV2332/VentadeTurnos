@@ -10,6 +10,7 @@
     "@testing-library/user-event": "^13.5.0",
     "html5-qrcode": "^2.3.8",
     "nodemailer": "^6.10.0",
+    "pg": "^8.16.3",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.6",
@@ -29,7 +30,15 @@
     "eject": "react-scripts eject",
     "db:apply": "node scripts/apply-schema.mjs",
     "db:seed": "node scripts/seed-demo.mjs",
-    "db:seed-super": "node scripts/seed-super.mjs"
+    "db:seed-super": "node scripts/seed-super.mjs",
+    "db:backup": "node scripts/backup-db.mjs",
+    "db:backup:full": "node scripts/backup-pg-full.mjs",
+    "db:apply:local": "node scripts/apply-schema-local.mjs",
+    "db:restore:local": "node scripts/restore-backup-local.mjs",
+    "supabase:start": "npx supabase start",
+    "supabase:stop": "npx supabase stop",
+    "supabase:status": "npx supabase status",
+    "local:setup": "npm run supabase:start && npm run db:apply:local && npm run db:restore:local"
   },
   "eslintConfig": {
     "extends": [
