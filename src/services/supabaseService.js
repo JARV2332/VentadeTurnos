@@ -451,6 +451,14 @@ export async function getTurnoById(turnoId) {
   return data;
 }
 
+export async function getTurnosByIds(turnoIds) {
+  const ids = [...new Set((turnoIds || []).filter(Boolean))];
+  if (!ids.length) return {};
+  const { data, error } = await supabase.from('turnos').select('*').in('id', ids);
+  if (error) throw error;
+  return Object.fromEntries((data || []).map((t) => [t.id, t]));
+}
+
 export async function updateTurno(organizacionId, turnoId, datos) {
   if (!turnoId) return { error: 'Turno no válido.' };
 

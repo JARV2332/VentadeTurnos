@@ -15,6 +15,7 @@ import {
   subscribeData,
 } from '../services/dataService';
 import EditDevotoModal from '../components/EditDevotoModal';
+import ReenvioMasivoModal from '../components/ReenvioMasivoModal';
 import { enviarBoletaPorCorreo } from '../services/emailService';
 import { construirEnlaceBoletaWhatsapp } from '../utils/whatsappUtils';
 import { localDigitsFromGtPhone } from '../utils/phoneGtUtils';
@@ -108,6 +109,7 @@ export default function Impresion() {
   const [guardandoDevoto, setGuardandoDevoto] = useState(false);
   const [errorDevoto, setErrorDevoto] = useState('');
   const [okDevoto, setOkDevoto] = useState('');
+  const [reenvioMasivoAbierto, setReenvioMasivoAbierto] = useState(false);
 
   const refresh = useCallback(async () => {
     const [brazos, cargadores, compras] = await Promise.all([
@@ -170,6 +172,8 @@ export default function Impresion() {
     () => filtrarRecibos(recibosLista, cargadoresPorId, busqueda),
     [recibosLista, cargadoresPorId, busqueda]
   );
+
+  const hayFiltroActivo = Boolean(busqueda.trim());
 
   const reciboSel = useMemo(
     () => recibosFiltrados.find((r) => r.id === selectedId) || null,
@@ -367,6 +371,14 @@ export default function Impresion() {
               Diseño del recibo
             </Link>
           )}
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={() => setReenvioMasivoAbierto(true)}
+            title="Reenviar boletas por correo con pausa entre envíos"
+          >
+            Reenvío masivo
+          </button>
         </div>
       </div>
 
@@ -464,6 +476,17 @@ export default function Impresion() {
         errorGuardar={errorDevoto}
         onGuardar={handleGuardarDevoto}
         onCerrar={() => !guardandoDevoto && setDevotoEditando(null)}
+      />
+
+      <ReenvioMasivoModal
+        abierto={reenvioMasivoAbierto}
+        onCerrar={() => setReenvioMasivoAbierto(false)}
+        recibosTodos={recibosLista}
+        recibosFiltrados={recibosFiltrados}
+        cargadoresPorId={cargadoresPorId}
+        organizacionId={organizacionId}
+        organizacion={organizacion}
+        hayFiltroActivo={hayFiltroActivo}
       />
     </Layout>
   );

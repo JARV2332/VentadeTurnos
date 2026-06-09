@@ -30,6 +30,11 @@ export const getTurnoById = (turnoId) =>
     ? sb.getTurnoById(turnoId)
     : Promise.resolve(mock.getStore().turnos.find((t) => t.id === turnoId) || null);
 
+export const getTurnosByIds = (turnoIds) =>
+  useSb()
+    ? sb.getTurnosByIds(turnoIds)
+    : Promise.resolve(mock.getTurnosByIdsMock(turnoIds));
+
 export const getTurnosAgrupados = (cortejoId, organizacionId) =>
   useSb()
     ? sb.getTurnosAgrupados(cortejoId, organizacionId)

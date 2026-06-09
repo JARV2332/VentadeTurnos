@@ -203,6 +203,15 @@ export function getTurnosByCortejo(cortejoId) {
     .sort((a, b) => a.numero_turno - b.numero_turno);
 }
 
+export function getTurnosByIdsMock(turnoIds) {
+  const ids = new Set((turnoIds || []).filter(Boolean));
+  const map = {};
+  store.turnos.forEach((t) => {
+    if (ids.has(t.id)) map[t.id] = t;
+  });
+  return map;
+}
+
 export function updateTurnoMock(organizacionId, turnoId, datos) {
   const idx = store.turnos.findIndex(
     (t) => t.id === turnoId && t.organizacion_id === organizacionId

@@ -2424,6 +2424,103 @@ body {
   gap: 1rem;
 }
 
+.reenvio-masivo-modal__campo {
+  display: block;
+  margin: 1rem 0 0.75rem;
+}
+
+.reenvio-masivo-modal__label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.reenvio-masivo-modal__campo select {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+}
+
+.reenvio-masivo-modal__radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  margin: 0.35rem 0;
+  cursor: pointer;
+}
+
+.reenvio-masivo-modal__resumen {
+  margin: 1rem 0;
+  padding: 0.75rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.88rem;
+}
+
+.reenvio-masivo-modal__resumen p {
+  margin: 0.25rem 0;
+}
+
+.reenvio-masivo-modal__gmail-hint {
+  font-size: 0.82rem;
+  margin: 0 0 1rem;
+}
+
+.reenvio-masivo-modal__aviso {
+  color: var(--warning, #b45309);
+}
+
+.reenvio-masivo-modal__estado {
+  margin: 0 0 0.35rem;
+  font-weight: 500;
+}
+
+.reenvio-masivo-modal__actual,
+.reenvio-masivo-modal__espera {
+  font-size: 0.85rem;
+  margin: 0 0 0.75rem;
+}
+
+.reenvio-masivo-modal__barra {
+  height: 8px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 1rem 0;
+}
+
+.reenvio-masivo-modal__barra-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}
+
+.reenvio-masivo-modal__ok {
+  color: var(--success);
+}
+
+.reenvio-masivo-modal__error {
+  color: var(--danger);
+}
+
+.reenvio-masivo-modal__errores {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+  font-size: 0.82rem;
+  color: var(--danger);
+  max-height: 140px;
+  overflow-y: auto;
+}
+
 .impresion-print-tip {
   margin-top: 1.25rem;
   font-size: 0.82rem;
