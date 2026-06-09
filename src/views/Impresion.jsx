@@ -471,6 +471,7 @@ export default function Impresion() {
       </p>
 
       <EditDevotoModal
+        abierto={Boolean(devotoEditando)}
         devoto={devotoEditando}
         guardando={guardandoDevoto}
         errorGuardar={errorDevoto}

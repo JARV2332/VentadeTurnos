@@ -10,11 +10,9 @@ import {
   subscribeData,
   buscarBoletaPorCodigo,
   anularVentaPorCodigo,
-  buscarCargadorPorCui,
   updateDevoto,
 } from '../services/dataService';
 import { labelMetodoPago } from '../utils/pagoUtils';
-import { normalizarCui, isValidCui } from '../utils/cuiUtils';
 import {
   filtrarVentasCaja,
   formatQ,
@@ -41,8 +39,6 @@ export default function CajaSaaS() {
   const [anulando, setAnulando] = useState(false);
   const [okMsg, setOkMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  const [cuiBuscar, setCuiBuscar] = useState('');
-  const [buscandoDevoto, setBuscandoDevoto] = useState(false);
   const [devotoEditando, setDevotoEditando] = useState(null);
   const [guardandoDevoto, setGuardandoDevoto] = useState(false);
   const [errorDevoto, setErrorDevoto] = useState('');
@@ -162,28 +158,6 @@ export default function CajaSaaS() {
       await refreshFinanzas();
     } finally {
       setAnulando(false);
-    }
-  };
-
-  const handleBuscarDevotoCui = async (e) => {
-    e?.preventDefault();
-    setErrorMsg('');
-    const cui = normalizarCui(cuiBuscar);
-    if (!isValidCui(cui)) {
-      setErrorMsg('Ingrese un CUI válido (13 dígitos).');
-      return;
-    }
-    setBuscandoDevoto(true);
-    try {
-      const devoto = await buscarCargadorPorCui(organizacionId, cui);
-      if (!devoto) {
-        setErrorMsg('No hay devoto(a) registrado(a) con ese CUI.');
-        return;
-      }
-      setErrorDevoto('');
-      setDevotoEditando(devoto);
-    } finally {
-      setBuscandoDevoto(false);
     }
   };
 
@@ -342,29 +316,6 @@ export default function CajaSaaS() {
         </div>
       </section>
 
-      <section className="panel caja-devoto-panel">
-        <h3 className="panel__title">Editar datos de devoto(a)</h3>
-        <p className="text-muted config-hint">
-          Busque por CUI/DPI para corregir nombre, WhatsApp o correo. También puede editar desde{' '}
-          <strong>Impresión</strong> al seleccionar una boleta.
-        </p>
-        <form className="caja-devoto-panel__buscar config-form" onSubmit={handleBuscarDevotoCui}>
-          <label>
-            CUI / DPI
-            <input
-              type="text"
-              inputMode="numeric"
-              value={cuiBuscar}
-              onChange={(e) => setCuiBuscar(normalizarCui(e.target.value))}
-              placeholder="13 dígitos"
-            />
-          </label>
-          <button type="submit" className="btn btn--primary btn--sm" disabled={buscandoDevoto}>
-            {buscandoDevoto ? 'Buscando…' : 'Buscar y editar'}
-          </button>
-        </form>
-      </section>
-
       <div className="caja-grid">
         <section className="panel">
           <h3 className="panel__title">Cierre por mesa</h3>
@@ -510,6 +461,7 @@ export default function CajaSaaS() {
       )}
 
       <EditDevotoModal
+        abierto={Boolean(devotoEditando)}
         devoto={devotoEditando}
         guardando={guardandoDevoto}
         errorGuardar={errorDevoto}

@@ -64,6 +64,7 @@ export const DEMO_ROLES = [
       'entrega',
       'caja',
       'impresion',
+      'devotos',
       'config',
       'config_correo',
       'config_recibo',

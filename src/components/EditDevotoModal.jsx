@@ -14,25 +14,36 @@ function devotoToForm(devoto) {
   };
 }
 
-export default function EditDevotoModal({ devoto, guardando, errorGuardar, onGuardar, onCerrar }) {
+export default function EditDevotoModal({
+  abierto,
+  devoto,
+  guardando,
+  errorGuardar,
+  onGuardar,
+  onCerrar,
+}) {
+  const esEdicion = Boolean(devoto?.id);
+  const visible = abierto ?? Boolean(devoto);
   const [form, setForm] = useState(devotoToForm(null));
   const [errorLocal, setErrorLocal] = useState('');
 
   useEffect(() => {
-    setForm(devotoToForm(devoto));
-    setErrorLocal('');
-  }, [devoto]);
+    if (visible) {
+      setForm(devotoToForm(devoto));
+      setErrorLocal('');
+    }
+  }, [visible, devoto]);
 
   useEffect(() => {
-    if (!devoto || typeof document === 'undefined') return undefined;
+    if (!visible || typeof document === 'undefined') return undefined;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [devoto]);
+  }, [visible]);
 
-  if (!devoto || typeof document === 'undefined') return null;
+  if (!visible || typeof document === 'undefined') return null;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -64,10 +75,14 @@ export default function EditDevotoModal({ devoto, guardando, errorGuardar, onGua
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="edit-devoto-titulo" className="modal-edit-turno__titulo">
-          Editar datos del {TERMINO_DEVOTO.toLowerCase()}
+          {esEdicion
+            ? `Editar datos del ${TERMINO_DEVOTO.toLowerCase()}`
+            : `Nuevo ${TERMINO_DEVOTO.toLowerCase()}`}
         </h2>
         <p className="text-muted config-hint">
-          Los cambios se reflejan en boletas, correos y entrega. No modifica ventas ya anuladas.
+          {esEdicion
+            ? 'Los cambios se reflejan en boletas, correos y entrega. No modifica ventas ya anuladas. Teléfono y correo pueden repetirse entre devotos; el CUI es único.'
+            : 'Registre los datos del devoto(a). El CUI es único; teléfono y correo pueden repetirse entre personas distintas.'}
         </p>
 
         {(errorLocal || errorGuardar) && (
@@ -130,7 +145,11 @@ export default function EditDevotoModal({ devoto, guardando, errorGuardar, onGua
               Cancelar
             </button>
             <button type="submit" className="btn btn--primary" disabled={guardando}>
-              {guardando ? 'Guardando…' : 'Guardar cambios'}
+              {guardando
+                ? 'Guardando…'
+                : esEdicion
+                  ? 'Guardar cambios'
+                  : 'Registrar devoto(a)'}
             </button>
           </div>
         </form>

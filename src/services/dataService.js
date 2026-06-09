@@ -80,6 +80,16 @@ export const updateDevoto = (organizacionId, cargadorId, datos) =>
     ? sb.updateDevoto(organizacionId, cargadorId, datos)
     : Promise.resolve(mock.updateDevotoMock(organizacionId, cargadorId, datos));
 
+export const createDevoto = (organizacionId, datos) =>
+  useSb()
+    ? sb.createDevoto(organizacionId, datos)
+    : Promise.resolve(mock.createDevotoMock(organizacionId, datos));
+
+export const deleteDevoto = (organizacionId, cargadorId) =>
+  useSb()
+    ? sb.deleteDevoto(organizacionId, cargadorId)
+    : Promise.resolve(mock.deleteDevotoMock(organizacionId, cargadorId));
+
 export const buscarCargadorPorWhatsapp = (organizacionId, whatsapp) =>
   useSb()
     ? sb.buscarCargadorPorWhatsapp(organizacionId, whatsapp)

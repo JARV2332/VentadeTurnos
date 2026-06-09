@@ -123,8 +123,7 @@
       cui_o_identificacion TEXT,
       telefono_emergencia  TEXT,
       created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (organizacion_id, whatsapp)
+      updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
     -- ── Config correo ──

@@ -346,11 +346,6 @@ export function updateDevotoMock(organizacionId, cargadorId, datos) {
     return { error: 'Ese CUI ya está registrado en otro devoto(a).' };
   }
 
-  const otroWa = buscarCargadorPorWhatsapp(organizacionId, whatsapp);
-  if (otroWa && otroWa.id !== cargadorId) {
-    return { error: 'Ese WhatsApp ya está registrado en otro devoto(a).' };
-  }
-
   const actualizado = {
     ...store.cargadores[idx],
     nombre_completo: datos.nombre_completo.trim(),
@@ -363,6 +358,74 @@ export function updateDevotoMock(organizacionId, cargadorId, datos) {
   store.cargadores[idx] = actualizado;
   emit('devoto:actualizado', { cargador: actualizado });
   return { data: actualizado };
+}
+
+function validarDatosDevoto(organizacionId, datos, { excluirId } = {}) {
+  const whatsapp = String(datos.whatsapp || '').replace(/\D/g, '');
+  const cuiNorm = normalizarCui(datos.cui_o_identificacion);
+
+  if (!datos.nombre_completo?.trim()) {
+    return { error: 'Nombre del devoto(a) obligatorio.' };
+  }
+  if (!isValidCui(cuiNorm)) {
+    return { error: 'Ingrese un CUI válido (13 dígitos).' };
+  }
+  if (!/^502[0-9]{8}$/.test(whatsapp)) {
+    return { error: 'WhatsApp inválido (+502 y 8 dígitos).' };
+  }
+
+  const otroCui = buscarCargadorPorCui(organizacionId, cuiNorm);
+  if (otroCui && otroCui.id !== excluirId) {
+    return { error: 'Ese CUI ya está registrado en otro devoto(a).' };
+  }
+
+  return {
+    campos: {
+      nombre_completo: datos.nombre_completo.trim(),
+      whatsapp,
+      correo: datos.correo?.trim() || '',
+      cui_o_identificacion: cuiNorm,
+      telefono_emergencia: datos.telefono_emergencia?.replace(/\D/g, '') || '',
+    },
+  };
+}
+
+export function createDevotoMock(organizacionId, datos) {
+  const val = validarDatosDevoto(organizacionId, datos);
+  if (val.error) return val;
+
+  const nuevo = {
+    id: `carg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    organizacion_id: organizacionId,
+    ...val.campos,
+  };
+  store.cargadores.push(nuevo);
+  emit('devoto:creado', { cargador: nuevo });
+  return { data: nuevo };
+}
+
+export function deleteDevotoMock(organizacionId, cargadorId) {
+  if (!cargadorId) return { error: 'Devoto no válido.' };
+
+  const idx = store.cargadores.findIndex(
+    (c) => c.id === cargadorId && c.organizacion_id === organizacionId
+  );
+  if (idx === -1) return { error: 'Devoto(a) no encontrado(a).' };
+
+  const tieneBrazos = store.brazos.some(
+    (b) => b.cargador_id === cargadorId && b.organizacion_id === organizacionId
+  );
+  if (tieneBrazos) {
+    return {
+      error:
+        'No se puede eliminar: tiene turnos asociados (ventas o apartados). Puede editar los datos del devoto(a).',
+    };
+  }
+
+  const nombre = store.cargadores[idx].nombre_completo;
+  store.cargadores.splice(idx, 1);
+  emit('devoto:eliminado', { cargadorId });
+  return { ok: true, nombre };
 }
 
 export function getEmailConfig(organizacionId) {
@@ -693,14 +756,6 @@ export function confirmarVentaMock(brazoId, cargadorData, precioPagado, organiza
   }
 
   let cargador = buscarCargadorPorCui(organizacionId, cuiNorm);
-  const porWhatsapp = buscarCargadorPorWhatsapp(organizacionId, cargadorData.whatsapp);
-  if (cargador && porWhatsapp && cargador.id !== porWhatsapp.id) {
-    return {
-      error:
-        'Este CUI y este WhatsApp están registrados en devotos distintos. Verifique los datos.',
-    };
-  }
-  if (!cargador) cargador = porWhatsapp;
 
   if (!cargador) {
     cargador = {
@@ -761,14 +816,6 @@ function upsertCargadorVentaMock(organizacionId, cargadorData) {
   }
 
   let cargador = buscarCargadorPorCui(organizacionId, cuiNorm);
-  const porWhatsapp = buscarCargadorPorWhatsapp(organizacionId, cargadorData.whatsapp);
-  if (cargador && porWhatsapp && cargador.id !== porWhatsapp.id) {
-    return {
-      error:
-        'Este CUI y este WhatsApp están registrados en devotos distintos. Verifique los datos.',
-    };
-  }
-  if (!cargador) cargador = porWhatsapp;
 
   if (!cargador) {
     cargador = {
@@ -1272,9 +1319,6 @@ function upsertCargadorParcial(organizacionId, datos) {
     'Sin nombre';
 
   let cargador = isValidCui(cui) ? buscarCargadorPorCui(organizacionId, cui) : null;
-  if (!cargador && whatsapp.length >= 11) {
-    cargador = buscarCargadorPorWhatsapp(organizacionId, whatsapp);
-  }
 
   const campos = {
     nombre_completo: nombreCompleto,

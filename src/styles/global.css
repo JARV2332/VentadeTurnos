@@ -4132,6 +4132,35 @@ body {
   max-width: 420px;
 }
 
+.devotos-panel__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.devotos-panel__busqueda {
+  flex: 1 1 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.devotos-panel__busqueda input {
+  width: 100%;
+  max-width: 420px;
+}
+
+.devotos-panel__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
 .btn--danger-text {
   color: var(--danger, #dc2626);
 }

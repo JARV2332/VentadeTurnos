@@ -702,11 +702,6 @@ export async function updateDevoto(organizacionId, cargadorId, datos) {
     return { error: 'Ese CUI ya está registrado en otro devoto(a).' };
   }
 
-  const otroWa = await buscarCargadorPorWhatsapp(organizacionId, whatsapp);
-  if (otroWa && otroWa.id !== cargadorId) {
-    return { error: 'Ese WhatsApp ya está registrado en otro devoto(a).' };
-  }
-
   const campos = {
     nombre_completo: datos.nombre_completo.trim(),
     whatsapp,
@@ -725,6 +720,78 @@ export async function updateDevoto(organizacionId, cargadorId, datos) {
 
   if (error) return err(error);
   return { data };
+}
+
+export async function createDevoto(organizacionId, datos) {
+  const whatsapp = String(datos.whatsapp || '').replace(/\D/g, '');
+  const cuiNorm = normalizarCui(datos.cui_o_identificacion);
+
+  if (!datos.nombre_completo?.trim()) {
+    return { error: 'Nombre del devoto(a) obligatorio.' };
+  }
+  if (!isValidCui(cuiNorm)) {
+    return { error: 'Ingrese un CUI válido (13 dígitos).' };
+  }
+  if (!/^502[0-9]{8}$/.test(whatsapp)) {
+    return { error: 'WhatsApp inválido (+502 y 8 dígitos).' };
+  }
+
+  const otroCui = await buscarCargadorPorCui(organizacionId, cuiNorm);
+  if (otroCui) return { error: 'Ese CUI ya está registrado.' };
+
+  const campos = {
+    organizacion_id: organizacionId,
+    nombre_completo: datos.nombre_completo.trim(),
+    whatsapp,
+    correo: datos.correo?.trim() || '',
+    cui_o_identificacion: cuiNorm,
+    telefono_emergencia: datos.telefono_emergencia?.replace(/\D/g, '') || '',
+  };
+
+  const { data, error } = await supabase
+    .from('cargadores_organizacion')
+    .insert(campos)
+    .select()
+    .single();
+
+  if (error) return err(error);
+  return { data };
+}
+
+export async function deleteDevoto(organizacionId, cargadorId) {
+  if (!cargadorId) return { error: 'Devoto no válido.' };
+
+  const { data: actual, error: findErr } = await supabase
+    .from('cargadores_organizacion')
+    .select('id, nombre_completo')
+    .eq('id', cargadorId)
+    .eq('organizacion_id', organizacionId)
+    .maybeSingle();
+  if (findErr) return err(findErr);
+  if (!actual) return { error: 'Devoto(a) no encontrado(a).' };
+
+  const { data: brazos, error: bErr } = await supabase
+    .from('brazos')
+    .select('id')
+    .eq('cargador_id', cargadorId)
+    .eq('organizacion_id', organizacionId)
+    .limit(1);
+  if (bErr) return err(bErr);
+  if (brazos?.length) {
+    return {
+      error:
+        'No se puede eliminar: tiene turnos asociados (ventas o apartados). Puede editar los datos del devoto(a).',
+    };
+  }
+
+  const { error } = await supabase
+    .from('cargadores_organizacion')
+    .delete()
+    .eq('id', cargadorId)
+    .eq('organizacion_id', organizacionId);
+
+  if (error) return err(error);
+  return { ok: true, nombre: actual.nombre_completo };
 }
 
 export async function buscarCargadorPorCui(organizacionId, cui) {
@@ -746,6 +813,7 @@ export async function buscarCargadorPorWhatsapp(organizacionId, whatsapp) {
     .select('*')
     .eq('organizacion_id', organizacionId)
     .eq('whatsapp', limpio)
+    .limit(1)
     .maybeSingle();
   return data;
 }
@@ -777,15 +845,6 @@ async function upsertDevotoVenta(orgId, cargadorData) {
   }
 
   let devoto = await buscarCargadorPorCui(orgId, cuiNorm);
-  const porWhatsapp = await buscarCargadorPorWhatsapp(orgId, whatsapp);
-
-  if (devoto && porWhatsapp && devoto.id !== porWhatsapp.id) {
-    return {
-      error:
-        'Este CUI y este WhatsApp están registrados en devotos distintos. Verifique los datos.',
-    };
-  }
-  if (!devoto) devoto = porWhatsapp;
 
   const campos = {
     nombre_completo: cargadorData.nombre_completo.trim(),
@@ -1932,9 +1991,6 @@ async function upsertCargadorParcialImport(organizacionId, datos) {
     'Sin nombre';
 
   let cargador = isValidCui(cui) ? await buscarCargadorPorCui(organizacionId, cui) : null;
-  if (!cargador && whatsapp.length >= 11) {
-    cargador = await buscarCargadorPorWhatsapp(organizacionId, whatsapp);
-  }
 
   if (!isValidCui(cui) && !whatsapp) return null;
 

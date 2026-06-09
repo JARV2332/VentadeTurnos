@@ -12,6 +12,7 @@ import ConfigImportReservas from './views/ConfigImportReservas';
 import Taquilla from './views/Taquilla';
 import CajaSaaS from './views/CajaSaaS';
 import Impresion from './views/Impresion';
+import Devotos from './views/Devotos';
 import EntregaTurno from './views/EntregaTurno';
 import PerfilUsuario from './views/PerfilUsuario';
 import PlataformaAdmin from './views/PlataformaAdmin';
@@ -109,6 +110,14 @@ function App() {
             element={
               <PrivateRoute permission="impresion">
                 <Impresion />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/devotos"
+            element={
+              <PrivateRoute permission="devotos">
+                <Devotos />
               </PrivateRoute>
             }
           />

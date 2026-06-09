@@ -10,7 +10,6 @@ import {
   subscribeData,
   reservarBrazo,
   confirmarVentaCompra,
-  buscarCargadorPorWhatsapp,
   buscarCargadorPorCui,
   getCargadorById,
 } from '../services/dataService';
@@ -368,15 +367,9 @@ export default function Taquilla() {
     }
   };
 
-  const handleWhatsappChange = async (value) => {
+  const handleWhatsappChange = (value) => {
     const whatsapp = String(value || '').replace(/\D/g, '').slice(0, 11);
     setForm((f) => ({ ...f, whatsapp }));
-    if (isValidGtWhatsapp(whatsapp)) {
-      const existente = await buscarCargadorPorWhatsapp(organizacionId, whatsapp);
-      if (existente) {
-        setForm(devotoToForm(existente));
-      }
-    }
   };
 
   const handleContinuarAPago = (e) => {
@@ -752,7 +745,7 @@ export default function Taquilla() {
                     value={form.whatsapp}
                     onChange={handleWhatsappChange}
                     required
-                    hint="Solo los 8 números; el +502 ya está incluido"
+                    hint="Puede repetirse entre devotos distintos (familia, contacto compartido)"
                   />
                   <label>
                     Correo electrónico (boleta)
@@ -994,7 +987,7 @@ export default function Taquilla() {
                       value={form.whatsapp}
                       onChange={handleWhatsappChange}
                       required
-                      hint="Solo los 8 números; el +502 ya está incluido"
+                      hint="Puede repetirse entre devotos distintos (familia, contacto compartido)"
                     />
                     <label>
                       Correo electrónico (boleta)

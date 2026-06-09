@@ -9,6 +9,7 @@ const LABEL_CORTO = {
   entrega: 'Entrega',
   caja: 'Caja',
   impresion: 'Imprimir',
+  devotos: 'Devotos',
   config: 'Procesiones',
   config_correo: 'Correo',
   config_recibo: 'Recibos',

@@ -34,6 +34,7 @@ const SQL_FILES = [
   '017_operador_venta.sql',
   '018_anular_venta.sql',
   '019_horario_turno.sql',
+  '020_devoto_whatsapp_no_unique.sql',
 ];
 
 const client = new pg.Client({ connectionString: LOCAL_DATABASE_URL });

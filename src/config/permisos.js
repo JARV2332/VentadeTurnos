@@ -16,6 +16,7 @@ export const PANTALLAS = [
   { id: 'entrega', label: 'Entrega turnos', path: '/entrega', icon: '⎔', grupo: 'Operación' },
   { id: 'caja', label: 'Caja', path: '/caja', icon: '◈', grupo: 'Operación' },
   { id: 'impresion', label: 'Impresión', path: '/impresion', icon: '▣', grupo: 'Operación' },
+  { id: 'devotos', label: 'Devotos', path: '/devotos', icon: '◉', grupo: 'Operación' },
   { id: 'config', label: 'Procesiones', path: '/config', icon: '⚙', grupo: 'Administración' },
   { id: 'config_correo', label: 'Correo y boletas', path: '/config/correo', icon: '✉', grupo: 'Administración' },
   {
@@ -44,7 +45,8 @@ export const PANTALLAS = [
 /** Permiso para gestionar roles y usuarios (solo administrador) */
 export const PERMISO_GESTION_USUARIOS = 'usuarios';
 
-export const PERMISOS_ADMIN_COMPLETO = PANTALLAS.map((p) => p.id);
+/** Permisos al crear una org nueva (devotos se asigna explícitamente al rol). */
+export const PERMISOS_ADMIN_COMPLETO = PANTALLAS.filter((p) => p.id !== 'devotos').map((p) => p.id);
 
 export function tienePermiso(permisos, permisoId) {
   return Array.isArray(permisos) && permisos.includes(permisoId);
