@@ -16,7 +16,7 @@ export const PANTALLAS = [
   { id: 'entrega', label: 'Entrega turnos', path: '/entrega', icon: '⎔', grupo: 'Operación' },
   { id: 'caja', label: 'Caja', path: '/caja', icon: '◈', grupo: 'Operación' },
   { id: 'impresion', label: 'Impresión', path: '/impresion', icon: '▣', grupo: 'Operación' },
-  { id: 'devotos', label: 'Devotos', path: '/devotos', icon: '◉', grupo: 'Operación' },
+  { id: 'devotos', label: 'Devotos', path: '/devotos', icon: '👤', grupo: 'Operación' },
   { id: 'config', label: 'Procesiones', path: '/config', icon: '⚙', grupo: 'Administración' },
   { id: 'config_correo', label: 'Correo y boletas', path: '/config/correo', icon: '✉', grupo: 'Administración' },
   {
