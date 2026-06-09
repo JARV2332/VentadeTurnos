@@ -167,6 +167,11 @@ export const registrarCorreoEnviado = (organizacionId, datos) =>
     ? sb.registrarCorreoEnviado(organizacionId, datos)
     : Promise.resolve(mock.registrarCorreoEnviadoMock(organizacionId, datos));
 
+export const updateCorreoEnviadoEstado = (organizacionId, correoId, estado, nota) =>
+  useSb()
+    ? sb.updateCorreoEnviadoEstado(organizacionId, correoId, estado, nota)
+    : Promise.resolve(mock.updateCorreoEnviadoEstadoMock(organizacionId, correoId, estado, nota));
+
 export const getRolesByOrg = (organizacionId) =>
   useSb()
     ? sb.getRolesByOrg(organizacionId)

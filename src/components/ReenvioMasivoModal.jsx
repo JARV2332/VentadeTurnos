@@ -7,6 +7,7 @@ import {
   analizarColaReenvio,
   formatearDuracionEstimada,
 } from '../utils/reenvioMasivoUtils';
+import { exportarErroresCsv } from '../utils/correoHistorialUtils';
 
 export default function ReenvioMasivoModal({
   abierto,
@@ -249,19 +250,36 @@ export default function ReenvioMasivoModal({
             </div>
 
             {resultados.error.length > 0 && (
-              <ul className="reenvio-masivo-modal__errores">
-                {resultados.error.slice(0, 8).map((e) => (
-                  <li key={e.reciboId}>
-                    {e.etiqueta}: {e.error}
-                  </li>
-                ))}
-                {resultados.error.length > 8 && (
-                  <li className="text-muted">…y {resultados.error.length - 8} más</li>
-                )}
-              </ul>
+              <>
+                <ul className="reenvio-masivo-modal__errores">
+                  {resultados.error.map((e) => (
+                    <li key={e.reciboId}>
+                      <strong>{e.nombre || e.etiqueta}</strong>
+                      {e.destinatario && <span> · {e.destinatario}</span>}
+                      {e.codigo && <span> · {e.codigo}</span>}
+                      <br />
+                      {e.error}
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-muted reenvio-masivo-modal__rebote-hint">
+                  Si Gmail aceptó el correo pero rebotó después, revise la bandeja del remitente
+                  (&quot;No entregado&quot;) y marque esos casos en{' '}
+                  <strong>Configuración → Correo → Historial</strong>.
+                </p>
+              </>
             )}
 
             <div className="modal-edit-turno__actions">
+              {resultados.error.length > 0 && (
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => exportarErroresCsv(resultados.error)}
+                >
+                  Descargar errores (CSV)
+                </button>
+              )}
               <button type="button" className="btn btn--primary" onClick={handleCerrar}>
                 Cerrar
               </button>

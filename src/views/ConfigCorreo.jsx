@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
 import { Link } from 'react-router-dom';
 
@@ -15,7 +15,7 @@ import {
   saveEmailConfig,
 
   getCorreosEnviados,
-
+  updateCorreoEnviadoEstado,
   subscribeData,
 
   getCortejosByOrg,
@@ -32,6 +32,12 @@ import {
 } from '../utils/emailTemplateUtils';
 
 import { MOCK_MODE } from '../config/supabaseClient';
+import {
+  etiquetaEstadoCorreo,
+  exportarErroresCsv,
+  filtrarHistorialCorreos,
+  ESTADOS_CORREO,
+} from '../utils/correoHistorialUtils';
 
 import { DEMO_NOMBRE_ORGANIZACION } from '../data/mockData';
 
@@ -106,6 +112,8 @@ export default function ConfigCorreo() {
   const [config, setConfig] = useState(DEFAULT_CONFIG);
 
   const [historial, setHistorial] = useState([]);
+  const [filtroHistorial, setFiltroHistorial] = useState('todos');
+  const [marcandoRebote, setMarcandoRebote] = useState(null);
 
   const [okMsg, setOkMsg] = useState('');
 
@@ -162,7 +170,39 @@ export default function ConfigCorreo() {
 
   }, [organizacionId, refresh]);
 
+  const historialFiltrado = useMemo(
+    () => filtrarHistorialCorreos(historial, filtroHistorial),
+    [historial, filtroHistorial]
+  );
 
+  const conteoProblemas = useMemo(
+    () => historial.filter((r) => r.estado === 'error' || r.estado === 'rebotado').length,
+    [historial]
+  );
+
+  const handleMarcarRebotado = async (row) => {
+    if (row.estado === 'rebotado') return;
+    setMarcandoRebote(row.id);
+    const res = await updateCorreoEnviadoEstado(organizacionId, row.id, 'rebotado');
+    if (res?.data) {
+      setHistorial((prev) =>
+        prev.map((r) => (r.id === row.id ? { ...r, estado: 'rebotado', metadata: res.data.metadata } : r))
+      );
+    }
+    setMarcandoRebote(null);
+  };
+
+  const handleExportarProblemas = () => {
+    const problemas = historial.filter((r) => r.estado === 'error' || r.estado === 'rebotado');
+    exportarErroresCsv(
+      problemas.map((r) => ({
+        nombre: r.metadata?.cargador_nombre || '',
+        destinatario: r.destinatario,
+        codigo: r.codigo_boleta,
+        error: r.metadata?.error || 'Rebotado (correo no entregado)',
+      }))
+    );
+  };
 
   const handleSave = async (e) => {
 
@@ -598,7 +638,20 @@ export default function ConfigCorreo() {
 
       <section className="card" style={{ marginTop: '1.25rem' }}>
 
-        <h3 className="panel__title">Historial de envíos</h3>
+        <div className="correo-historial__head">
+          <h3 className="panel__title">Historial de envíos</h3>
+          {conteoProblemas > 0 && (
+            <button type="button" className="btn btn--ghost btn--sm" onClick={handleExportarProblemas}>
+              Exportar problemas (CSV)
+            </button>
+          )}
+        </div>
+
+        <p className="text-muted config-hint correo-historial__hint">
+          Los <strong>rebotes</strong> (correo mal escrito o buzón inexistente) suelen llegar minutos
+          después a la bandeja del Gmail remitente como &quot;No entregado&quot; o &quot;Mail Delivery
+          Subsystem&quot;. Revise esa cuenta, luego marque aquí los que rebotaron para llevar control.
+        </p>
 
         {historial.length === 0 ? (
 
@@ -606,6 +659,23 @@ export default function ConfigCorreo() {
 
         ) : (
 
+          <>
+            <div className="correo-historial__filtros">
+              <label>
+                Filtrar
+                <select value={filtroHistorial} onChange={(e) => setFiltroHistorial(e.target.value)}>
+                  <option value="todos">Todos ({historial.length})</option>
+                  <option value="enviado">Enviados</option>
+                  <option value="error">Error al enviar</option>
+                  <option value="rebotado">Rebotados</option>
+                  <option value="problemas">Con problemas ({conteoProblemas})</option>
+                </select>
+              </label>
+            </div>
+
+            {historialFiltrado.length === 0 ? (
+              <p className="text-muted">No hay registros con ese filtro.</p>
+            ) : (
           <div className="table-wrap">
 
             <table className="data-table">
@@ -616,11 +686,17 @@ export default function ConfigCorreo() {
 
                   <th>Fecha</th>
 
-                  <th>Destinatario</th>
+                  <th>Devoto(a)</th>
+
+                  <th>Correo</th>
 
                   <th>Boleta</th>
 
                   <th>Estado</th>
+
+                  <th>Detalle</th>
+
+                  <th></th>
 
                 </tr>
 
@@ -628,17 +704,41 @@ export default function ConfigCorreo() {
 
               <tbody>
 
-                {historial.map((row) => (
+                {historialFiltrado.map((row) => (
 
-                  <tr key={row.id}>
+                  <tr key={row.id} className={row.estado === 'error' || row.estado === 'rebotado' ? 'correo-historial__fila--problema' : ''}>
 
                     <td>{new Date(row.created_at).toLocaleString('es-GT')}</td>
+
+                    <td>{row.metadata?.cargador_nombre || '—'}</td>
 
                     <td>{row.destinatario}</td>
 
                     <td>{row.codigo_boleta || '—'}</td>
 
-                    <td>{row.estado}</td>
+                    <td>
+                      <span className={`correo-estado ${ESTADOS_CORREO[row.estado]?.clase || ''}`}>
+                        {etiquetaEstadoCorreo(row.estado)}
+                      </span>
+                    </td>
+
+                    <td className="correo-historial__detalle">
+                      {row.metadata?.error || (row.estado === 'rebotado' ? 'Marcado como rebotado' : '—')}
+                    </td>
+
+                    <td>
+                      {row.estado === 'enviado' && (
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--sm"
+                          disabled={marcandoRebote === row.id}
+                          onClick={() => handleMarcarRebotado(row)}
+                          title="Marcar como rebotado si Gmail devolvió el correo"
+                        >
+                          {marcandoRebote === row.id ? '…' : 'Marcar rebotado'}
+                        </button>
+                      )}
+                    </td>
 
                   </tr>
 
@@ -649,6 +749,8 @@ export default function ConfigCorreo() {
             </table>
 
           </div>
+            )}
+          </>
 
         )}
 

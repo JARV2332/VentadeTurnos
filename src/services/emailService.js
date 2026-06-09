@@ -171,6 +171,11 @@ export async function enviarBoletaPorCorreo({
   if (MOCK_MODE || !EMAIL_WEBHOOK_URL) {
     await registrarCorreoEnviado(organizacionId, {
       ...datos,
+      cargador,
+      brazo,
+      turno,
+      cortejo,
+      compra,
       enviado_en: new Date().toISOString(),
       modo: 'demo',
     });
@@ -210,11 +215,29 @@ export async function enviarBoletaPorCorreo({
     clearTimeout(timeoutId);
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
+      await registrarCorreoEnviado(organizacionId, {
+        ...datos,
+        cargador,
+        brazo,
+        turno,
+        cortejo,
+        compra,
+        destinatario: cargador.correo,
+        estado: 'error',
+        error: json.error || 'Error al enviar correo',
+        enviado_en: new Date().toISOString(),
+        modo: 'gmail',
+      });
       return { ok: false, error: json.error || 'Error al enviar correo' };
     }
 
     await registrarCorreoEnviado(organizacionId, {
       ...datos,
+      cargador,
+      brazo,
+      turno,
+      cortejo,
+      compra,
       destinatario: cargador.correo,
       estado: 'enviado',
       enviado_en: new Date().toISOString(),
@@ -224,16 +247,33 @@ export async function enviarBoletaPorCorreo({
     return { ok: true, destinatario: cargador.correo, asunto: datos.asunto };
   } catch (err) {
     const msg = err?.message || '';
+    const errorText =
+      err?.name === 'AbortError'
+        ? 'El envío de correo tardó demasiado. La venta ya está guardada.'
+        : msg.includes('Failed to fetch')
+          ? 'No se pudo conectar con el servidor de correo. Verifique GMAIL_USER y GMAIL_APP_PASSWORD en Vercel.'
+          : msg || 'No se pudo enviar el correo';
+
+    await registrarCorreoEnviado(organizacionId, {
+      ...datos,
+      cargador,
+      brazo,
+      turno,
+      cortejo,
+      compra,
+      destinatario: cargador.correo,
+      estado: 'error',
+      error: errorText,
+      enviado_en: new Date().toISOString(),
+      modo: 'gmail',
+    });
+
     if (err?.name === 'AbortError') {
-      return { ok: false, error: 'El envío de correo tardó demasiado. La venta ya está guardada.' };
+      return { ok: false, error: errorText };
     }
     if (msg.includes('Failed to fetch')) {
-      return {
-        ok: false,
-        error:
-          'No se pudo conectar con el servidor de correo. Verifique GMAIL_USER y GMAIL_APP_PASSWORD en Vercel.',
-      };
+      return { ok: false, error: errorText };
     }
-    return { ok: false, error: msg || 'No se pudo enviar el correo' };
+    return { ok: false, error: errorText };
   }
 }

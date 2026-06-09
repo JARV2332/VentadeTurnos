@@ -1386,6 +1386,7 @@ export async function registrarCorreoEnviado(organizacionId, datos) {
     asunto: datos.asunto || null,
     codigo_boleta:
       datos.codigo_boleta ||
+      datos.compra?.codigo_recibo ||
       datos.brazo?.codigo_boleta_qr ||
       null,
     estado: datos.estado || 'enviado',
@@ -1400,6 +1401,8 @@ export async function registrarCorreoEnviado(organizacionId, datos) {
       turno_id: datos.turno?.id || null,
       cortejo_id: datos.cortejo?.id || null,
       cargador_id: datos.cargador?.id || null,
+      cargador_nombre: datos.cargador?.nombre_completo?.trim() || null,
+      error: datos.error || null,
     },
   };
 
@@ -1410,6 +1413,38 @@ export async function registrarCorreoEnviado(organizacionId, datos) {
     .single();
   if (error) return err(error);
   return data;
+}
+
+export async function updateCorreoEnviadoEstado(organizacionId, correoId, estado, nota) {
+  if (!correoId) return { error: 'Registro no válido.' };
+
+  const { data: actual, error: readErr } = await supabase
+    .from('correos_enviados')
+    .select('metadata')
+    .eq('id', correoId)
+    .eq('organizacion_id', organizacionId)
+    .maybeSingle();
+
+  if (readErr) return err(readErr);
+  if (!actual) return { error: 'Registro no encontrado.' };
+
+  const metadata = {
+    ...(actual.metadata || {}),
+    ...(nota ? { nota_rebote: nota } : {}),
+    marcado_rebotado_en:
+      estado === 'rebotado' ? new Date().toISOString() : actual.metadata?.marcado_rebotado_en,
+  };
+
+  const { data, error } = await supabase
+    .from('correos_enviados')
+    .update({ estado, metadata })
+    .eq('id', correoId)
+    .eq('organizacion_id', organizacionId)
+    .select()
+    .single();
+
+  if (error) return err(error);
+  return { data };
 }
 
 export async function getRolesByOrg(organizacionId) {

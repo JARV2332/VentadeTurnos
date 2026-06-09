@@ -92,6 +92,9 @@ export async function ejecutarReenvioMasivo({
       reciboId: recibo.id,
       etiqueta,
       destinatario: prep.cargador?.correo,
+      nombre: prep.cargador?.nombre_completo?.trim() || '',
+      codigo: codigoReciboDisplay(recibo.compra, recibo.brazos),
+      cargadorId: prep.cargador?.id || null,
     };
 
     if (res.ok) {

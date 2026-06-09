@@ -416,10 +416,55 @@ export function saveReciboConfig(organizacionId, { formato, diseño }) {
 export function registrarCorreoEnviadoMock(organizacionId, datos) {
   if (!store.correosEnviados) store.correosEnviados = {};
   if (!store.correosEnviados[organizacionId]) store.correosEnviados[organizacionId] = [];
-  const registro = { id: `mail-${Date.now()}`, ...datos };
-  store.correosEnviados[organizacionId].push(registro);
+  const now = new Date().toISOString();
+  const registro = {
+    id: `mail-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    organizacion_id: organizacionId,
+    destinatario:
+      datos.destinatario?.trim() ||
+      datos.cargador?.correo?.trim() ||
+      '',
+    asunto: datos.asunto || null,
+    codigo_boleta:
+      datos.codigo_boleta ||
+      datos.compra?.codigo_recibo ||
+      datos.brazo?.codigo_boleta_qr ||
+      null,
+    estado: datos.estado || 'enviado',
+    metadata: {
+      modo: datos.modo || null,
+      enviado_en: datos.enviado_en || now,
+      enlace_boleta: datos.enlaceBoleta || null,
+      remitente: datos.remitente || null,
+      nombre_remitente: datos.nombreRemitente || null,
+      responder_a: datos.responderA || null,
+      brazo_id: datos.brazo?.id || null,
+      turno_id: datos.turno?.id || null,
+      cortejo_id: datos.cortejo?.id || null,
+      cargador_id: datos.cargador?.id || null,
+      cargador_nombre: datos.cargador?.nombre_completo?.trim() || null,
+      error: datos.error || null,
+    },
+    created_at: now,
+  };
+  store.correosEnviados[organizacionId].unshift(registro);
   emit('email:enviado', registro);
   return registro;
+}
+
+export function updateCorreoEnviadoEstadoMock(organizacionId, correoId, estado, nota) {
+  const lista = store.correosEnviados?.[organizacionId] || [];
+  const idx = lista.findIndex((r) => r.id === correoId);
+  if (idx === -1) return { error: 'Registro no encontrado.' };
+  const actual = lista[idx];
+  const metadata = {
+    ...(actual.metadata || {}),
+    ...(nota ? { nota_rebote: nota } : {}),
+    marcado_rebotado_en: estado === 'rebotado' ? new Date().toISOString() : actual.metadata?.marcado_rebotado_en,
+  };
+  lista[idx] = { ...actual, estado, metadata };
+  emit('email:actualizado', lista[idx]);
+  return { data: lista[idx] };
 }
 
 export function getCorreosEnviadosMock(organizacionId) {
