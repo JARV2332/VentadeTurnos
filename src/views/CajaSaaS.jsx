@@ -23,6 +23,7 @@ import {
   formatFechaReporte,
   fechaVentaKey,
 } from '../utils/cajaReportUtils';
+import { formatHoraVentaGt } from '../utils/turnoHorarioUtils';
 
 export default function CajaSaaS() {
   const { organizacionId, organizacion } = useAuth();
@@ -427,6 +428,7 @@ export default function CajaSaaS() {
             <thead>
               <tr>
                 <th>Fecha</th>
+                <th>Hora</th>
                 <th>Turno</th>
                 <th>Tipo</th>
                 <th>Boleta</th>
@@ -441,6 +443,7 @@ export default function CajaSaaS() {
               {ventasFiltradas.map((v) => (
                 <tr key={v.id}>
                   <td>{formatFechaReporte(fechaVentaKey(v))}</td>
+                  <td>{formatHoraVentaGt(v.pago_confirmado_en || v.updated_at) || '—'}</td>
                   <td>#{v.numero_turno}</td>
                   <td>{labelTipoTurno(v.tipo_turno)}</td>
                   <td>

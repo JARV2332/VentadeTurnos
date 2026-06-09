@@ -1,11 +1,6 @@
 import * as XLSX from 'xlsx';
 import { labelMetodoPago } from './pagoUtils';
-import {
-  formatFechaEventoCorta,
-  formatHoraDisplay,
-  formatTimestampGt,
-  combinarFechaHoraTurno,
-} from './turnoHorarioUtils';
+import { formatHoraVentaGt } from './turnoHorarioUtils';
 
 const TIPO_TURNO_LABELS = {
   ordinario: 'Ordinario',
@@ -157,14 +152,9 @@ function filtrosTexto(filtros) {
 function filasDetalleExcel(ventas) {
   return ventas.map((v) => ({
     'Fecha venta': formatFechaReporte(fechaVentaKey(v)),
-    'Hora venta': formatTimestampGt(v.pago_confirmado_en || v.updated_at),
-    Procesión: v.cortejo_nombre || '—',
-    'Fecha evento': formatFechaEventoCorta(v.fecha_evento),
-    'Hora turno': formatHoraDisplay(v.hora_estimada),
-    'Fecha y hora turno': combinarFechaHoraTurno(v.fecha_evento, v.hora_estimada),
+    'Hora venta': formatHoraVentaGt(v.pago_confirmado_en || v.updated_at),
     Turno: v.numero_turno ?? '—',
     'Tipo turno': labelTipoTurno(v.tipo_turno),
-    Honor: v.turno_etiqueta || '—',
     Boleta: v.codigo_boleta_qr || '—',
     Operador: v.operador_nombre || '—',
     Pago: labelMetodoPago(v.metodo_pago),
@@ -342,16 +332,14 @@ function buildReporteCajaHtml({ ventas, resumen, filtros = {}, orgNombre = '' })
   <div class="panel">
     <h2>Detalle (${ventas.length} registros)</h2>
     <table>
-      <thead><tr><th>Fecha venta</th><th>Hora venta</th><th>Fecha evento</th><th>Hora turno</th><th>Turno</th><th>Tipo</th><th>Boleta</th><th>Operador</th><th>Pago</th><th>Ofrenda</th></tr></thead>
+      <thead><tr><th>Fecha</th><th>Hora</th><th>Turno</th><th>Tipo</th><th>Boleta</th><th>Operador</th><th>Pago</th><th>Ofrenda</th></tr></thead>
       <tbody>
         ${ventas
           .slice(0, 500)
           .map(
             (v) => `<tr>
           <td>${escapeHtml(formatFechaReporte(fechaVentaKey(v)))}</td>
-          <td>${escapeHtml(formatTimestampGt(v.pago_confirmado_en || v.updated_at))}</td>
-          <td>${escapeHtml(formatFechaEventoCorta(v.fecha_evento))}</td>
-          <td>${escapeHtml(formatHoraDisplay(v.hora_estimada))}</td>
+          <td>${escapeHtml(formatHoraVentaGt(v.pago_confirmado_en || v.updated_at) || '—')}</td>
           <td>#${escapeHtml(v.numero_turno ?? '—')}</td>
           <td>${escapeHtml(labelTipoTurno(v.tipo_turno))}</td>
           <td>${escapeHtml(v.codigo_boleta_qr || '—')}</td>

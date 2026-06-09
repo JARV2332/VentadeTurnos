@@ -99,3 +99,15 @@ export function formatTimestampGt(iso) {
     timeStyle: 'short',
   }).format(d);
 }
+
+/** Solo la hora de venta (sin fecha). */
+export function formatHoraVentaGt(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('es-GT', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(d);
+}

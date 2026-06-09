@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Loader from './Loader';
 import { getCortejosByOrg, getTurnosByCortejo, subscribeData } from '../services/dataService';
 import {
-  combinarFechaHoraTurno,
   formatFechaEvento,
   formatHoraDisplay,
 } from '../utils/turnoHorarioUtils';
@@ -54,7 +53,6 @@ export default function HorarioTurnosPanel({ organizacionId, incluirInactivas = 
   );
 
   const conHorario = turnos.filter((t) => t.hora_estimada).length;
-  const sinHorario = turnos.length - conHorario;
 
   return (
     <section className="panel horario-turnos">
@@ -83,9 +81,9 @@ export default function HorarioTurnosPanel({ organizacionId, incluirInactivas = 
       {cortejo && (
         <p className="horario-turnos__evento">
           <strong>Fecha del evento:</strong> {formatFechaEvento(cortejo.fecha)}
-          {turnos.length > 0 && (
+          {conHorario > 0 && (
             <span className="horario-turnos__stats">
-              · {conHorario} con hora · {sinHorario} sin hora
+              · {conHorario} turno(s) con hora asignada
             </span>
           )}
         </p>
@@ -95,6 +93,11 @@ export default function HorarioTurnosPanel({ organizacionId, incluirInactivas = 
         <Loader text="Cargando turnos…" />
       ) : !turnos.length ? (
         <p className="text-muted">No hay turnos en esta procesión.</p>
+      ) : conHorario === 0 ? (
+        <p className="text-muted">
+          Aún no hay horario de paso configurado. Asígnelo en <strong>Procesiones</strong> al editar
+          cada turno o con asignación automática.
+        </p>
       ) : (
         <div className="table-wrap">
           <table className="data-table data-table--compact">
@@ -103,22 +106,20 @@ export default function HorarioTurnosPanel({ organizacionId, incluirInactivas = 
                 <th>#</th>
                 <th>Turno</th>
                 <th>Tipo</th>
-                <th>Fecha evento</th>
-                <th>Hora estimada</th>
-                <th>Fecha y hora</th>
+                <th>Hora de paso</th>
               </tr>
             </thead>
             <tbody>
-              {turnos.map((t) => (
-                <tr key={t.id} className={!t.hora_estimada ? 'horario-turnos__sin-hora' : ''}>
-                  <td>{t.numero_turno}</td>
-                  <td>{t.etiqueta || t.tipo_turno}</td>
-                  <td>{t.tipo_turno}</td>
-                  <td>{formatFechaEvento(cortejo?.fecha)}</td>
-                  <td>{formatHoraDisplay(t.hora_estimada)}</td>
-                  <td>{combinarFechaHoraTurno(cortejo?.fecha, t.hora_estimada)}</td>
-                </tr>
-              ))}
+              {turnos
+                .filter((t) => t.hora_estimada)
+                .map((t) => (
+                  <tr key={t.id}>
+                    <td>{t.numero_turno}</td>
+                    <td>{t.etiqueta || t.tipo_turno}</td>
+                    <td>{t.tipo_turno}</td>
+                    <td>{formatHoraDisplay(t.hora_estimada)}</td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
