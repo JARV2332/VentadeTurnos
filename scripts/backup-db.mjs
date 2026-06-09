@@ -15,13 +15,23 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
+const cloudMode =
+  process.env.BACKUP_TARGET === 'cloud' || process.argv.includes('--cloud');
 
-dotenv.config({ path: path.join(root, '.env.local') });
+if (!cloudMode) {
+  dotenv.config({ path: path.join(root, '.env.local') });
+}
 dotenv.config({ path: path.join(root, '.env.production') });
 dotenv.config({ path: path.join(root, '.env') });
 
-const url = process.env.REACT_APP_SUPABASE_URL;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const url = cloudMode
+  ? process.env.REACT_APP_SUPABASE_URL_CLOUD ||
+    process.env.REACT_APP_SUPABASE_URL ||
+    process.env.SUPABASE_URL
+  : process.env.REACT_APP_SUPABASE_URL || process.env.SUPABASE_URL;
+const serviceKey = cloudMode
+  ? process.env.SUPABASE_SERVICE_ROLE_KEY_CLOUD || process.env.SUPABASE_SERVICE_ROLE_KEY
+  : process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const TABLES = [
   'organizaciones',
@@ -71,16 +81,22 @@ async function fetchTable(admin, table) {
 
 if (!url || !serviceKey) {
   console.error(`
-❌ Falta configuración para el backup.
+❌ Falta configuración para el backup${cloudMode ? ' de la nube' : ''}.
 
-Cree el archivo .env.local en la raíz del proyecto con:
+${cloudMode ? `Opción A — Vercel (recomendado):
+  cmd /c "set BACKUP_TARGET=cloud && npx vercel env run -e production -- node scripts/backup-db.mjs --cloud"
+
+Opción B — .env.local con clave de la nube:
+  REACT_APP_SUPABASE_URL_CLOUD=https://kolhnoectddjgfowyvux.supabase.co
+  SUPABASE_SERVICE_ROLE_KEY_CLOUD=sb_secret_...   ← Supabase → Settings → API → secret
+
+  npm run db:backup:cloud
+` : `Cree el archivo .env.local en la raíz del proyecto con:
 
 REACT_APP_SUPABASE_URL=https://kolhnoectddjgfowyvux.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJ...   ← Settings → API → service_role (secreta)
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_...   ← Settings → API → service_role (secreta)
 
-Luego ejecute: npm run db:backup
-
-La service_role NO se sube a GitHub; solo queda en su PC.
+Luego ejecute: npm run db:backup`}
 `);
   process.exit(1);
 }
@@ -97,6 +113,7 @@ console.log(`\n📦 Backup Supabase → ${outDir}\n`);
 const manifest = {
   exported_at: new Date().toISOString(),
   supabase_url: url,
+  target: cloudMode ? 'cloud' : 'default',
   tables: {},
 };
 

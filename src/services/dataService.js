@@ -237,6 +237,11 @@ export const aplicarImportApartados = (cortejoId, orgId, filas, opts) =>
     ? sb.aplicarImportApartados(cortejoId, orgId, filas, opts)
     : Promise.resolve(mock.aplicarImportApartadosMock(cortejoId, orgId, filas, opts));
 
+export const quitarApartados = (organizacionId, cortejoId, opts) =>
+  useSb()
+    ? sb.quitarApartados(organizacionId, cortejoId, opts)
+    : Promise.resolve(mock.quitarApartadosMock(organizacionId, cortejoId, opts));
+
 export const updatePerfil = (userId, orgId, datos, email) =>
   useSb()
     ? sb.updatePerfilSupabase(userId, orgId, datos, email)

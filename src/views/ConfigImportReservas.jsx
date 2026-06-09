@@ -7,6 +7,7 @@ import {
   getResumenApartados,
   getTurnosAgrupados,
   aplicarImportApartados,
+  quitarApartados,
   subscribeData,
 } from '../services/dataService';
 import ManualApartadoForm from '../components/ManualApartadoForm';
@@ -36,6 +37,7 @@ export default function ConfigImportReservas() {
   const [leyendo, setLeyendo] = useState(false);
   const [aplicando, setAplicando] = useState(false);
   const [aplicacionOk, setAplicacionOk] = useState(null);
+  const [quitandoId, setQuitandoId] = useState(null);
 
   const refresh = useCallback(async () => {
     if (!organizacionId) return;
@@ -64,8 +66,58 @@ export default function ConfigImportReservas() {
 
   const refreshResumen = async () => {
     if (!cortejoId || !organizacionId) return;
-    const data = await getResumenApartados(cortejoId, organizacionId);
+    const [data, turnosData] = await Promise.all([
+      getResumenApartados(cortejoId, organizacionId),
+      getTurnosAgrupados(cortejoId, organizacionId),
+    ]);
     setResumen(Array.isArray(data) ? data : []);
+    setTurnos(Array.isArray(turnosData) ? turnosData : []);
+  };
+
+  const handleQuitarApartados = async ({ brazoIds, turnoId, confirmMsg, accionId }) => {
+    if (!cortejoId || !organizacionId) return;
+    if (!window.confirm(confirmMsg)) return;
+
+    setError('');
+    setOkMsg('');
+    setQuitandoId(accionId);
+    try {
+      const res = await quitarApartados(organizacionId, cortejoId, { brazoIds, turnoId });
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      setOkMsg(res.mensaje || `${res.ok} apartado(s) liberado(s).`);
+      await refreshResumen();
+    } catch (err) {
+      setError(err.message || 'No se pudo quitar el apartado');
+    } finally {
+      setQuitandoId(null);
+    }
+  };
+
+  const handleQuitarBrazo = (d, item) => {
+    handleQuitarApartados({
+      brazoIds: [d.brazo.id],
+      confirmMsg: `¿Quitar apartado del brazo ${d.brazo.numero_brazo} ${d.brazo.lado} (turno #${item.turno.numero_turno}, ${d.etiqueta})? El espacio quedará disponible en Taquilla.`,
+      accionId: d.brazo.id,
+    });
+  };
+
+  const handleQuitarFila = (f) => {
+    handleQuitarApartados({
+      brazoIds: f.brazos.map((b) => b.id),
+      confirmMsg: `¿Quitar apartado de ${f.nombre} en turno #${f.turnoNum} (${f.cantidad} espacio(s))? Quedarán disponibles en Taquilla.`,
+      accionId: `fila-${f.turnoId}-${f.nombre}-${f.dpi}`,
+    });
+  };
+
+  const handleQuitarTurno = (item) => {
+    handleQuitarApartados({
+      turnoId: item.turno.id,
+      confirmMsg: `¿Quitar todos los apartados del turno #${item.turno.numero_turno} (${item.apartados} espacio(s))? Quedarán disponibles en Taquilla.`,
+      accionId: `turno-${item.turno.id}`,
+    });
   };
 
   const handleArchivo = async (e) => {
@@ -411,8 +463,9 @@ export default function ConfigImportReservas() {
           Listado general de apartados ({totalApartados} espacio(s))
         </h3>
         <p className="text-muted config-hint">
-          Vista tipo Excel: qué turno está apartado y a quién. También puede apartar arriba sin subir
-          archivo.
+          Vista tipo Excel: qué turno está apartado y a quién. Use <strong>Quitar fila</strong> para
+          liberar todos los espacios de esa fila, o el detalle por turno para quitar uno a uno o el
+          turno completo.
         </p>
         {filasGenerales.length === 0 ? (
           <p className="text-muted">No hay apartados registrados en esta procesión.</p>
@@ -427,11 +480,12 @@ export default function ConfigImportReservas() {
                   <th>DPI</th>
                   <th>Cant.</th>
                   <th>Brazos</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
                 {filasGenerales.map((f) => (
-                  <tr key={`${f.turnoId}-${f.nombre}-${f.dpi}-${f.cantidad}`}>
+                  <tr key={`${f.turnoId}-${f.nombre}-${f.dpi}-${f.brazos.map((b) => b.id).join('-')}`}>
                     <td>
                       <strong>#{f.turnoNum}</strong>
                     </td>
@@ -443,6 +497,18 @@ export default function ConfigImportReservas() {
                     <td>{f.cantidad}</td>
                     <td className="text-muted">
                       {f.brazos.map((b) => `${b.numero} ${b.lado[0]}`).join(', ')}
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm btn--danger-text"
+                        disabled={Boolean(quitandoId)}
+                        onClick={() => handleQuitarFila(f)}
+                      >
+                        {quitandoId === `fila-${f.turnoId}-${f.nombre}-${f.dpi}`
+                          ? 'Quitando…'
+                          : 'Quitar fila'}
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -458,7 +524,8 @@ export default function ConfigImportReservas() {
         </h3>
         <p className="text-muted config-hint">
           Los espacios importados aparecen en <strong>amarillo (apartado)</strong> en Taquilla con el
-          nombre del devoto(a). Puede completar la venta desde taquilla al hacer clic.
+          nombre del devoto(a). Puede completar la venta desde taquilla al hacer clic, o quitar el
+          apartado si fue un error.
         </p>
         {resumen.length === 0 ? (
           <p className="text-muted">Seleccione una procesión.</p>
@@ -474,24 +541,46 @@ export default function ConfigImportReservas() {
                   <span className="text-muted">
                     {item.apartados} apartados · {item.vendidos} vendidos · {item.libres} libres
                   </span>
+                  {item.apartados > 0 && (
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--sm btn--danger-text"
+                      disabled={Boolean(quitandoId)}
+                      onClick={() => handleQuitarTurno(item)}
+                    >
+                      {quitandoId === `turno-${item.turno.id}`
+                        ? 'Quitando…'
+                        : 'Quitar turno completo'}
+                    </button>
+                  )}
                 </div>
                 {(item.detalle || []).length === 0 ? (
                   <p className="text-muted resumen-apartados__vacio">Sin apartados en este turno</p>
                 ) : (
                   <ul className="resumen-apartados__lista">
                     {(item.detalle || []).map((d) => (
-                      <li key={d.brazo.id}>
-                        Brazo {d.brazo.numero_brazo} {d.brazo.lado}:{' '}
-                        <strong>{d.etiqueta}</strong>
-                        {d.cargador?.cui_o_identificacion && (
-                          <span className="text-muted">
-                            {' '}
-                            — DPI {d.cargador.cui_o_identificacion}
-                          </span>
-                        )}
-                        {d.brazo.apartado_notas && (
-                          <span className="text-muted"> — {d.brazo.apartado_notas}</span>
-                        )}
+                      <li key={d.brazo.id} className="resumen-apartados__item">
+                        <span>
+                          Brazo {d.brazo.numero_brazo} {d.brazo.lado}:{' '}
+                          <strong>{d.etiqueta}</strong>
+                          {d.cargador?.cui_o_identificacion && (
+                            <span className="text-muted">
+                              {' '}
+                              — DPI {d.cargador.cui_o_identificacion}
+                            </span>
+                          )}
+                          {d.brazo.apartado_notas && (
+                            <span className="text-muted"> — {d.brazo.apartado_notas}</span>
+                          )}
+                        </span>
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--sm btn--danger-text"
+                          disabled={Boolean(quitandoId)}
+                          onClick={() => handleQuitarBrazo(d, item)}
+                        >
+                          {quitandoId === d.brazo.id ? '…' : 'Quitar'}
+                        </button>
                       </li>
                     ))}
                   </ul>

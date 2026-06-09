@@ -16,7 +16,7 @@ import {
 } from '../utils/importReservasUtils';
 import { isValidCui, normalizarCui } from '../utils/cuiUtils';
 import { aplicarAsignacionBrazos } from '../utils/aplicarAsignacionBrazos';
-import { RESET_BRAZO_VENTA, normalizarCodigoBoleta } from '../utils/ventaAnulacionUtils';
+import { RESET_BRAZO_VENTA, RESET_BRAZO_APARTADO, esBrazoApartadoQuitables, normalizarCodigoBoleta } from '../utils/ventaAnulacionUtils';
 import { PERMISOS_ADMIN_COMPLETO } from '../config/permisos';
 import { normalizarHoraInput, calcularHoraTurno } from '../utils/turnoHorarioUtils';
 
@@ -2164,4 +2164,80 @@ export async function aplicarImportApartados(cortejoId, organizacionId, filas, {
   }
 
   return { ok, omitidos, total: filas.length, resultados };
+}
+
+export async function quitarApartados(organizacionId, cortejoId, { brazoIds = [], turnoId } = {}) {
+  if (!organizacionId || !cortejoId) {
+    return { error: 'Organización o procesión no válida.' };
+  }
+
+  let ids = [...new Set((brazoIds || []).filter(Boolean))];
+
+  if (turnoId) {
+    const { data: turno, error: turnoErr } = await supabase
+      .from('turnos')
+      .select('id')
+      .eq('id', turnoId)
+      .eq('cortejo_id', cortejoId)
+      .eq('organizacion_id', organizacionId)
+      .maybeSingle();
+
+    if (turnoErr) return err(turnoErr);
+    if (!turno) return { error: 'Turno no encontrado en esta procesión.' };
+
+    const { data: brazosTurno, error: bErr } = await supabase
+      .from('brazos')
+      .select('id, estado, reserva_apartado')
+      .eq('turno_id', turnoId)
+      .eq('organizacion_id', organizacionId);
+
+    if (bErr) return err(bErr);
+
+    const apartadosTurno = (brazosTurno || [])
+      .filter(esBrazoApartadoQuitables)
+      .map((b) => b.id);
+    ids = [...new Set([...ids, ...apartadosTurno])];
+  }
+
+  if (!ids.length) {
+    return { error: 'No hay apartados para quitar.' };
+  }
+
+  const { data: brazos, error: readErr } = await supabase
+    .from('brazos')
+    .select('id, estado, reserva_apartado, numero_brazo, lado, turno_id')
+    .in('id', ids)
+    .eq('organizacion_id', organizacionId);
+
+  if (readErr) return err(readErr);
+
+  const quitables = (brazos || []).filter(esBrazoApartadoQuitables);
+  const omitidos = (brazos || []).length - quitables.length;
+
+  if (!quitables.length) {
+    return {
+      error: 'Ningún espacio seleccionado está apartado (puede estar vendido o ya libre).',
+      omitidos,
+    };
+  }
+
+  const { error: updateErr } = await supabase
+    .from('brazos')
+    .update(RESET_BRAZO_APARTADO)
+    .in(
+      'id',
+      quitables.map((b) => b.id)
+    )
+    .eq('organizacion_id', organizacionId)
+    .eq('estado', 'reservado')
+    .eq('reserva_apartado', true);
+
+  if (updateErr) return err(updateErr);
+
+  return {
+    ok: quitables.length,
+    omitidos,
+    total: ids.length,
+    mensaje: `${quitables.length} apartado(s) liberado(s)${omitidos ? ` · ${omitidos} omitido(s)` : ''}.`,
+  };
 }

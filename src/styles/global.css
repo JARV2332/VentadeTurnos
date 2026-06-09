@@ -4800,8 +4800,23 @@ body {
 
 .resumen-apartados__lista {
   margin: 0;
-  padding-left: 1.2rem;
+  padding-left: 0;
+  list-style: none;
   font-size: 0.82rem;
+}
+
+.resumen-apartados__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.resumen-apartados__item:first-child {
+  border-top: none;
 }
 
 .resumen-apartados__vacio {

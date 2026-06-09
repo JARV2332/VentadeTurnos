@@ -20,6 +20,22 @@ export const RESET_BRAZO_VENTA = {
   apartado_notas: null,
 };
 
+/** Payload para liberar un espacio apartado (sin venta). */
+export const RESET_BRAZO_APARTADO = {
+  estado: 'disponible',
+  cargador_id: null,
+  bloqueado_hasta: null,
+  vendedor_id: null,
+  mesa_id: null,
+  reserva_apartado: false,
+  asignado_nombre: null,
+  apartado_notas: null,
+};
+
+export function esBrazoApartadoQuitables(brazo) {
+  return brazo?.estado === 'reservado' && Boolean(brazo?.reserva_apartado);
+}
+
 export function normalizarCodigoBoleta(codigo) {
   return (
     String(codigo || '')

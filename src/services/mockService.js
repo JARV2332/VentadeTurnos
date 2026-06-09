@@ -12,7 +12,7 @@ import {
 } from '../utils/importReservasUtils';
 import { isValidCui, normalizarCui } from '../utils/cuiUtils';
 import { aplicarAsignacionBrazos } from '../utils/aplicarAsignacionBrazos';
-import { RESET_BRAZO_VENTA, normalizarCodigoBoleta } from '../utils/ventaAnulacionUtils';
+import { RESET_BRAZO_VENTA, RESET_BRAZO_APARTADO, esBrazoApartadoQuitables, normalizarCodigoBoleta } from '../utils/ventaAnulacionUtils';
 import { normalizarHoraInput, calcularHoraTurno } from '../utils/turnoHorarioUtils';
 
 let store = crearStoreInicial();
@@ -1475,4 +1475,58 @@ export function aplicarImportApartadosMock(cortejoId, organizacionId, filas, { u
 
   emit('brazos', { eventType: 'IMPORT', cortejoId });
   return { ok, omitidos, total: filas.length, resultados };
+}
+
+export function quitarApartadosMock(organizacionId, cortejoId, { brazoIds = [], turnoId } = {}) {
+  if (!organizacionId || !cortejoId) {
+    return { error: 'Organización o procesión no válida.' };
+  }
+
+  let ids = [...new Set((brazoIds || []).filter(Boolean))];
+
+  if (turnoId) {
+    const turno = store.turnos.find(
+      (t) =>
+        t.id === turnoId &&
+        t.cortejo_id === cortejoId &&
+        t.organizacion_id === organizacionId
+    );
+    if (!turno) return { error: 'Turno no encontrado en esta procesión.' };
+
+    store.brazos
+      .filter((b) => b.turno_id === turnoId && b.organizacion_id === organizacionId)
+      .filter(esBrazoApartadoQuitables)
+      .forEach((b) => ids.push(b.id));
+    ids = [...new Set(ids)];
+  }
+
+  if (!ids.length) {
+    return { error: 'No hay apartados para quitar.' };
+  }
+
+  const brazos = store.brazos.filter(
+    (b) => ids.includes(b.id) && b.organizacion_id === organizacionId
+  );
+  const quitables = brazos.filter(esBrazoApartadoQuitables);
+  const omitidos = brazos.length - quitables.length;
+
+  if (!quitables.length) {
+    return {
+      error: 'Ningún espacio seleccionado está apartado (puede estar vendido o ya libre).',
+      omitidos,
+    };
+  }
+
+  const quitarIds = new Set(quitables.map((b) => b.id));
+  store.brazos = store.brazos.map((b) =>
+    quitarIds.has(b.id) ? { ...b, ...RESET_BRAZO_APARTADO } : b
+  );
+  emit('brazos', { eventType: 'UPDATE', cortejoId });
+
+  return {
+    ok: quitables.length,
+    omitidos,
+    total: ids.length,
+    mensaje: `${quitables.length} apartado(s) liberado(s)${omitidos ? ` · ${omitidos} omitido(s)` : ''}.`,
+  };
 }

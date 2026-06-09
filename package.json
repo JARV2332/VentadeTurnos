@@ -32,6 +32,7 @@
     "db:seed": "node scripts/seed-demo.mjs",
     "db:seed-super": "node scripts/seed-super.mjs",
     "db:backup": "node scripts/backup-db.mjs",
+    "db:backup:cloud": "node scripts/backup-db.mjs --cloud",
     "db:backup:full": "node scripts/backup-pg-full.mjs",
     "db:apply:local": "node scripts/apply-schema-local.mjs",
     "db:restore:local": "node scripts/restore-backup-local.mjs",
