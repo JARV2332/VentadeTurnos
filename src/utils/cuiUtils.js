@@ -11,6 +11,12 @@ export function isValidCui(value) {
   return d.length === CUI_DIGITS;
 }
 
+/** Búsqueda pública: mínimo 4 dígitos para evitar consultas demasiado amplias. */
+export function cuiValidoParaBusqueda(value) {
+  const d = String(value || '').replace(/\D/g, '');
+  return d.length >= 4 && d.length <= 20;
+}
+
 /** Normaliza DPI desde Excel (número, texto, vacío, guiones). */
 export function normalizarDpiImport(value) {
   const raw = String(value ?? '').trim();

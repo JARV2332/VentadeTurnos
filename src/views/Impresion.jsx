@@ -310,6 +310,15 @@ export default function Impresion() {
   return (
     <Layout title="Impresión de boletas" subtitle="Busque por devoto(a), imprima o reenvíe boleta">
       {okDevoto && <div className="alert alert--success no-print">{okDevoto}</div>}
+      {organizacion?.subdominio_slug && (
+        <div className="info-box no-print mis-turnos-enlace-admin">
+          <strong>Enlace público «Ver mis turnos»</strong>
+          <p className="text-muted">
+            Comparta este enlace en redes sociales para que los devotos descarguen sus boletas con su DPI:
+          </p>
+          <code>{typeof window !== 'undefined' ? `${window.location.origin}/mis-turnos/${organizacion.subdominio_slug}` : `/mis-turnos/${organizacion.subdominio_slug}`}</code>
+        </div>
+      )}
       <div className="impresion-controls no-print">
         <label className="impresion-controls__busqueda">
           Buscar {TERMINO_DEVOTO.toLowerCase()}

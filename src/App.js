@@ -17,6 +17,7 @@ import EntregaTurno from './views/EntregaTurno';
 import PerfilUsuario from './views/PerfilUsuario';
 import PlataformaAdmin from './views/PlataformaAdmin';
 import BoletaPublica from './views/BoletaPublica';
+import MisTurnosPublico from './views/MisTurnosPublico';
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/boleta/:codigo" element={<BoletaPublica />} />
+          <Route path="/mis-turnos/:orgSlug" element={<MisTurnosPublico />} />
           <Route
             path="/plataforma"
             element={
