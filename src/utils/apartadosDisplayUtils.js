@@ -1,4 +1,6 @@
 import { etiquetaAsignado } from './importReservasUtils';
+import { TIPOS_TURNO } from './turnoUtils';
+import { labelTipoTurno } from './cajaReportUtils';
 
 function dpiDesdeApartado(brazo, cargador) {
   const cui = cargador?.cui_o_identificacion?.trim();
@@ -69,5 +71,45 @@ export function filasGeneralesApartados(resumen) {
     (a, b) =>
       a.turnoNum - b.turnoNum ||
       a.nombre.localeCompare(b.nombre, 'es')
+  );
+}
+
+/** Agrupa apartados por tipo/honor de turno (Salida, Ordinario, Extraordinario, Entrada). */
+export function resumenApartadosPorTipo(resumen) {
+  const map = new Map();
+
+  (resumen || []).forEach((item) => {
+    const tipo = item.turno?.tipo_turno || 'Otro';
+    if (!map.has(tipo)) {
+      map.set(tipo, {
+        tipo,
+        label: labelTipoTurno(tipo),
+        turnosConApartados: 0,
+        apartados: 0,
+        brazoIds: [],
+      });
+    }
+    const g = map.get(tipo);
+    if (item.apartados > 0) g.turnosConApartados += 1;
+    g.apartados += item.apartados || 0;
+    (item.detalle || []).forEach((d) => {
+      if (d.brazo?.id) g.brazoIds.push(d.brazo.id);
+    });
+  });
+
+  const orden = [...TIPOS_TURNO, 'Otro'];
+  return [...map.values()]
+    .filter((g) => g.apartados > 0)
+    .sort((a, b) => {
+      const ia = orden.indexOf(a.tipo);
+      const ib = orden.indexOf(b.tipo);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+}
+
+/** Todos los brazo IDs apartados de la procesión. */
+export function todosBrazoIdsApartados(resumen) {
+  return (resumen || []).flatMap((item) =>
+    (item.detalle || []).map((d) => d.brazo?.id).filter(Boolean)
   );
 }

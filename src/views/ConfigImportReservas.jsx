@@ -11,7 +11,11 @@ import {
   subscribeData,
 } from '../services/dataService';
 import ManualApartadoForm from '../components/ManualApartadoForm';
-import { filasGeneralesApartados } from '../utils/apartadosDisplayUtils';
+import {
+  filasGeneralesApartados,
+  resumenApartadosPorTipo,
+  todosBrazoIdsApartados,
+} from '../utils/apartadosDisplayUtils';
 import {
   PLANTILLA_LISTADO_COLUMNAS,
   PLANTILLA_COLUMNAS,
@@ -155,6 +159,25 @@ export default function ConfigImportReservas() {
     });
   };
 
+  const handleQuitarPorTipo = (grupo) => {
+    if (!grupo?.brazoIds?.length) return;
+    handleQuitarApartados({
+      brazoIds: grupo.brazoIds,
+      confirmMsg: `¿Liberar ${grupo.apartados} apartado(s) de tipo «${grupo.label}» en ${grupo.turnosConApartados} turno(s)? Solo espacios apartados — no afecta ventas pagadas.`,
+      accionId: `tipo-${grupo.tipo}`,
+    });
+  };
+
+  const handleQuitarTodos = () => {
+    const brazoIds = todosBrazoIdsApartados(resumen);
+    if (!brazoIds.length) return;
+    handleQuitarApartados({
+      brazoIds,
+      confirmMsg: `¿Liberar TODOS los ${brazoIds.length} apartado(s) de esta procesión? Los espacios quedarán disponibles en Taquilla. No se tocan turnos ya vendidos.`,
+      accionId: 'todos-apartados',
+    });
+  };
+
   const handleArchivo = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -247,6 +270,8 @@ export default function ConfigImportReservas() {
   const totalApartados = (resumen || []).reduce((s, r) => s + (r.apartados || 0), 0);
   const statsPreview = resumenFilasImport(preview, formatoImport);
   const filasGenerales = filasGeneralesApartados(resumen);
+
+  const resumenPorTipo = useMemo(() => resumenApartadosPorTipo(resumen), [resumen]);
 
   const filasGeneralesFiltradas = useMemo(() => {
     const q = busquedaApartados.trim().toLowerCase();
@@ -511,13 +536,57 @@ export default function ConfigImportReservas() {
         </section>
       )}
 
+      {totalApartados > 0 && (
+        <section className="panel apartados-masivo">
+          <div className="apartados-masivo__head">
+            <div>
+              <h3 className="panel__title">Liberación masiva por tipo / honor</h3>
+              <p className="text-muted config-hint">
+                Libere todos los apartados de un tipo de turno de una vez (Salida, Ordinario,
+                Extraordinario, Entrada). Solo afecta reservas sin pago — no ventas confirmadas.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn--danger btn--sm"
+              disabled={Boolean(quitandoId)}
+              onClick={handleQuitarTodos}
+            >
+              {quitandoId === 'todos-apartados'
+                ? 'Liberando…'
+                : `Liberar todos (${totalApartados})`}
+            </button>
+          </div>
+          <div className="apartados-masivo__grid">
+            {resumenPorTipo.map((grupo) => (
+              <div key={grupo.tipo} className="apartados-masivo__card">
+                <strong className="apartados-masivo__tipo">{grupo.label}</strong>
+                <p className="text-muted apartados-masivo__stats">
+                  {grupo.apartados} espacio(s) · {grupo.turnosConApartados} turno(s)
+                </p>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm btn--danger-text"
+                  disabled={Boolean(quitandoId)}
+                  onClick={() => handleQuitarPorTipo(grupo)}
+                >
+                  {quitandoId === `tipo-${grupo.tipo}`
+                    ? 'Liberando…'
+                    : `Liberar ${grupo.label}`}
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="panel">
         <h3 className="panel__title">
           Listado general de apartados ({totalApartados} espacio(s))
         </h3>
         <p className="text-muted config-hint">
           Busque por nombre o DPI y libere por cantidad. Si alguien tiene 2 espacios puede liberar 1
-          o todos. También puede quitar brazo a brazo en el detalle por turno abajo.
+          o todos. Use la liberación masiva arriba por tipo, o el detalle por turno abajo.
         </p>
 
         <div className="apartados-busqueda">

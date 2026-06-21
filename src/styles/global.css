@@ -4967,6 +4967,41 @@ html {
   vertical-align: top;
 }
 
+.apartados-masivo__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.apartados-masivo__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.75rem;
+}
+
+.apartados-masivo__card {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.apartados-masivo__tipo {
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.apartados-masivo__stats {
+  font-size: 0.8rem;
+  margin: 0;
+}
+
 .apartados-busqueda {
   display: flex;
   flex-wrap: wrap;
