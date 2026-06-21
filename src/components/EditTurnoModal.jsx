@@ -4,7 +4,6 @@ import { normalizarHoraInput } from '../utils/turnoHorarioUtils';
 import {
   tiposTurnoEditables,
   maxNumeroTurno,
-  referenciaPorTipoTurno,
   validarBrazosPares,
   brazosPorLado,
 } from '../utils/turnoUtils';
@@ -63,16 +62,6 @@ export default function EditTurnoModal({
     };
   }, [turno]);
 
-  const handleTipoChange = (nuevoTipo) => {
-    setTipoTurno(nuevoTipo);
-    const refs = referenciaPorTipoTurno(
-      turnosExistentes.filter((t) => t.id !== turno?.id),
-      nuevoTipo
-    );
-    setPrecio(refs.precio);
-    setTotalBrazos(refs.total_brazos);
-  };
-
   if (!turno || typeof document === 'undefined') return null;
 
   const handleSubmit = (e) => {
@@ -126,7 +115,7 @@ export default function EditTurnoModal({
             ) : (
               <select
                 value={tipoTurno}
-                onChange={(e) => handleTipoChange(e.target.value)}
+                onChange={(e) => setTipoTurno(e.target.value)}
               >
                 {tiposPermitidos.map((t) => (
                   <option key={t} value={t}>
