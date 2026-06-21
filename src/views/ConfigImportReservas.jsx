@@ -13,7 +13,8 @@ import {
 import ManualApartadoForm from '../components/ManualApartadoForm';
 import {
   filasGeneralesApartados,
-  resumenApartadosPorTipo,
+  resumenApartadosMasivo,
+  filtrarApartadosMasivo,
   todosBrazoIdsApartados,
 } from '../utils/apartadosDisplayUtils';
 import {
@@ -271,7 +272,11 @@ export default function ConfigImportReservas() {
   const statsPreview = resumenFilasImport(preview, formatoImport);
   const filasGenerales = filasGeneralesApartados(resumen);
 
-  const resumenPorTipo = useMemo(() => resumenApartadosPorTipo(resumen), [resumen]);
+  const masivoData = useMemo(() => resumenApartadosMasivo(resumen), [resumen]);
+  const masivoFiltrado = useMemo(
+    () => filtrarApartadosMasivo(masivoData.gruposTipo, busquedaApartados),
+    [masivoData.gruposTipo, busquedaApartados]
+  );
 
   const filasGeneralesFiltradas = useMemo(() => {
     const q = busquedaApartados.trim().toLowerCase();
@@ -540,10 +545,11 @@ export default function ConfigImportReservas() {
         <section className="panel apartados-masivo">
           <div className="apartados-masivo__head">
             <div>
-              <h3 className="panel__title">Liberación masiva por tipo / honor</h3>
+              <h3 className="panel__title">Liberación masiva por turno</h3>
               <p className="text-muted config-hint">
-                Libere todos los apartados de un tipo de turno de una vez (Salida, Ordinario,
-                Extraordinario, Entrada). Solo afecta reservas sin pago — no ventas confirmadas.
+                Vea cada turno con su número y honor (Salida, Ordinario 2, Extraordinario turno 7…).
+                Libere un turno completo, todos los de un tipo, o toda la procesión. Solo apartados
+                sin pago.
               </p>
             </div>
             <button
@@ -557,54 +563,93 @@ export default function ConfigImportReservas() {
                 : `Liberar todos (${totalApartados})`}
             </button>
           </div>
-          <div className="apartados-masivo__grid">
-            {resumenPorTipo.map((grupo) => (
-              <div key={grupo.tipo} className="apartados-masivo__card">
-                <strong className="apartados-masivo__tipo">{grupo.label}</strong>
-                <p className="text-muted apartados-masivo__stats">
-                  {grupo.apartados} espacio(s) · {grupo.turnosConApartados} turno(s)
-                </p>
-                <button
-                  type="button"
-                  className="btn btn--ghost btn--sm btn--danger-text"
-                  disabled={Boolean(quitandoId)}
-                  onClick={() => handleQuitarPorTipo(grupo)}
-                >
-                  {quitandoId === `tipo-${grupo.tipo}`
-                    ? 'Liberando…'
-                    : `Liberar ${grupo.label}`}
-                </button>
-              </div>
-            ))}
+
+          <div className="apartados-busqueda apartados-busqueda--masivo">
+            <label>
+              Buscar turno, honor o devoto(a)
+              <input
+                type="search"
+                value={busquedaApartados}
+                onChange={(e) => setBusquedaApartados(e.target.value)}
+                placeholder="Ej. Ordinario, Extraordinario, turno 7, García"
+              />
+            </label>
+            {busquedaApartados.trim() && (
+              <span className="text-muted apartados-busqueda__meta">
+                {masivoFiltrado.reduce((s, g) => s + g.turnos.length, 0)} turno(s) ·{' '}
+                {filasGeneralesFiltradas.length} fila(s) por persona
+              </span>
+            )}
           </div>
+
+          {masivoFiltrado.length === 0 ? (
+            <p className="text-muted">Ningún turno apartado coincide con la búsqueda.</p>
+          ) : (
+            <div className="apartados-masivo__grupos">
+              {masivoFiltrado.map((grupo) => (
+                <div key={grupo.tipo} className="apartados-masivo__grupo">
+                  <div className="apartados-masivo__grupo-head">
+                    <div>
+                      <strong className="apartados-masivo__tipo">{grupo.label}</strong>
+                      <span className="text-muted apartados-masivo__grupo-meta">
+                        {grupo.apartados} espacio(s) · {grupo.turnos.length} turno(s)
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--sm btn--danger-text"
+                      disabled={Boolean(quitandoId)}
+                      onClick={() => handleQuitarPorTipo(grupo)}
+                    >
+                      {quitandoId === `tipo-${grupo.tipo}`
+                        ? 'Liberando…'
+                        : `Liberar todo ${grupo.label}`}
+                    </button>
+                  </div>
+                  <ul className="apartados-masivo__turnos">
+                    {grupo.turnos.map((t) => (
+                      <li key={t.turnoId} className="apartados-masivo__turno">
+                        <div className="apartados-masivo__turno-info">
+                          <strong>
+                            Turno #{t.numero} · {t.honor}
+                          </strong>
+                          <span className="text-muted">
+                            {t.apartados} apartado(s)
+                            {t.nombresPreview ? ` · ${t.nombresPreview}` : ''}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--sm btn--danger-text"
+                          disabled={Boolean(quitandoId)}
+                          onClick={() => handleQuitarTurno(t.resumenItem)}
+                        >
+                          {quitandoId === `turno-${t.turnoId}` ? 'Liberando…' : 'Liberar turno'}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       )}
 
       <section className="panel">
         <h3 className="panel__title">
-          Listado general de apartados ({totalApartados} espacio(s))
+          Listado por devoto(a) ({totalApartados} espacio(s))
         </h3>
         <p className="text-muted config-hint">
-          Busque por nombre o DPI y libere por cantidad. Si alguien tiene 2 espacios puede liberar 1
-          o todos. Use la liberación masiva arriba por tipo, o el detalle por turno abajo.
+          Busque por nombre o DPI y libere por cantidad (1, N o todos los espacios de una persona en
+          un turno). La búsqueda de arriba también filtra este listado.
         </p>
 
-        <div className="apartados-busqueda">
-          <label>
-            Buscar por nombre, DPI o turno
-            <input
-              type="search"
-              value={busquedaApartados}
-              onChange={(e) => setBusquedaApartados(e.target.value)}
-              placeholder="Ej. García, 1234567890123, turno 7"
-            />
-          </label>
-          {busquedaApartados.trim() && (
-            <span className="text-muted apartados-busqueda__meta">
-              {filasGeneralesFiltradas.length} resultado(s)
-            </span>
-          )}
-        </div>
+        {!busquedaApartados.trim() && (
+          <p className="text-muted config-hint apartados-lista-hint">
+            Use el buscador en «Liberación masiva» para filtrar por turno, honor o nombre.
+          </p>
+        )}
 
         {filasGenerales.length === 0 ? (
           <p className="text-muted">No hay apartados registrados en esta procesión.</p>

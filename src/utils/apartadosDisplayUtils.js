@@ -1,5 +1,5 @@
 import { etiquetaAsignado } from './importReservasUtils';
-import { TIPOS_TURNO } from './turnoUtils';
+import { TIPOS_TURNO, etiquetaHonorTurno } from './turnoUtils';
 import { labelTipoTurno } from './cajaReportUtils';
 
 function dpiDesdeApartado(brazo, cargador) {
@@ -112,4 +112,87 @@ export function todosBrazoIdsApartados(resumen) {
   return (resumen || []).flatMap((item) =>
     (item.detalle || []).map((d) => d.brazo?.id).filter(Boolean)
   );
+}
+
+function turnoApartadoItem(item) {
+  const turno = item.turno || {};
+  const honor = turno.etiqueta?.trim() || etiquetaHonorTurno(turno);
+  const nombres = [...new Set((item.detalle || []).map((d) => d.etiqueta).filter(Boolean))];
+  return {
+    turnoId: turno.id,
+    numero: turno.numero_turno,
+    tipo: turno.tipo_turno || 'Otro',
+    tipoLabel: labelTipoTurno(turno.tipo_turno),
+    honor,
+    apartados: item.apartados || 0,
+    brazoIds: (item.detalle || []).map((d) => d.brazo?.id).filter(Boolean),
+    nombresPreview:
+      nombres.length <= 3
+        ? nombres.join(', ')
+        : `${nombres.slice(0, 2).join(', ')} (+${nombres.length - 2})`,
+    resumenItem: item,
+  };
+}
+
+/**
+ * Liberación masiva: agrupado por tipo con cada turno (#, honor, devotos).
+ */
+export function resumenApartadosMasivo(resumen) {
+  const turnosConApartados = (resumen || [])
+    .filter((item) => item.apartados > 0)
+    .map(turnoApartadoItem)
+    .sort((a, b) => a.numero - b.numero);
+
+  const porTipo = new Map();
+  turnosConApartados.forEach((t) => {
+    if (!porTipo.has(t.tipo)) {
+      porTipo.set(t.tipo, {
+        tipo: t.tipo,
+        label: t.tipoLabel,
+        turnos: [],
+        apartados: 0,
+        brazoIds: [],
+      });
+    }
+    const g = porTipo.get(t.tipo);
+    g.turnos.push(t);
+    g.apartados += t.apartados;
+    g.brazoIds.push(...t.brazoIds);
+  });
+
+  const orden = [...TIPOS_TURNO, 'Otro'];
+  const gruposTipo = [...porTipo.values()].sort((a, b) => {
+    const ia = orden.indexOf(a.tipo);
+    const ib = orden.indexOf(b.tipo);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  return { turnosConApartados, gruposTipo };
+}
+
+/** Filtra grupos masivos por número de turno, honor, tipo o nombre de devoto. */
+export function filtrarApartadosMasivo(gruposTipo, busqueda) {
+  const q = String(busqueda || '').trim().toLowerCase();
+  if (!q) return gruposTipo;
+
+  const qDigits = q.replace(/\D/g, '');
+
+  return gruposTipo
+    .map((grupo) => ({
+      ...grupo,
+      turnos: grupo.turnos.filter((t) => {
+        const honor = (t.honor || '').toLowerCase();
+        const tipo = (t.tipoLabel || '').toLowerCase();
+        const nombres = (t.nombresPreview || '').toLowerCase();
+        const numStr = String(t.numero);
+        return (
+          honor.includes(q) ||
+          tipo.includes(q) ||
+          nombres.includes(q) ||
+          numStr.includes(q) ||
+          (qDigits.length > 0 && numStr.includes(qDigits))
+        );
+      }),
+    }))
+    .filter((g) => g.turnos.length > 0);
 }
