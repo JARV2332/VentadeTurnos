@@ -1,5 +1,5 @@
 import { etiquetaAsignado } from './importReservasUtils';
-import { etiquetaHonorTurno } from './turnoUtils';
+import { TIPOS_TURNO, etiquetaHonorTurno } from './turnoUtils';
 import { labelTipoTurno } from './cajaReportUtils';
 
 function dpiDesdeApartado(brazo, cargador) {
@@ -105,7 +105,7 @@ function turnoApartadoItem(item) {
   };
 }
 
-/** Lista de turnos con apartados (para select de liberación). */
+/** Lista de turnos con reservas (para liberación). */
 export function listaTurnosConApartados(resumen) {
   return (resumen || [])
     .filter((item) => item.apartados > 0)
@@ -113,7 +113,67 @@ export function listaTurnosConApartados(resumen) {
     .sort((a, b) => a.numero - b.numero);
 }
 
-/** Todos los brazo IDs apartados de la procesión. */
+/**
+ * Liberación masiva: agrupado por tipo con cada turno (#, honor, devotos).
+ */
+export function resumenApartadosMasivo(resumen) {
+  const turnosConApartados = listaTurnosConApartados(resumen);
+
+  const porTipo = new Map();
+  turnosConApartados.forEach((t) => {
+    if (!porTipo.has(t.tipo)) {
+      porTipo.set(t.tipo, {
+        tipo: t.tipo,
+        label: t.tipoLabel,
+        turnos: [],
+        apartados: 0,
+        brazoIds: [],
+      });
+    }
+    const g = porTipo.get(t.tipo);
+    g.turnos.push(t);
+    g.apartados += t.apartados;
+    g.brazoIds.push(...t.brazoIds);
+  });
+
+  const orden = [...TIPOS_TURNO, 'Otro'];
+  const gruposTipo = [...porTipo.values()].sort((a, b) => {
+    const ia = orden.indexOf(a.tipo);
+    const ib = orden.indexOf(b.tipo);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  return { turnosConApartados, gruposTipo };
+}
+
+/** Filtra grupos masivos por número de turno, honor, tipo o nombre de devoto. */
+export function filtrarApartadosMasivo(gruposTipo, busqueda) {
+  const q = String(busqueda || '').trim().toLowerCase();
+  if (!q) return gruposTipo;
+
+  const qDigits = q.replace(/\D/g, '');
+
+  return gruposTipo
+    .map((grupo) => ({
+      ...grupo,
+      turnos: grupo.turnos.filter((t) => {
+        const honor = (t.honor || '').toLowerCase();
+        const tipo = (t.tipoLabel || '').toLowerCase();
+        const nombres = (t.nombresPreview || '').toLowerCase();
+        const numStr = String(t.numero);
+        return (
+          honor.includes(q) ||
+          tipo.includes(q) ||
+          nombres.includes(q) ||
+          numStr.includes(q) ||
+          (qDigits.length > 0 && numStr.includes(qDigits))
+        );
+      }),
+    }))
+    .filter((g) => g.turnos.length > 0);
+}
+
+/** Todos los brazo IDs reservados de la procesión. */
 export function todosBrazoIdsApartados(resumen) {
   return (resumen || []).flatMap((item) =>
     (item.detalle || []).map((d) => d.brazo?.id).filter(Boolean)
