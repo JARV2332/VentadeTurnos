@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
@@ -38,6 +38,8 @@ export default function ConfigImportReservas() {
   const [aplicando, setAplicando] = useState(false);
   const [aplicacionOk, setAplicacionOk] = useState(null);
   const [quitandoId, setQuitandoId] = useState(null);
+  const [busquedaApartados, setBusquedaApartados] = useState('');
+  const [cantidadesLiberar, setCantidadesLiberar] = useState({});
 
   const refresh = useCallback(async () => {
     if (!organizacionId) return;
@@ -105,10 +107,43 @@ export default function ConfigImportReservas() {
   };
 
   const handleQuitarFila = (f) => {
+    handleQuitarParcial(f, f.cantidad);
+  };
+
+  const claveFilaApartado = (f) => `${f.turnoId}-${f.nombre}-${f.dpi}`;
+
+  const cantidadParaFila = (f) => {
+    const key = claveFilaApartado(f);
+    const raw = cantidadesLiberar[key];
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 1) return 1;
+    return Math.min(n, f.cantidad);
+  };
+
+  const setCantidadParaFila = (f, valor) => {
+    const key = claveFilaApartado(f);
+    const n = Math.max(1, Math.min(Number(valor) || 1, f.cantidad));
+    setCantidadesLiberar((prev) => ({ ...prev, [key]: n }));
+  };
+
+  const handleQuitarParcial = (f, cantidad) => {
+    const n = Math.min(Math.max(1, Number(cantidad) || 1), f.cantidad);
+    const brazosOrdenados = [...f.brazos].sort(
+      (a, b) => a.numero - b.numero || a.lado.localeCompare(b.lado, 'es')
+    );
+    const ids = brazosOrdenados.slice(0, n).map((b) => b.id);
+    const brazosTxt = brazosOrdenados
+      .slice(0, n)
+      .map((b) => `${b.numero} ${b.lado[0]}`)
+      .join(', ');
+
     handleQuitarApartados({
-      brazoIds: f.brazos.map((b) => b.id),
-      confirmMsg: `¿Quitar apartado de ${f.nombre} en turno #${f.turnoNum} (${f.cantidad} espacio(s))? Quedarán disponibles en Taquilla.`,
-      accionId: `fila-${f.turnoId}-${f.nombre}-${f.dpi}`,
+      brazoIds: ids,
+      confirmMsg:
+        n >= f.cantidad
+          ? `¿Liberar ${n} espacio(s) de ${f.nombre} en turno #${f.turnoNum}? Quedarán disponibles en Taquilla.`
+          : `¿Liberar ${n} de ${f.cantidad} espacio(s) de ${f.nombre} en turno #${f.turnoNum} (${brazosTxt})? El resto sigue apartado.`,
+      accionId: `parcial-${f.turnoId}-${f.nombre}-${f.dpi}-${n}`,
     });
   };
 
@@ -212,6 +247,24 @@ export default function ConfigImportReservas() {
   const totalApartados = (resumen || []).reduce((s, r) => s + (r.apartados || 0), 0);
   const statsPreview = resumenFilasImport(preview, formatoImport);
   const filasGenerales = filasGeneralesApartados(resumen);
+
+  const filasGeneralesFiltradas = useMemo(() => {
+    const q = busquedaApartados.trim().toLowerCase();
+    if (!q) return filasGenerales;
+    const qDigits = q.replace(/\D/g, '');
+    return filasGenerales.filter((f) => {
+      const nombre = (f.nombre || '').toLowerCase();
+      const dpi = String(f.dpi || '').replace(/\D/g, '');
+      const turno = String(f.turnoNum);
+      const honor = (f.turnoEtiqueta || '').toLowerCase();
+      return (
+        nombre.includes(q) ||
+        honor.includes(q) ||
+        turno.includes(q) ||
+        (qDigits.length >= 3 && dpi.includes(qDigits))
+      );
+    });
+  }, [filasGenerales, busquedaApartados]);
 
   return (
     <Layout
@@ -463,12 +516,31 @@ export default function ConfigImportReservas() {
           Listado general de apartados ({totalApartados} espacio(s))
         </h3>
         <p className="text-muted config-hint">
-          Vista tipo Excel: qué turno está apartado y a quién. Use <strong>Quitar fila</strong> para
-          liberar todos los espacios de esa fila, o el detalle por turno para quitar uno a uno o el
-          turno completo.
+          Busque por nombre o DPI y libere por cantidad. Si alguien tiene 2 espacios puede liberar 1
+          o todos. También puede quitar brazo a brazo en el detalle por turno abajo.
         </p>
+
+        <div className="apartados-busqueda">
+          <label>
+            Buscar por nombre, DPI o turno
+            <input
+              type="search"
+              value={busquedaApartados}
+              onChange={(e) => setBusquedaApartados(e.target.value)}
+              placeholder="Ej. García, 1234567890123, turno 7"
+            />
+          </label>
+          {busquedaApartados.trim() && (
+            <span className="text-muted apartados-busqueda__meta">
+              {filasGeneralesFiltradas.length} resultado(s)
+            </span>
+          )}
+        </div>
+
         {filasGenerales.length === 0 ? (
           <p className="text-muted">No hay apartados registrados en esta procesión.</p>
+        ) : filasGeneralesFiltradas.length === 0 ? (
+          <p className="text-muted">Ningún apartado coincide con la búsqueda.</p>
         ) : (
           <div className="table-wrap">
             <table className="data-table data-table--compact apartados-general-table">
@@ -480,12 +552,17 @@ export default function ConfigImportReservas() {
                   <th>DPI</th>
                   <th>Cant.</th>
                   <th>Brazos</th>
-                  <th></th>
+                  <th>Liberar</th>
                 </tr>
               </thead>
               <tbody>
-                {filasGenerales.map((f) => (
-                  <tr key={`${f.turnoId}-${f.nombre}-${f.dpi}-${f.brazos.map((b) => b.id).join('-')}`}>
+                {filasGeneralesFiltradas.map((f) => {
+                  const filaKey = claveFilaApartado(f);
+                  const cantSel = cantidadParaFila(f);
+                  const liberando = quitandoId?.startsWith(`parcial-${filaKey}-`);
+
+                  return (
+                  <tr key={`${filaKey}-${f.brazos.map((b) => b.id).join('-')}`}>
                     <td>
                       <strong>#{f.turnoNum}</strong>
                     </td>
@@ -499,19 +576,49 @@ export default function ConfigImportReservas() {
                       {f.brazos.map((b) => `${b.numero} ${b.lado[0]}`).join(', ')}
                     </td>
                     <td>
-                      <button
-                        type="button"
-                        className="btn btn--ghost btn--sm btn--danger-text"
-                        disabled={Boolean(quitandoId)}
-                        onClick={() => handleQuitarFila(f)}
-                      >
-                        {quitandoId === `fila-${f.turnoId}-${f.nombre}-${f.dpi}`
-                          ? 'Quitando…'
-                          : 'Quitar fila'}
-                      </button>
+                      <div className="apartados-liberar-acciones">
+                        {f.cantidad > 1 && (
+                          <label className="apartados-liberar-cant">
+                            Cant.
+                            <input
+                              type="number"
+                              min={1}
+                              max={f.cantidad}
+                              value={cantSel}
+                              disabled={Boolean(quitandoId)}
+                              onChange={(e) => setCantidadParaFila(f, e.target.value)}
+                            />
+                          </label>
+                        )}
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--sm btn--danger-text"
+                          disabled={Boolean(quitandoId)}
+                          onClick={() => handleQuitarParcial(f, cantSel)}
+                        >
+                          {liberando
+                            ? 'Liberando…'
+                            : f.cantidad > 1
+                              ? `Liberar ${cantSel}`
+                              : 'Liberar'}
+                        </button>
+                        {f.cantidad > 1 && (
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            disabled={Boolean(quitandoId)}
+                            onClick={() => handleQuitarFila(f)}
+                          >
+                            {quitandoId === `parcial-${filaKey}-${f.cantidad}`
+                              ? 'Liberando…'
+                              : `Todos (${f.cantidad})`}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -579,7 +686,7 @@ export default function ConfigImportReservas() {
                           disabled={Boolean(quitandoId)}
                           onClick={() => handleQuitarBrazo(d, item)}
                         >
-                          {quitandoId === d.brazo.id ? '…' : 'Quitar'}
+                          {quitandoId === d.brazo.id ? '…' : 'Liberar'}
                         </button>
                       </li>
                     ))}

@@ -4817,6 +4817,64 @@ html {
   vertical-align: top;
 }
 
+.apartados-busqueda {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.apartados-busqueda label {
+  flex: 1 1 16rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.apartados-busqueda input {
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.apartados-busqueda__meta {
+  font-size: 0.82rem;
+  padding-bottom: 0.55rem;
+}
+
+.apartados-liberar-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  min-width: 8.5rem;
+}
+
+.apartados-liberar-cant {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  min-width: 3.25rem;
+}
+
+.apartados-liberar-cant input {
+  width: 3.25rem;
+  padding: 0.35rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+
 .resumen-apartados {
   display: flex;
   flex-direction: column;
