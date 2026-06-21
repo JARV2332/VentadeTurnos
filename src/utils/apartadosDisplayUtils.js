@@ -1,5 +1,5 @@
 import { etiquetaAsignado } from './importReservasUtils';
-import { TIPOS_TURNO, etiquetaHonorTurno } from './turnoUtils';
+import { etiquetaHonorTurno } from './turnoUtils';
 import { labelTipoTurno } from './cajaReportUtils';
 
 function dpiDesdeApartado(brazo, cargador) {
@@ -74,50 +74,20 @@ export function filasGeneralesApartados(resumen) {
   );
 }
 
-/** Agrupa apartados por tipo/honor de turno (Salida, Ordinario, Extraordinario, Entrada). */
-export function resumenApartadosPorTipo(resumen) {
-  const map = new Map();
-
-  (resumen || []).forEach((item) => {
-    const tipo = item.turno?.tipo_turno || 'Otro';
-    if (!map.has(tipo)) {
-      map.set(tipo, {
-        tipo,
-        label: labelTipoTurno(tipo),
-        turnosConApartados: 0,
-        apartados: 0,
-        brazoIds: [],
-      });
-    }
-    const g = map.get(tipo);
-    if (item.apartados > 0) g.turnosConApartados += 1;
-    g.apartados += item.apartados || 0;
-    (item.detalle || []).forEach((d) => {
-      if (d.brazo?.id) g.brazoIds.push(d.brazo.id);
-    });
-  });
-
-  const orden = [...TIPOS_TURNO, 'Otro'];
-  return [...map.values()]
-    .filter((g) => g.apartados > 0)
-    .sort((a, b) => {
-      const ia = orden.indexOf(a.tipo);
-      const ib = orden.indexOf(b.tipo);
-      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-    });
-}
-
-/** Todos los brazo IDs apartados de la procesión. */
-export function todosBrazoIdsApartados(resumen) {
-  return (resumen || []).flatMap((item) =>
-    (item.detalle || []).map((d) => d.brazo?.id).filter(Boolean)
-  );
-}
-
 function turnoApartadoItem(item) {
   const turno = item.turno || {};
   const honor = turno.etiqueta?.trim() || etiquetaHonorTurno(turno);
   const nombres = [...new Set((item.detalle || []).map((d) => d.etiqueta).filter(Boolean))];
+  const formales = item.apartados_formales || 0;
+  const taquilla = item.reservas_taquilla || 0;
+  let reservadosLabel = `${item.apartados || 0} reservado(s)`;
+  if (formales && taquilla) {
+    reservadosLabel = `${item.apartados} reservado(s) (${formales} apartado(s), ${taquilla} taquilla)`;
+  } else if (taquilla && !formales) {
+    reservadosLabel = `${taquilla} reserva(s) taquilla`;
+  } else if (formales) {
+    reservadosLabel = `${formales} apartado(s)`;
+  }
   return {
     turnoId: turno.id,
     numero: turno.numero_turno,
@@ -125,6 +95,7 @@ function turnoApartadoItem(item) {
     tipoLabel: labelTipoTurno(turno.tipo_turno),
     honor,
     apartados: item.apartados || 0,
+    reservadosLabel,
     brazoIds: (item.detalle || []).map((d) => d.brazo?.id).filter(Boolean),
     nombresPreview:
       nombres.length <= 3
@@ -134,65 +105,17 @@ function turnoApartadoItem(item) {
   };
 }
 
-/**
- * Liberación masiva: agrupado por tipo con cada turno (#, honor, devotos).
- */
-export function resumenApartadosMasivo(resumen) {
-  const turnosConApartados = (resumen || [])
+/** Lista de turnos con apartados (para select de liberación). */
+export function listaTurnosConApartados(resumen) {
+  return (resumen || [])
     .filter((item) => item.apartados > 0)
     .map(turnoApartadoItem)
     .sort((a, b) => a.numero - b.numero);
-
-  const porTipo = new Map();
-  turnosConApartados.forEach((t) => {
-    if (!porTipo.has(t.tipo)) {
-      porTipo.set(t.tipo, {
-        tipo: t.tipo,
-        label: t.tipoLabel,
-        turnos: [],
-        apartados: 0,
-        brazoIds: [],
-      });
-    }
-    const g = porTipo.get(t.tipo);
-    g.turnos.push(t);
-    g.apartados += t.apartados;
-    g.brazoIds.push(...t.brazoIds);
-  });
-
-  const orden = [...TIPOS_TURNO, 'Otro'];
-  const gruposTipo = [...porTipo.values()].sort((a, b) => {
-    const ia = orden.indexOf(a.tipo);
-    const ib = orden.indexOf(b.tipo);
-    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-  });
-
-  return { turnosConApartados, gruposTipo };
 }
 
-/** Filtra grupos masivos por número de turno, honor, tipo o nombre de devoto. */
-export function filtrarApartadosMasivo(gruposTipo, busqueda) {
-  const q = String(busqueda || '').trim().toLowerCase();
-  if (!q) return gruposTipo;
-
-  const qDigits = q.replace(/\D/g, '');
-
-  return gruposTipo
-    .map((grupo) => ({
-      ...grupo,
-      turnos: grupo.turnos.filter((t) => {
-        const honor = (t.honor || '').toLowerCase();
-        const tipo = (t.tipoLabel || '').toLowerCase();
-        const nombres = (t.nombresPreview || '').toLowerCase();
-        const numStr = String(t.numero);
-        return (
-          honor.includes(q) ||
-          tipo.includes(q) ||
-          nombres.includes(q) ||
-          numStr.includes(q) ||
-          (qDigits.length > 0 && numStr.includes(qDigits))
-        );
-      }),
-    }))
-    .filter((g) => g.turnos.length > 0);
+/** Todos los brazo IDs apartados de la procesión. */
+export function todosBrazoIdsApartados(resumen) {
+  return (resumen || []).flatMap((item) =>
+    (item.detalle || []).map((d) => d.brazo?.id).filter(Boolean)
+  );
 }

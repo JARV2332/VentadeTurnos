@@ -4967,6 +4967,40 @@ html {
   vertical-align: top;
 }
 
+.apartados-liberar-select__fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  margin-top: 0.75rem;
+}
+
+.apartados-liberar-select__label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1 1 16rem;
+  min-width: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.apartados-liberar-select__label select {
+  width: 100%;
+  max-width: 32rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
+.apartados-liberar-select__preview {
+  margin: 0.65rem 0 0;
+  font-size: 0.82rem;
+}
+
 .apartados-masivo__head {
   display: flex;
   flex-wrap: wrap;

@@ -15,7 +15,7 @@ import {
 } from '../utils/importReservasUtils';
 import { isValidCui, normalizarCui } from '../utils/cuiUtils';
 import { aplicarAsignacionBrazos } from '../utils/aplicarAsignacionBrazos';
-import { RESET_BRAZO_VENTA, RESET_BRAZO_APARTADO, esBrazoApartadoQuitables, normalizarCodigoBoleta } from '../utils/ventaAnulacionUtils';
+import { RESET_BRAZO_VENTA, RESET_BRAZO_APARTADO, esBrazoReservadoLiberable, normalizarCodigoBoleta } from '../utils/ventaAnulacionUtils';
 import { normalizarHoraInput, calcularHoraTurno } from '../utils/turnoHorarioUtils';
 
 let store = crearStoreInicial();
@@ -1490,18 +1490,20 @@ export function getResumenApartados(cortejoId, organizacionId) {
 
   return turnos.map((turno) => {
     const brazos = store.brazos.filter((b) => b.turno_id === turno.id);
-    const apartados = brazos.filter(
-      (b) => b.estado === 'reservado' && b.reserva_apartado
-    );
+    const reservados = brazos.filter((b) => b.estado === 'reservado');
+    const apartadosFormales = reservados.filter((b) => b.reserva_apartado);
+    const reservasTaquilla = reservados.filter((b) => !b.reserva_apartado);
     const vendidos = brazos.filter((b) => b.estado === 'vendido');
     const libres = brazos.filter((b) => b.estado === 'disponible');
     return {
       turno,
       total: brazos.length,
-      apartados: apartados.length,
+      apartados: reservados.length,
+      apartados_formales: apartadosFormales.length,
+      reservas_taquilla: reservasTaquilla.length,
       vendidos: vendidos.length,
       libres: libres.length,
-      detalle: apartados.map((b) => {
+      detalle: reservados.map((b) => {
         const cargador = store.cargadores.find((c) => c.id === b.cargador_id);
         return {
           brazo: b,
@@ -1510,7 +1512,7 @@ export function getResumenApartados(cortejoId, organizacionId) {
             cargador?.nombre_completo ||
             b.asignado_nombre ||
             b.apartado_notas ||
-            'Apartado',
+            (b.reserva_apartado ? 'Apartado' : 'Reserva taquilla'),
         };
       }),
     };
@@ -1654,24 +1656,24 @@ export function quitarApartadosMock(organizacionId, cortejoId, { brazoIds = [], 
 
     store.brazos
       .filter((b) => b.turno_id === turnoId && b.organizacion_id === organizacionId)
-      .filter(esBrazoApartadoQuitables)
+      .filter(esBrazoReservadoLiberable)
       .forEach((b) => ids.push(b.id));
     ids = [...new Set(ids)];
   }
 
   if (!ids.length) {
-    return { error: 'No hay apartados para quitar.' };
+    return { error: 'No hay reservas para liberar.' };
   }
 
   const brazos = store.brazos.filter(
     (b) => ids.includes(b.id) && b.organizacion_id === organizacionId
   );
-  const quitables = brazos.filter(esBrazoApartadoQuitables);
+  const quitables = brazos.filter(esBrazoReservadoLiberable);
   const omitidos = brazos.length - quitables.length;
 
   if (!quitables.length) {
     return {
-      error: 'Ningún espacio seleccionado está apartado (puede estar vendido o ya libre).',
+      error: 'Ningún espacio seleccionado está reservado (puede estar vendido o ya libre).',
       omitidos,
     };
   }
@@ -1686,6 +1688,6 @@ export function quitarApartadosMock(organizacionId, cortejoId, { brazoIds = [], 
     ok: quitables.length,
     omitidos,
     total: ids.length,
-    mensaje: `${quitables.length} apartado(s) liberado(s)${omitidos ? ` · ${omitidos} omitido(s)` : ''}.`,
+    mensaje: `${quitables.length} reserva(s) liberada(s)${omitidos ? ` · ${omitidos} omitida(s)` : ''}.`,
   };
 }

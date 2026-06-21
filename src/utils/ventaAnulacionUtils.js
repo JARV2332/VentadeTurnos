@@ -36,6 +36,11 @@ export function esBrazoApartadoQuitables(brazo) {
   return brazo?.estado === 'reservado' && Boolean(brazo?.reserva_apartado);
 }
 
+/** Apartados formales o reservas temporales de Taquilla (sin venta). */
+export function esBrazoReservadoLiberable(brazo) {
+  return brazo?.estado === 'reservado';
+}
+
 export function normalizarCodigoBoleta(codigo) {
   return (
     String(codigo || '')

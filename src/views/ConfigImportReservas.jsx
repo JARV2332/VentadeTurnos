@@ -13,8 +13,7 @@ import {
 import ManualApartadoForm from '../components/ManualApartadoForm';
 import {
   filasGeneralesApartados,
-  resumenApartadosMasivo,
-  filtrarApartadosMasivo,
+  listaTurnosConApartados,
   todosBrazoIdsApartados,
 } from '../utils/apartadosDisplayUtils';
 import {
@@ -44,6 +43,7 @@ export default function ConfigImportReservas() {
   const [aplicacionOk, setAplicacionOk] = useState(null);
   const [quitandoId, setQuitandoId] = useState(null);
   const [busquedaApartados, setBusquedaApartados] = useState('');
+  const [seleccionLiberar, setSeleccionLiberar] = useState('');
   const [cantidadesLiberar, setCantidadesLiberar] = useState({});
 
   const refresh = useCallback(async () => {
@@ -155,17 +155,8 @@ export default function ConfigImportReservas() {
   const handleQuitarTurno = (item) => {
     handleQuitarApartados({
       turnoId: item.turno.id,
-      confirmMsg: `¿Quitar todos los apartados del turno #${item.turno.numero_turno} (${item.apartados} espacio(s))? Quedarán disponibles en Taquilla.`,
+      confirmMsg: `¿Liberar todas las reservas del turno #${item.turno.numero_turno} — ${item.turno.etiqueta || item.turno.tipo_turno} (${item.apartados} espacio(s))? Quedarán disponibles en Taquilla. No afecta ventas pagadas.`,
       accionId: `turno-${item.turno.id}`,
-    });
-  };
-
-  const handleQuitarPorTipo = (grupo) => {
-    if (!grupo?.brazoIds?.length) return;
-    handleQuitarApartados({
-      brazoIds: grupo.brazoIds,
-      confirmMsg: `¿Liberar ${grupo.apartados} apartado(s) de tipo «${grupo.label}» en ${grupo.turnosConApartados} turno(s)? Solo espacios apartados — no afecta ventas pagadas.`,
-      accionId: `tipo-${grupo.tipo}`,
     });
   };
 
@@ -174,7 +165,7 @@ export default function ConfigImportReservas() {
     if (!brazoIds.length) return;
     handleQuitarApartados({
       brazoIds,
-      confirmMsg: `¿Liberar TODOS los ${brazoIds.length} apartado(s) de esta procesión? Los espacios quedarán disponibles en Taquilla. No se tocan turnos ya vendidos.`,
+      confirmMsg: `¿Liberar TODAS las ${brazoIds.length} reserva(s) de esta procesión? Los espacios quedarán disponibles en Taquilla. No se tocan turnos ya vendidos.`,
       accionId: 'todos-apartados',
     });
   };
@@ -271,12 +262,33 @@ export default function ConfigImportReservas() {
   const totalApartados = (resumen || []).reduce((s, r) => s + (r.apartados || 0), 0);
   const statsPreview = resumenFilasImport(preview, formatoImport);
   const filasGenerales = filasGeneralesApartados(resumen);
+  const turnosApartados = useMemo(() => listaTurnosConApartados(resumen), [resumen]);
 
-  const masivoData = useMemo(() => resumenApartadosMasivo(resumen), [resumen]);
-  const masivoFiltrado = useMemo(
-    () => filtrarApartadosMasivo(masivoData.gruposTipo, busquedaApartados),
-    [masivoData.gruposTipo, busquedaApartados]
+  const turnoSeleccionado = useMemo(
+    () => turnosApartados.find((t) => t.turnoId === seleccionLiberar) || null,
+    [turnosApartados, seleccionLiberar]
   );
+
+  useEffect(() => {
+    if (!turnosApartados.length) {
+      setSeleccionLiberar('');
+      return;
+    }
+    const valido = turnosApartados.some((t) => t.turnoId === seleccionLiberar);
+    if (!valido && seleccionLiberar !== '__todos__') {
+      setSeleccionLiberar(turnosApartados[0].turnoId);
+    }
+  }, [turnosApartados, seleccionLiberar]);
+
+  const handleLiberarSeleccion = () => {
+    if (seleccionLiberar === '__todos__') {
+      handleQuitarTodos();
+      return;
+    }
+    if (turnoSeleccionado?.resumenItem) {
+      handleQuitarTurno(turnoSeleccionado.resumenItem);
+    }
+  };
 
   const filasGeneralesFiltradas = useMemo(() => {
     const q = busquedaApartados.trim().toLowerCase();
@@ -542,96 +554,50 @@ export default function ConfigImportReservas() {
       )}
 
       {totalApartados > 0 && (
-        <section className="panel apartados-masivo">
-          <div className="apartados-masivo__head">
-            <div>
-              <h3 className="panel__title">Liberación masiva por turno</h3>
-              <p className="text-muted config-hint">
-                Vea cada turno con su número y honor (Salida, Ordinario 2, Extraordinario turno 7…).
-                Libere un turno completo, todos los de un tipo, o toda la procesión. Solo apartados
-                sin pago.
-              </p>
-            </div>
+        <section className="panel apartados-liberar-select">
+          <h3 className="panel__title">Liberar reservas por turno</h3>
+          <p className="text-muted config-hint">
+            Elija un turno y libere todos sus espacios reservados sin pago: apartados (Excel/manual)
+            y reservas de Taquilla que quedaron colgadas. Los vendidos no aparecen aquí.
+          </p>
+          <div className="apartados-liberar-select__fila">
+            <label className="apartados-liberar-select__label">
+              Turno a liberar
+              <select
+                value={seleccionLiberar}
+                onChange={(e) => setSeleccionLiberar(e.target.value)}
+                disabled={Boolean(quitandoId)}
+              >
+                {turnosApartados.map((t) => (
+                  <option key={t.turnoId} value={t.turnoId}>
+                    Turno #{t.numero} · {t.honor} — {t.reservadosLabel}
+                  </option>
+                ))}
+                <option value="__todos__">
+                  Liberar TODAS las reservas ({totalApartados})
+                </option>
+              </select>
+            </label>
             <button
               type="button"
-              className="btn btn--danger btn--sm"
-              disabled={Boolean(quitandoId)}
-              onClick={handleQuitarTodos}
+              className="btn btn--danger"
+              disabled={Boolean(quitandoId) || !seleccionLiberar}
+              onClick={handleLiberarSeleccion}
             >
-              {quitandoId === 'todos-apartados'
+              {quitandoId
                 ? 'Liberando…'
-                : `Liberar todos (${totalApartados})`}
+                : seleccionLiberar === '__todos__'
+                  ? 'Liberar todos'
+                  : 'Liberar turno seleccionado'}
             </button>
           </div>
-
-          <div className="apartados-busqueda apartados-busqueda--masivo">
-            <label>
-              Buscar turno, honor o devoto(a)
-              <input
-                type="search"
-                value={busquedaApartados}
-                onChange={(e) => setBusquedaApartados(e.target.value)}
-                placeholder="Ej. Ordinario, Extraordinario, turno 7, García"
-              />
-            </label>
-            {busquedaApartados.trim() && (
-              <span className="text-muted apartados-busqueda__meta">
-                {masivoFiltrado.reduce((s, g) => s + g.turnos.length, 0)} turno(s) ·{' '}
-                {filasGeneralesFiltradas.length} fila(s) por persona
-              </span>
-            )}
-          </div>
-
-          {masivoFiltrado.length === 0 ? (
-            <p className="text-muted">Ningún turno apartado coincide con la búsqueda.</p>
-          ) : (
-            <div className="apartados-masivo__grupos">
-              {masivoFiltrado.map((grupo) => (
-                <div key={grupo.tipo} className="apartados-masivo__grupo">
-                  <div className="apartados-masivo__grupo-head">
-                    <div>
-                      <strong className="apartados-masivo__tipo">{grupo.label}</strong>
-                      <span className="text-muted apartados-masivo__grupo-meta">
-                        {grupo.apartados} espacio(s) · {grupo.turnos.length} turno(s)
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      className="btn btn--ghost btn--sm btn--danger-text"
-                      disabled={Boolean(quitandoId)}
-                      onClick={() => handleQuitarPorTipo(grupo)}
-                    >
-                      {quitandoId === `tipo-${grupo.tipo}`
-                        ? 'Liberando…'
-                        : `Liberar todo ${grupo.label}`}
-                    </button>
-                  </div>
-                  <ul className="apartados-masivo__turnos">
-                    {grupo.turnos.map((t) => (
-                      <li key={t.turnoId} className="apartados-masivo__turno">
-                        <div className="apartados-masivo__turno-info">
-                          <strong>
-                            Turno #{t.numero} · {t.honor}
-                          </strong>
-                          <span className="text-muted">
-                            {t.apartados} apartado(s)
-                            {t.nombresPreview ? ` · ${t.nombresPreview}` : ''}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          className="btn btn--ghost btn--sm btn--danger-text"
-                          disabled={Boolean(quitandoId)}
-                          onClick={() => handleQuitarTurno(t.resumenItem)}
-                        >
-                          {quitandoId === `turno-${t.turnoId}` ? 'Liberando…' : 'Liberar turno'}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
+          {turnoSeleccionado && seleccionLiberar !== '__todos__' && (
+            <p className="text-muted apartados-liberar-select__preview">
+              {turnoSeleccionado.tipoLabel} · {turnoSeleccionado.apartados} espacio(s)
+              {turnoSeleccionado.nombresPreview
+                ? ` · ${turnoSeleccionado.nombresPreview}`
+                : ''}
+            </p>
           )}
         </section>
       )}
@@ -641,15 +607,26 @@ export default function ConfigImportReservas() {
           Listado por devoto(a) ({totalApartados} espacio(s))
         </h3>
         <p className="text-muted config-hint">
-          Busque por nombre o DPI y libere por cantidad (1, N o todos los espacios de una persona en
-          un turno). La búsqueda de arriba también filtra este listado.
+          Opcional: busque por nombre o DPI y libere por persona (1, N o todos sus espacios en ese
+          turno).
         </p>
 
-        {!busquedaApartados.trim() && (
-          <p className="text-muted config-hint apartados-lista-hint">
-            Use el buscador en «Liberación masiva» para filtrar por turno, honor o nombre.
-          </p>
-        )}
+        <div className="apartados-busqueda">
+          <label>
+            Buscar por nombre, DPI o turno
+            <input
+              type="search"
+              value={busquedaApartados}
+              onChange={(e) => setBusquedaApartados(e.target.value)}
+              placeholder="Ej. García, 1234567890123, turno 7"
+            />
+          </label>
+          {busquedaApartados.trim() && (
+            <span className="text-muted apartados-busqueda__meta">
+              {filasGeneralesFiltradas.length} resultado(s)
+            </span>
+          )}
+        </div>
 
         {filasGenerales.length === 0 ? (
           <p className="text-muted">No hay apartados registrados en esta procesión.</p>
@@ -760,7 +737,14 @@ export default function ConfigImportReservas() {
                     {item.turno.etiqueta || item.turno.tipo_turno}
                   </strong>
                   <span className="text-muted">
-                    {item.apartados} apartados · {item.vendidos} vendidos · {item.libres} libres
+                    {item.apartados} reservado(s)
+                    {(item.reservas_taquilla || 0) > 0 && (item.apartados_formales || 0) > 0
+                      ? ` (${item.apartados_formales} apartado(s), ${item.reservas_taquilla} taquilla)`
+                      : (item.reservas_taquilla || 0) > 0
+                        ? ` (${item.reservas_taquilla} taquilla)`
+                        : ''}
+                    {' · '}
+                    {item.vendidos} vendidos · {item.libres} libres
                   </span>
                   {item.apartados > 0 && (
                     <button
@@ -776,7 +760,7 @@ export default function ConfigImportReservas() {
                   )}
                 </div>
                 {(item.detalle || []).length === 0 ? (
-                  <p className="text-muted resumen-apartados__vacio">Sin apartados en este turno</p>
+                  <p className="text-muted resumen-apartados__vacio">Sin reservas en este turno</p>
                 ) : (
                   <ul className="resumen-apartados__lista">
                     {(item.detalle || []).map((d) => (

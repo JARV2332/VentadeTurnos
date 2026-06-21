@@ -19,7 +19,7 @@ import {
 } from '../utils/importReservasUtils';
 import { isValidCui, normalizarCui } from '../utils/cuiUtils';
 import { aplicarAsignacionBrazos } from '../utils/aplicarAsignacionBrazos';
-import { RESET_BRAZO_VENTA, RESET_BRAZO_APARTADO, esBrazoApartadoQuitables, normalizarCodigoBoleta } from '../utils/ventaAnulacionUtils';
+import { RESET_BRAZO_VENTA, RESET_BRAZO_APARTADO, esBrazoReservadoLiberable, normalizarCodigoBoleta } from '../utils/ventaAnulacionUtils';
 import { PERMISOS_ADMIN_COMPLETO } from '../config/permisos';
 import { normalizarHoraInput, calcularHoraTurno } from '../utils/turnoHorarioUtils';
 
@@ -2066,19 +2066,21 @@ export async function getResumenApartados(cortejoId, organizacionId) {
       ...(Array.isArray(turno.izquierda) ? turno.izquierda : []),
       ...(Array.isArray(turno.derecha) ? turno.derecha : []),
     ];
-    const apartadosLista = todos.filter(
-      (b) => b.estado === 'reservado' && b.reserva_apartado
-    );
+    const reservadosLista = todos.filter((b) => b.estado === 'reservado');
+    const apartadosFormales = reservadosLista.filter((b) => b.reserva_apartado);
+    const reservasTaquilla = reservadosLista.filter((b) => !b.reserva_apartado);
     const vendidos = todos.filter((b) => b.estado === 'vendido');
     const libres = todos.filter((b) => b.estado === 'disponible');
 
     return {
       turno,
       total: todos.length,
-      apartados: apartadosLista.length,
+      apartados: reservadosLista.length,
+      apartados_formales: apartadosFormales.length,
+      reservas_taquilla: reservasTaquilla.length,
       vendidos: vendidos.length,
       libres: libres.length,
-      detalle: apartadosLista.map((b) => {
+      detalle: reservadosLista.map((b) => {
         const cargador = cargadoresPorId[b.cargador_id];
         return {
           brazo: b,
@@ -2087,7 +2089,7 @@ export async function getResumenApartados(cortejoId, organizacionId) {
             cargador?.nombre_completo ||
             b.asignado_nombre ||
             b.apartado_notas ||
-            'Apartado',
+            (b.reserva_apartado ? 'Apartado' : 'Reserva taquilla'),
         };
       }),
     };
@@ -2370,14 +2372,14 @@ export async function quitarApartados(organizacionId, cortejoId, { brazoIds = []
 
     if (bErr) return err(bErr);
 
-    const apartadosTurno = (brazosTurno || [])
-      .filter(esBrazoApartadoQuitables)
+    const reservadosTurno = (brazosTurno || [])
+      .filter(esBrazoReservadoLiberable)
       .map((b) => b.id);
-    ids = [...new Set([...ids, ...apartadosTurno])];
+    ids = [...new Set([...ids, ...reservadosTurno])];
   }
 
   if (!ids.length) {
-    return { error: 'No hay apartados para quitar.' };
+    return { error: 'No hay reservas para liberar.' };
   }
 
   const { data: brazos, error: readErr } = await supabase
@@ -2388,12 +2390,12 @@ export async function quitarApartados(organizacionId, cortejoId, { brazoIds = []
 
   if (readErr) return err(readErr);
 
-  const quitables = (brazos || []).filter(esBrazoApartadoQuitables);
+  const quitables = (brazos || []).filter(esBrazoReservadoLiberable);
   const omitidos = (brazos || []).length - quitables.length;
 
   if (!quitables.length) {
     return {
-      error: 'Ningún espacio seleccionado está apartado (puede estar vendido o ya libre).',
+      error: 'Ningún espacio seleccionado está reservado (puede estar vendido o ya libre).',
       omitidos,
     };
   }
@@ -2406,8 +2408,7 @@ export async function quitarApartados(organizacionId, cortejoId, { brazoIds = []
       quitables.map((b) => b.id)
     )
     .eq('organizacion_id', organizacionId)
-    .eq('estado', 'reservado')
-    .eq('reserva_apartado', true);
+    .eq('estado', 'reservado');
 
   if (updateErr) return err(updateErr);
 
@@ -2415,6 +2416,6 @@ export async function quitarApartados(organizacionId, cortejoId, { brazoIds = []
     ok: quitables.length,
     omitidos,
     total: ids.length,
-    mensaje: `${quitables.length} apartado(s) liberado(s)${omitidos ? ` · ${omitidos} omitido(s)` : ''}.`,
+    mensaje: `${quitables.length} reserva(s) liberada(s)${omitidos ? ` · ${omitidos} omitida(s)` : ''}.`,
   };
 }
