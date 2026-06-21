@@ -5006,42 +5006,51 @@ html {
   display: none;
 }
 
-.mobile-nav__scroll {
+.mobile-nav__bar {
   display: flex;
+  align-items: stretch;
+  justify-content: space-around;
   gap: 0.15rem;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  padding: 0.25rem 0.35rem;
+  padding: 0.35rem 0.5rem calc(0.35rem + env(safe-area-inset-bottom, 0));
+  max-width: 100%;
 }
 
-.mobile-nav__scroll::-webkit-scrollbar { display: none; }
-
 .mobile-nav__link {
-  flex: 1 0 auto;
-  min-width: 4.25rem;
+  flex: 1 1 0;
+  min-width: 0;
   max-width: 5.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.15rem;
-  padding: 0.4rem 0.35rem;
-  border-radius: 10px;
-  color: var(--sidebar-text);
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 0.45rem 0.25rem;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-muted);
   text-decoration: none;
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   font-weight: 600;
   text-align: center;
-  line-height: 1.2;
+  line-height: 1.15;
+  cursor: pointer;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.15s, background 0.15s;
 }
 
 .mobile-nav__link--active {
-  background: var(--sidebar-active);
-  color: white;
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
+.mobile-nav__link--mas {
+  appearance: none;
 }
 
 .mobile-nav__icon {
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   line-height: 1;
 }
 
@@ -5051,6 +5060,149 @@ html {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
+}
+
+/* Sheet «Más» en móvil */
+.mobile-menu-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.mobile-menu-sheet__backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: rgba(15, 23, 42, 0.45);
+  cursor: pointer;
+  animation: fadeIn 0.2s ease;
+}
+
+.mobile-menu-sheet__panel {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-height: min(85dvh, calc(100dvh - 1rem));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--surface);
+  border-radius: 20px 20px 0 0;
+  padding: 0.65rem 1rem calc(1rem + env(safe-area-inset-bottom, 0));
+  box-shadow: var(--shadow-lg);
+  animation: slideUp 0.28s ease;
+}
+
+.mobile-menu-sheet__handle {
+  width: 2.5rem;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border);
+  margin: 0 auto 0.85rem;
+}
+
+.mobile-menu-sheet__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.mobile-menu-sheet__org-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 0.15rem;
+}
+
+.mobile-menu-sheet__org-name {
+  display: block;
+  font-size: 0.95rem;
+  margin-bottom: 0.35rem;
+}
+
+.mobile-menu-sheet__close {
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.mobile-menu-sheet__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.mobile-menu-sheet__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 5rem;
+  padding: 0.65rem 0.35rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.2;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-menu-sheet__item--active {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.mobile-menu-sheet__icon {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.mobile-menu-sheet__logout {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--danger);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.config-form__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.config-form__head .panel__title {
+  margin: 0;
+}
+
+.config-form__cancel {
+  flex-shrink: 0;
 }
 
 /* Panel venta — overlay móvil */
@@ -5159,6 +5311,158 @@ body.taquilla-cobro-activo {
 
 /* ── Responsive ── */
 @media (max-width: 1024px) {
+  .sidebar {
+    display: none;
+  }
+
+  .sidebar-backdrop {
+    display: none !important;
+  }
+
+  .navbar__menu-btn {
+    display: none !important;
+  }
+
+  .navbar__user-link {
+    display: none;
+  }
+
+  .navbar {
+    padding: 0.85rem 1rem;
+  }
+
+  .navbar__title {
+    font-size: 1.1rem;
+  }
+
+  .navbar__subtitle {
+    font-size: 0.75rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .app-content {
+    padding: 1rem 1rem 0.5rem;
+  }
+
+  .app-footer {
+    display: none;
+  }
+
+  .mobile-nav {
+    display: block;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -6px 24px rgba(15, 23, 42, 0.08);
+  }
+
+  .app-main {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0));
+  }
+
+  .metrics-grid,
+  .metrics-grid--3,
+  .metrics-grid--4 {
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    gap: 0.75rem;
+    margin-left: -0.25rem;
+    margin-right: -0.25rem;
+    padding: 0 0.25rem 0.15rem;
+  }
+
+  .metrics-grid::-webkit-scrollbar,
+  .metrics-grid--3::-webkit-scrollbar,
+  .metrics-grid--4::-webkit-scrollbar {
+    display: none;
+  }
+
+  .metrics-grid .metric-card,
+  .metrics-grid--3 .metric-card,
+  .metrics-grid--4 .metric-card {
+    flex: 0 0 min(72vw, 260px);
+    scroll-snap-align: start;
+    margin-bottom: 0;
+  }
+
+  .config-grid--wide .config-form:not(.config-form--visible) {
+    display: none;
+  }
+
+  .table-wrap--cards {
+    overflow: visible;
+    margin: 0;
+    padding: 0;
+  }
+
+  .data-table--stack thead {
+    display: none;
+  }
+
+  .data-table--stack tbody tr {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0.85rem 1rem;
+    margin-bottom: 0.65rem;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+
+  .data-table--stack td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.35rem 0;
+    border: none;
+    font-size: 0.85rem;
+    text-align: right;
+  }
+
+  .data-table--stack td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+    text-align: left;
+  }
+
+  .data-table--stack td[data-label='Acciones'] {
+    flex-direction: column;
+    align-items: stretch;
+    padding-top: 0.65rem;
+    margin-top: 0.35rem;
+    border-top: 1px dashed var(--border);
+    text-align: left;
+  }
+
+  .data-table--stack td[data-label='Acciones']::before {
+    display: none;
+  }
+
+  .data-table--stack .usuarios-tabla-acciones {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .data-table--stack .usuarios-tabla-acciones .btn {
+    flex: 1 1 calc(50% - 0.25rem);
+    width: auto;
+  }
+
   .landing { grid-template-columns: 1fr; }
   .landing__auth { border-left: none; border-top: 1px solid var(--border); }
   .metrics-grid { grid-template-columns: repeat(2, 1fr); }
@@ -5389,106 +5693,12 @@ body.taquilla-cobro-activo {
 }
 
 @media (max-width: 768px) {
-  /* Sidebar como panel deslizable (no oculto del todo) */
-  .sidebar {
-    display: flex;
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    z-index: 260;
-    width: min(288px, 88vw);
-    height: auto;
-    max-height: none;
-    align-self: auto;
-    transform: translateX(-105%);
-    transition: transform 0.28s ease;
-    box-shadow: none;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .sidebar--open {
-    transform: translateX(0);
-    box-shadow: 8px 0 40px rgba(0, 0, 0, 0.28);
-  }
-
-  .sidebar-backdrop {
-    display: block;
-    position: fixed;
-    inset: 0;
-    z-index: 250;
-    border: none;
-    background: rgba(15, 23, 42, 0.5);
-    cursor: pointer;
-    animation: fadeIn 0.2s ease;
-  }
-
-  .mobile-nav {
-    display: block;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 100;
-    background: var(--sidebar-bg);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    padding-bottom: env(safe-area-inset-bottom, 0);
-  }
-
-  .app-main {
-    padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0));
-  }
-
   .app-main:has(.taquilla--cobro-abierto) {
     overflow: hidden;
   }
 
-  .navbar {
-    padding: 0.75rem 1rem;
-    flex-wrap: nowrap;
-    gap: 0.65rem;
-  }
-
-  .navbar__menu-btn {
-    display: flex;
-  }
-
-  .navbar__title { font-size: 1.05rem; }
-  .navbar__subtitle {
-    font-size: 0.75rem;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-  .navbar__user-text { display: none; }
   .navbar__pill--mock { font-size: 0.62rem; padding: 0.25rem 0.5rem; }
   .navbar__actions { flex-shrink: 0; }
-
-  .app-content {
-    padding: 1rem;
-  }
-
-  .app-footer {
-    padding: 0.75rem 1rem 0.5rem;
-    font-size: 0.68rem;
-  }
-
-  .app-footer__contact {
-    flex-direction: column;
-    gap: 0.15rem;
-  }
-
-  .app-footer__sep {
-    display: none;
-  }
-
-  .metrics-grid,
-  .metrics-grid--3,
-  .metrics-grid--4 {
-    grid-template-columns: 1fr;
-  }
 
   .caja-reporte__charts {
     grid-template-columns: 1fr;
@@ -5655,12 +5865,14 @@ body.taquilla-cobro-activo {
   }
 
   .panel__head-row {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
   }
 
   .panel__head-row > .btn {
-    width: 100%;
+    width: auto;
+    margin-left: auto;
   }
 
   .permisos-grid {
@@ -5674,24 +5886,7 @@ body.taquilla-cobro-activo {
   .usuarios-permisos-mini {
     max-width: none;
     display: block;
-  }
-
-  .usuarios-tabla-acciones {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .usuarios-tabla-acciones .btn {
-    width: 100%;
-  }
-
-  .data-table {
-    font-size: 0.8rem;
-  }
-
-  .data-table th,
-  .data-table td {
-    padding: 0.55rem 0.6rem;
+    text-align: left;
   }
 
   /* Procesiones / config */

@@ -374,8 +374,8 @@ export default function CajaSaaS() {
 
       <section className="panel">
         <h3 className="panel__title">Detalle de ventas ({ventasFiltradas.length})</h3>
-        <div className="table-wrap">
-          <table className="data-table">
+        <div className="table-wrap table-wrap--cards">
+          <table className="data-table data-table--stack">
             <thead>
               <tr>
                 <th>Fecha</th>
@@ -393,16 +393,16 @@ export default function CajaSaaS() {
             <tbody>
               {ventasFiltradas.map((v) => (
                 <tr key={v.id}>
-                  <td>{formatFechaReporte(fechaVentaKey(v))}</td>
-                  <td>{formatHoraVentaGt(v.pago_confirmado_en || v.updated_at) || '—'}</td>
-                  <td>#{v.numero_turno}</td>
-                  <td>{labelTipoTurno(v.tipo_turno)}</td>
-                  <td>
+                  <td data-label="Fecha">{formatFechaReporte(fechaVentaKey(v))}</td>
+                  <td data-label="Hora">{formatHoraVentaGt(v.pago_confirmado_en || v.updated_at) || '—'}</td>
+                  <td data-label="Turno">#{v.numero_turno}</td>
+                  <td data-label="Tipo">{labelTipoTurno(v.tipo_turno)}</td>
+                  <td data-label="Boleta">
                     <code>{v.codigo_boleta_qr}</code>
                   </td>
-                  <td>{v.operador_nombre || '—'}</td>
-                  <td>{labelMetodoPago(v.metodo_pago)}</td>
-                  <td>
+                  <td data-label="Operador">{v.operador_nombre || '—'}</td>
+                  <td data-label="Pago">{labelMetodoPago(v.metodo_pago)}</td>
+                  <td data-label="Comprobante">
                     {v.comprobante_url ? (
                       <button
                         type="button"
@@ -415,8 +415,8 @@ export default function CajaSaaS() {
                       <span className="text-muted">—</span>
                     )}
                   </td>
-                  <td>{formatQ(v.precio_pagado)}</td>
-                  <td>
+                  <td data-label="Ofrenda">{formatQ(v.precio_pagado)}</td>
+                  <td data-label="Acciones">
                     <button
                       type="button"
                       className="btn btn--ghost btn--sm btn--danger-text"

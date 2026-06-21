@@ -38,6 +38,8 @@ export default function ConfigUsuarios() {
   const [error, setError] = useState('');
   const [okMsg, setOkMsg] = useState('');
   const [toggleUsuarioId, setToggleUsuarioId] = useState(null);
+  const [rolFormVisible, setRolFormVisible] = useState(false);
+  const [userFormVisible, setUserFormVisible] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!organizacionId) return;
@@ -71,12 +73,21 @@ export default function ConfigUsuarios() {
       descripcion: rol.descripcion || '',
       permisos: [...rol.permisos],
     });
+    setRolFormVisible(true);
     setError('');
   };
 
   const nuevoRol = () => {
     setRolEditId(null);
     setRolForm({ ...ROL_VACIO, permisos: ['taquilla'] });
+    setRolFormVisible(true);
+    setError('');
+  };
+
+  const cancelarRol = () => {
+    setRolEditId(null);
+    setRolForm(ROL_VACIO);
+    setRolFormVisible(false);
     setError('');
   };
 
@@ -91,6 +102,7 @@ export default function ConfigUsuarios() {
     setOkMsg(rolEditId ? 'Rol actualizado.' : 'Rol creado.');
     setRolEditId(null);
     setRolForm(ROL_VACIO);
+    setRolFormVisible(false);
     refresh();
     setTimeout(() => setOkMsg(''), 4000);
   };
@@ -106,6 +118,7 @@ export default function ConfigUsuarios() {
     if (rolEditId === rol.id) {
       setRolEditId(null);
       setRolForm(ROL_VACIO);
+      setRolFormVisible(false);
     }
     refresh();
     setTimeout(() => setOkMsg(''), 4000);
@@ -120,6 +133,7 @@ export default function ConfigUsuarios() {
       rol_id: u.rol_id,
       activo: u.activo !== false,
     });
+    setUserFormVisible(true);
     setTab('usuarios');
     setError('');
   };
@@ -130,7 +144,15 @@ export default function ConfigUsuarios() {
       ...USUARIO_VACIO,
       rol_id: roles.find((r) => !r.es_sistema)?.id || roles[0]?.id || '',
     });
+    setUserFormVisible(true);
     setTab('usuarios');
+    setError('');
+  };
+
+  const cancelarUsuario = () => {
+    setUserEditId(null);
+    setUserForm(USUARIO_VACIO);
+    setUserFormVisible(false);
     setError('');
   };
 
@@ -145,6 +167,7 @@ export default function ConfigUsuarios() {
     setOkMsg(userEditId ? 'Usuario actualizado.' : 'Usuario creado.');
     setUserEditId(null);
     setUserForm(USUARIO_VACIO);
+    setUserFormVisible(false);
     refresh();
     setTimeout(() => setOkMsg(''), 4000);
   };
@@ -267,10 +290,18 @@ export default function ConfigUsuarios() {
             </div>
           </div>
 
-          <form className="panel config-form" onSubmit={guardarRol}>
-            <h3 className="panel__title">
-              {rolEditId ? 'Editar rol' : 'Crear rol'}
-            </h3>
+          <form
+            className={`panel config-form ${rolFormVisible ? 'config-form--visible' : ''}`}
+            onSubmit={guardarRol}
+          >
+            <div className="config-form__head">
+              <h3 className="panel__title">
+                {rolEditId ? 'Editar rol' : 'Crear rol'}
+              </h3>
+              <button type="button" className="btn btn--ghost btn--sm config-form__cancel" onClick={cancelarRol}>
+                Cancelar
+              </button>
+            </div>
 
             <label>
               Nombre del rol
@@ -337,8 +368,8 @@ export default function ConfigUsuarios() {
               Cada usuario inicia sesión con su correo y ve solo las pantallas de su rol.
             </p>
 
-            <div className="table-wrap">
-              <table className="data-table">
+            <div className="table-wrap table-wrap--cards">
+              <table className="data-table data-table--stack">
                 <thead>
                   <tr>
                     <th>Nombre</th>
@@ -352,20 +383,20 @@ export default function ConfigUsuarios() {
                 <tbody>
                   {usuarios.map((u) => (
                     <tr key={u.id}>
-                      <td>{u.nombre}</td>
-                      <td>{u.email}</td>
-                      <td>{u.rol_nombre}</td>
-                      <td>
+                      <td data-label="Nombre">{u.nombre}</td>
+                      <td data-label="Correo">{u.email}</td>
+                      <td data-label="Rol">{u.rol_nombre}</td>
+                      <td data-label="Pantallas">
                         <span className="text-muted usuarios-permisos-mini">
                           {(Array.isArray(u.permisos) ? u.permisos : []).map(labelPermiso).join(', ')}
                         </span>
                       </td>
-                      <td>
+                      <td data-label="Estado">
                         <span className={`badge ${u.activo !== false ? 'badge--success' : 'badge--warning'}`}>
                           {u.activo !== false ? 'Activo' : 'Inactivo'}
                         </span>
                       </td>
-                      <td>
+                      <td data-label="Acciones">
                         <div className="usuarios-tabla-acciones">
                           <button
                             type="button"
@@ -399,10 +430,18 @@ export default function ConfigUsuarios() {
             </div>
           </div>
 
-          <form className="panel config-form" onSubmit={guardarUsuario}>
-            <h3 className="panel__title">
-              {userEditId ? 'Editar usuario' : 'Crear usuario'}
-            </h3>
+          <form
+            className={`panel config-form ${userFormVisible ? 'config-form--visible' : ''}`}
+            onSubmit={guardarUsuario}
+          >
+            <div className="config-form__head">
+              <h3 className="panel__title">
+                {userEditId ? 'Editar usuario' : 'Crear usuario'}
+              </h3>
+              <button type="button" className="btn btn--ghost btn--sm config-form__cancel" onClick={cancelarUsuario}>
+                Cancelar
+              </button>
+            </div>
 
             <label>
               Nombre completo
