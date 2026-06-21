@@ -1260,6 +1260,69 @@ export async function anularVentaPorCodigo(organizacionId, codigo, motivo = '') 
   return { data };
 }
 
+const METODOS_PAGO_VALIDOS = new Set(['efectivo', 'transferencia', 'tarjeta']);
+
+function metodoRequiereComprobantePago(metodo) {
+  return metodo === 'transferencia' || metodo === 'tarjeta';
+}
+
+export async function actualizarPagoPorCodigo(organizacionId, codigo, pagoData = {}) {
+  const codigoLimpio = normalizarCodigoBoleta(codigo);
+  if (!codigoLimpio || !/^V[RT]-[A-Z0-9]+$/.test(codigoLimpio)) {
+    return { error: 'Código de boleta inválido.' };
+  }
+
+  const metodo = pagoData.metodo_pago || 'efectivo';
+  if (!METODOS_PAGO_VALIDOS.has(metodo)) {
+    return { error: 'Método de pago inválido.' };
+  }
+
+  const comprobante = pagoData.comprobante_url || null;
+  if (metodoRequiereComprobantePago(metodo) && !comprobante) {
+    return { error: 'Suba la foto del comprobante de transferencia o voucher de pago.' };
+  }
+
+  const preview = await buscarBoletaPorCodigo(organizacionId, codigoLimpio);
+  if (preview.error) return preview;
+
+  const brazos = preview.brazos || [];
+  if (!brazos.length) {
+    return { error: 'Boleta no encontrada o ya anulada.' };
+  }
+
+  const payload = {
+    metodo_pago: metodo,
+    comprobante_url: metodoRequiereComprobantePago(metodo) ? comprobante : null,
+  };
+
+  const ids = brazos.map((b) => b.id);
+  const { error: upErr } = await supabase
+    .from('brazos')
+    .update(payload)
+    .in('id', ids)
+    .eq('organizacion_id', organizacionId)
+    .eq('estado', 'vendido');
+
+  if (upErr) return err(upErr);
+
+  if (preview.compra?.id) {
+    const { error: cErr } = await supabase
+      .from('compras')
+      .update(payload)
+      .eq('id', preview.compra.id)
+      .eq('organizacion_id', organizacionId);
+    if (cErr) return err(cErr);
+  }
+
+  return {
+    data: {
+      codigo: codigoLimpio,
+      metodo_pago: metodo,
+      brazos_actualizados: brazos.length,
+    },
+  };
+}
+
 export async function marcarEntregado(brazoId) {
   const { data, error } = await supabase.rpc('marcar_entregado_brazo', { p_brazo_id: brazoId });
   if (error) {

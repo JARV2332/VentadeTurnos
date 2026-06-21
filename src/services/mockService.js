@@ -722,6 +722,64 @@ export function anularVentaPorCodigoMock(organizacionId, codigo, motivo = '') {
   };
 }
 
+const METODOS_PAGO_VALIDOS_MOCK = new Set(['efectivo', 'transferencia', 'tarjeta']);
+
+function metodoRequiereComprobanteMock(metodo) {
+  return metodo === 'transferencia' || metodo === 'tarjeta';
+}
+
+export function actualizarPagoPorCodigoMock(organizacionId, codigo, pagoData = {}) {
+  const codigoLimpio = normalizarCodigoBoleta(codigo);
+  if (!codigoLimpio || !/^V[RT]-[A-Z0-9]+$/.test(codigoLimpio)) {
+    return { error: 'Código de boleta inválido.' };
+  }
+
+  const metodo = pagoData.metodo_pago || 'efectivo';
+  if (!METODOS_PAGO_VALIDOS_MOCK.has(metodo)) {
+    return { error: 'Método de pago inválido.' };
+  }
+
+  const comprobante = pagoData.comprobante_url || null;
+  if (metodoRequiereComprobanteMock(metodo) && !comprobante) {
+    return { error: 'Suba la foto del comprobante de transferencia o voucher de pago.' };
+  }
+
+  const preview = buscarBoletaPorCodigo(organizacionId, codigoLimpio);
+  if (preview.error) return preview;
+
+  const brazos = preview.brazos || [];
+  if (!brazos.length) {
+    return { error: 'Boleta no encontrada o ya anulada.' };
+  }
+
+  const payload = {
+    metodo_pago: metodo,
+    comprobante_url: metodoRequiereComprobanteMock(metodo) ? comprobante : null,
+  };
+
+  brazos.forEach((b) => {
+    const idx = store.brazos.findIndex((x) => x.id === b.id);
+    if (idx === -1) return;
+    store.brazos[idx] = { ...store.brazos[idx], ...payload };
+    emit('brazos', { eventType: 'UPDATE', new: store.brazos[idx] });
+  });
+
+  if (preview.compra?.id) {
+    const cIdx = (store.compras || []).findIndex((c) => c.id === preview.compra.id);
+    if (cIdx !== -1) {
+      store.compras[cIdx] = { ...store.compras[cIdx], ...payload };
+    }
+  }
+
+  return {
+    data: {
+      codigo: codigoLimpio,
+      metodo_pago: metodo,
+      brazos_actualizados: brazos.length,
+    },
+  };
+}
+
 /** Marca el turno físico como entregado tras validar QR. */
 export function marcarEntregadoMock(brazoId, organizacionId, usuarioId) {
   const brazo = store.brazos.find(

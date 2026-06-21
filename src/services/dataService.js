@@ -132,6 +132,11 @@ export const anularVentaPorCodigo = (organizacionId, codigo, motivo) =>
     ? sb.anularVentaPorCodigo(organizacionId, codigo, motivo)
     : Promise.resolve(mock.anularVentaPorCodigoMock(organizacionId, codigo, motivo));
 
+export const actualizarPagoPorCodigo = (organizacionId, codigo, pagoData) =>
+  isSupabaseBackend()
+    ? sb.actualizarPagoPorCodigo(organizacionId, codigo, pagoData)
+    : Promise.resolve(mock.actualizarPagoPorCodigoMock(organizacionId, codigo, pagoData));
+
 export const marcarEntregado = (brazoId, organizacionId, usuarioId) =>
   isSupabaseBackend()
     ? sb.marcarEntregado(brazoId)

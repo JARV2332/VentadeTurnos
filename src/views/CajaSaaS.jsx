@@ -3,6 +3,7 @@ import Layout from '../components/Layout';
 import Loader from '../components/Loader';
 import CajaReportePanel from '../components/CajaReportePanel';
 import AnularBoletaModal from '../components/AnularBoletaModal';
+import EditarPagoBoletaModal from '../components/EditarPagoBoletaModal';
 import EditDevotoModal from '../components/EditDevotoModal';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -10,6 +11,7 @@ import {
   subscribeData,
   buscarBoletaPorCodigo,
   anularVentaPorCodigo,
+  actualizarPagoPorCodigo,
   updateDevoto,
 } from '../services/dataService';
 import { labelMetodoPago } from '../utils/pagoUtils';
@@ -37,6 +39,11 @@ export default function CajaSaaS() {
   const [previewAnular, setPreviewAnular] = useState(null);
   const [buscandoAnular, setBuscandoAnular] = useState(false);
   const [anulando, setAnulando] = useState(false);
+  const [editarPagoAbierto, setEditarPagoAbierto] = useState(false);
+  const [codigoEditarPago, setCodigoEditarPago] = useState('');
+  const [previewEditarPago, setPreviewEditarPago] = useState(null);
+  const [buscandoEditarPago, setBuscandoEditarPago] = useState(false);
+  const [guardandoPago, setGuardandoPago] = useState(false);
   const [okMsg, setOkMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [devotoEditando, setDevotoEditando] = useState(null);
@@ -184,6 +191,54 @@ export default function CajaSaaS() {
     setDevotoEditando(previewAnular.cargador);
   };
 
+  const abrirEditarPago = (codigo = '') => {
+    setErrorMsg('');
+    setOkMsg('');
+    setPreviewEditarPago(null);
+    setCodigoEditarPago(codigo || '');
+    setEditarPagoAbierto(true);
+  };
+
+  const cerrarEditarPago = () => {
+    if (guardandoPago) return;
+    setEditarPagoAbierto(false);
+    setPreviewEditarPago(null);
+    setCodigoEditarPago('');
+  };
+
+  const handleBuscarEditarPago = async (codigo) => {
+    setErrorMsg('');
+    setBuscandoEditarPago(true);
+    try {
+      const res = await buscarBoletaPorCodigo(organizacionId, codigo);
+      setPreviewEditarPago(res);
+    } finally {
+      setBuscandoEditarPago(false);
+    }
+  };
+
+  const handleConfirmarEditarPago = async ({ codigo, metodo_pago, comprobante_url }) => {
+    setErrorMsg('');
+    setGuardandoPago(true);
+    try {
+      const res = await actualizarPagoPorCodigo(organizacionId, codigo, {
+        metodo_pago,
+        comprobante_url,
+      });
+      if (res.error) {
+        setPreviewEditarPago((prev) => ({ ...(prev || {}), error: res.error }));
+        return;
+      }
+      setEditarPagoAbierto(false);
+      setPreviewEditarPago(null);
+      setCodigoEditarPago('');
+      setOkMsg(`Pago actualizado a ${labelMetodoPago(res.data?.metodo_pago || metodo_pago)}.`);
+      await refreshFinanzas();
+    } finally {
+      setGuardandoPago(false);
+    }
+  };
+
   if (!finanzas) {
     return (
       <Layout title="Caja y Finanzas" subtitle="Cuadre, análisis y reportes">
@@ -206,7 +261,9 @@ export default function CajaSaaS() {
   return (
     <Layout title="Caja y Finanzas" subtitle="Cuadre, análisis y reportes de ventas">
       {okMsg && <div className="alert alert--success">{okMsg}</div>}
-      {errorMsg && !anularAbierto && <div className="alert alert--error">{errorMsg}</div>}
+      {errorMsg && !anularAbierto && !editarPagoAbierto && (
+        <div className="alert alert--error">{errorMsg}</div>
+      )}
 
       <div className="metrics-grid metrics-grid--3">
         <div className="metric-card">
@@ -300,6 +357,21 @@ export default function CajaSaaS() {
         filtrosMeta={filtrosMeta}
         orgNombre={organizacion?.nombre_oficial || ''}
       />
+
+      <section className="panel caja-anular-panel">
+        <div className="caja-anular-panel__head">
+          <div>
+            <h3 className="panel__title">Editar pago de boleta</h3>
+            <p className="text-muted config-hint">
+              Corrija efectivo, transferencia o tarjeta por código VT- o VR-. Transferencia y
+              tarjeta requieren subir comprobante.
+            </p>
+          </div>
+          <button type="button" className="btn btn--primary btn--sm" onClick={() => abrirEditarPago()}>
+            Editar pago…
+          </button>
+        </div>
+      </section>
 
       <section className="panel caja-anular-panel">
         <div className="caja-anular-panel__head">
@@ -419,6 +491,13 @@ export default function CajaSaaS() {
                   <td data-label="Acciones">
                     <button
                       type="button"
+                      className="btn btn--ghost btn--sm"
+                      onClick={() => abrirEditarPago(v.codigo_boleta_qr)}
+                    >
+                      Editar pago
+                    </button>
+                    <button
+                      type="button"
                       className="btn btn--ghost btn--sm btn--danger-text"
                       onClick={() => abrirAnular(v.codigo_boleta_qr)}
                     >
@@ -445,6 +524,18 @@ export default function CajaSaaS() {
             </button>
           </div>
         </div>
+      )}
+
+      {editarPagoAbierto && (
+        <EditarPagoBoletaModal
+          preview={previewEditarPago}
+          buscando={buscandoEditarPago}
+          guardando={guardandoPago}
+          codigoInicial={codigoEditarPago}
+          onBuscar={handleBuscarEditarPago}
+          onGuardar={handleConfirmarEditarPago}
+          onCerrar={cerrarEditarPago}
+        />
       )}
 
       {anularAbierto && (
