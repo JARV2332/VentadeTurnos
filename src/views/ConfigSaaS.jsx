@@ -600,8 +600,8 @@ export default function ConfigSaaS() {
                 <h4>Turnos de: {procesionVer.nombre_evento}</h4>
                 <p className="text-muted config-hint">
                   Orden del cortejo: turno 1 = salida · último = entrada. Use{' '}
-                  <strong>Editar</strong> para cambiar nombre, son o alabado;{' '}
-                  <strong>Agregar turno</strong> si falta un número en el cortejo.
+                  <strong>Editar</strong> para cambiar tipo (ordinario/extraordinario), melodía,
+                  ofrenda o brazos; <strong>Agregar turno</strong> si falta un número en el cortejo.
                 </p>
               </div>
               <button
@@ -659,6 +659,7 @@ export default function ConfigSaaS() {
 
       <EditTurnoModal
         turno={turnoEditando}
+        turnosExistentes={procesionVer?.turnos || []}
         guardando={guardandoTurno}
         onGuardar={handleGuardarTurno}
         onCerrar={() => !guardandoTurno && setTurnoEditando(null)}

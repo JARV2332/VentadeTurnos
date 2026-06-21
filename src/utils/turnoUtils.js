@@ -274,3 +274,103 @@ export function sugerirDefaultsNuevoTurno(turnosExistentes, numeroTurno) {
 
   return { tipo_turno, precio, total_brazos, etiqueta };
 }
+
+/** Máximo número de turno en una procesión. */
+export function maxNumeroTurno(turnos) {
+  const nums = (turnos || []).map((t) => t.numero_turno);
+  return nums.length ? Math.max(...nums) : 0;
+}
+
+/** Tipos permitidos al editar un turno existente (salida/entrada fijos en extremos). */
+export function tiposTurnoEditables(numeroTurno, maxNumero) {
+  const n = Number(numeroTurno);
+  const max = Number(maxNumero) || 0;
+  if (n === 1) return ['Salida'];
+  if (max > 0 && n === max) return ['Entrada'];
+  return ['Ordinario', 'Extraordinario'];
+}
+
+/** Precio y brazos de referencia según otro turno del mismo tipo en la procesión. */
+export function referenciaPorTipoTurno(turnosExistentes, tipo) {
+  const lista = Array.isArray(turnosExistentes) ? turnosExistentes : [];
+  const ref = lista.find((t) => t.tipo_turno === tipo);
+  const ordinario = lista.find((t) => t.tipo_turno === 'Ordinario');
+  const extra = lista.find((t) => t.tipo_turno === 'Extraordinario');
+  if (tipo === 'Extraordinario') {
+    return {
+      precio: ref?.precio ?? extra?.precio ?? ordinario?.precio ?? 300,
+      total_brazos: ref?.total_brazos ?? extra?.total_brazos ?? ordinario?.total_brazos ?? 12,
+    };
+  }
+  if (tipo === 'Salida' || tipo === 'Entrada') {
+    const refTipo = lista.find((t) => t.tipo_turno === tipo);
+    return {
+      precio: refTipo?.precio ?? ordinario?.precio ?? 400,
+      total_brazos: refTipo?.total_brazos ?? ordinario?.total_brazos ?? 20,
+    };
+  }
+  return {
+    precio: ref?.precio ?? ordinario?.precio ?? 150,
+    total_brazos: ref?.total_brazos ?? ordinario?.total_brazos ?? 20,
+  };
+}
+
+/**
+ * Plan para aumentar o reducir brazos de un turno.
+ * @returns {{ error?: string, agregar?: object[], eliminarIds?: string[] }}
+ */
+export function planAjusteBrazos(brazosDelTurno, { turnoId, numeroTurno, organizacionId, nuevoTotal }) {
+  const total = Number(nuevoTotal);
+  if (!validarBrazosPares(total)) {
+    return { error: 'El total de brazos debe ser par y mayor que 0.' };
+  }
+
+  const delTurno = (brazosDelTurno || []).filter((b) => b.turno_id === turnoId);
+  const actualTotal = delTurno.length;
+
+  if (total === actualTotal) {
+    return { agregar: [], eliminarIds: [] };
+  }
+
+  if (total > actualTotal) {
+    if (actualTotal === 0) {
+      const creados = crearBrazosParaTurno({
+        turnoId,
+        numeroTurno,
+        totalBrazos: total,
+        organizacionId,
+      }).map(({ id, ...b }) => b);
+      return { agregar: creados, eliminarIds: [] };
+    }
+
+    const actualPorLado = actualTotal / 2;
+    const nuevoPorLado = total / 2;
+    const agregar = [];
+    for (let n = actualPorLado + 1; n <= nuevoPorLado; n += 1) {
+      ['Izquierda', 'Derecha'].forEach((lado) => {
+        agregar.push({
+          organizacion_id: organizacionId,
+          turno_id: turnoId,
+          numero_turno: numeroTurno,
+          numero_brazo: n,
+          lado,
+          estado: 'disponible',
+        });
+      });
+    }
+    return { agregar, eliminarIds: [] };
+  }
+
+  const nuevoPorLado = total / 2;
+  const aEliminar = delTurno.filter((b) => b.numero_brazo > nuevoPorLado);
+  const bloqueados = aEliminar.filter(
+    (b) => b.estado !== 'disponible' || b.reserva_apartado || b.cargador_id
+  );
+  if (bloqueados.length > 0) {
+    return {
+      error:
+        'No se puede reducir brazos: hay espacios vendidos, apartados o reservados en los brazos que se quitarían.',
+    };
+  }
+  return { agregar: [], eliminarIds: aEliminar.map((b) => b.id) };
+}

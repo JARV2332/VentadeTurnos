@@ -7,6 +7,9 @@ import {
   construirTurnosConfig,
   crearBrazosParaTurno,
   validarBrazosPares,
+  planAjusteBrazos,
+  tiposTurnoEditables,
+  maxNumeroTurno,
 } from '../utils/turnoUtils';
 import {
   normalizarLado,
@@ -462,13 +465,68 @@ export async function getTurnosByIds(turnoIds) {
 export async function updateTurno(organizacionId, turnoId, datos) {
   if (!turnoId) return { error: 'Turno no válido.' };
 
+  const { data: turnoActual, error: fetchErr } = await supabase
+    .from('turnos')
+    .select('*')
+    .eq('id', turnoId)
+    .eq('organizacion_id', organizacionId)
+    .maybeSingle();
+  if (fetchErr) return err(fetchErr);
+  if (!turnoActual) return { error: 'Turno no encontrado.' };
+
+  if (datos.tipo_turno !== undefined) {
+    const hermanos = await getTurnosByCortejo(turnoActual.cortejo_id);
+    const maxNum = maxNumeroTurno(hermanos);
+    const permitidos = tiposTurnoEditables(turnoActual.numero_turno, maxNum);
+    const tipo = String(datos.tipo_turno).trim();
+    if (!permitidos.includes(tipo)) {
+      return {
+        error: `El turno #${turnoActual.numero_turno} solo puede ser: ${permitidos.join(' o ')}.`,
+      };
+    }
+  }
+
   const payload = {
     etiqueta: datos.etiqueta?.trim() || null,
     son: datos.son?.trim() || null,
     alabado: datos.alabado?.trim() || null,
   };
+  if (datos.tipo_turno !== undefined) payload.tipo_turno = String(datos.tipo_turno).trim();
+  if (datos.precio !== undefined) payload.precio = Number(datos.precio) || 0;
+  if (datos.total_brazos !== undefined) {
+    payload.total_brazos = Number(datos.total_brazos) || turnoActual.total_brazos;
+  }
   if (datos.hora_estimada !== undefined) {
     payload.hora_estimada = normalizarHoraInput(datos.hora_estimada);
+  }
+
+  const nuevoTotal = payload.total_brazos ?? turnoActual.total_brazos;
+  if (Number(nuevoTotal) !== Number(turnoActual.total_brazos)) {
+    const { data: brazos, error: brazosErr } = await supabase
+      .from('brazos')
+      .select('*')
+      .eq('turno_id', turnoId)
+      .eq('organizacion_id', organizacionId);
+    if (brazosErr) return err(brazosErr);
+
+    const plan = planAjusteBrazos(brazos || [], {
+      turnoId,
+      numeroTurno: turnoActual.numero_turno,
+      organizacionId,
+      nuevoTotal,
+    });
+    if (plan.error) return { error: plan.error };
+
+    if (plan.eliminarIds?.length) {
+      const { error: delErr } = await supabase.from('brazos').delete().in('id', plan.eliminarIds);
+      if (delErr) return err(delErr);
+    }
+    if (plan.agregar?.length) {
+      const bErr = await insertarBrazosEnLotes(plan.agregar);
+      if (bErr) {
+        return { error: `Error al ajustar brazos del turno: ${bErr.message || bErr}` };
+      }
+    }
   }
 
   let { data, error } = await supabase

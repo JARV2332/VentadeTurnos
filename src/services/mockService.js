@@ -3,6 +3,9 @@ import {
   construirTurnosConfig,
   crearBrazosParaTurno,
   agruparTurnosConBrazos,
+  planAjusteBrazos,
+  tiposTurnoEditables,
+  maxNumeroTurno,
 } from '../utils/turnoUtils';
 import {
   normalizarLado,
@@ -218,12 +221,66 @@ export function updateTurnoMock(organizacionId, turnoId, datos) {
   );
   if (idx === -1) return { error: 'Turno no encontrado.' };
 
+  const turnoActual = store.turnos[idx];
+
+  if (datos.tipo_turno !== undefined) {
+    const hermanos = getTurnosByCortejo(turnoActual.cortejo_id);
+    const maxNum = maxNumeroTurno(hermanos);
+    const permitidos = tiposTurnoEditables(turnoActual.numero_turno, maxNum);
+    const tipo = String(datos.tipo_turno).trim();
+    if (!permitidos.includes(tipo)) {
+      return {
+        error: `El turno #${turnoActual.numero_turno} solo puede ser: ${permitidos.join(' o ')}.`,
+      };
+    }
+  }
+
+  const nuevoTotal =
+    datos.total_brazos !== undefined
+      ? Number(datos.total_brazos) || turnoActual.total_brazos
+      : turnoActual.total_brazos;
+
+  if (Number(nuevoTotal) !== Number(turnoActual.total_brazos)) {
+    const brazosDelTurno = store.brazos.filter(
+      (b) => b.turno_id === turnoId && b.organizacion_id === organizacionId
+    );
+    const plan = planAjusteBrazos(brazosDelTurno, {
+      turnoId,
+      numeroTurno: turnoActual.numero_turno,
+      organizacionId,
+      nuevoTotal,
+    });
+    if (plan.error) return { error: plan.error };
+
+    if (plan.eliminarIds?.length) {
+      store.brazos = store.brazos.filter((b) => !plan.eliminarIds.includes(b.id));
+    }
+    if (plan.agregar?.length) {
+      const ts = Date.now();
+      plan.agregar.forEach((b, i) => {
+        store.brazos.push({
+          id: `brazo-edit-${ts}-${i}`,
+          ...b,
+        });
+      });
+    }
+  }
+
   const actualizado = {
-    ...store.turnos[idx],
+    ...turnoActual,
     etiqueta: datos.etiqueta?.trim() || null,
     son: datos.son?.trim() || null,
     alabado: datos.alabado?.trim() || null,
   };
+  if (datos.tipo_turno !== undefined) {
+    actualizado.tipo_turno = String(datos.tipo_turno).trim();
+  }
+  if (datos.precio !== undefined) {
+    actualizado.precio = Number(datos.precio) || 0;
+  }
+  if (datos.total_brazos !== undefined) {
+    actualizado.total_brazos = nuevoTotal;
+  }
   if (datos.hora_estimada !== undefined) {
     actualizado.hora_estimada = normalizarHoraInput(datos.hora_estimada);
   }
