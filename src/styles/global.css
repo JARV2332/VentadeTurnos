@@ -2459,6 +2459,22 @@ html {
   gap: 1.5rem;
 }
 
+.caja-detalle-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+}
+
+.caja-detalle__dia td {
+  background: var(--primary-light, #f8fafc);
+  border-top: 2px solid var(--border);
+  padding: 0.55rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.caja-detalle__dia:first-child td {
+  border-top: none;
+}
+
 /* ── Impresión ── */
 .impresion-controls {
   display: flex;

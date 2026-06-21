@@ -45,6 +45,54 @@ export function formatQ(n) {
   );
 }
 
+/** Marca de tiempo UTC de la venta (pago confirmado o actualización). */
+export function timestampVenta(venta) {
+  const raw = venta?.pago_confirmado_en || venta?.updated_at || venta?.created_at;
+  if (!raw) return null;
+  const t = new Date(raw).getTime();
+  return Number.isNaN(t) ? null : t;
+}
+
+/** Orden cronológico: fecha y luego hora (sin fecha al final). */
+export function ordenarVentasCaja(ventas, { direccion = 'asc' } = {}) {
+  const lista = Array.isArray(ventas) ? [...ventas] : [];
+  lista.sort((a, b) => {
+    const ta = timestampVenta(a);
+    const tb = timestampVenta(b);
+    if (ta == null && tb == null) return 0;
+    if (ta == null) return 1;
+    if (tb == null) return -1;
+    const cmp = ta - tb;
+    if (cmp !== 0) return direccion === 'desc' ? -cmp : cmp;
+    const turnoA = Number(a.numero_turno) || 0;
+    const turnoB = Number(b.numero_turno) || 0;
+    return turnoA - turnoB;
+  });
+  return lista;
+}
+
+/** Ventas agrupadas por día, cada día ordenado por hora. */
+export function agruparVentasPorDia(ventas) {
+  const ordenadas = ordenarVentasCaja(ventas);
+  const grupos = [];
+  let actual = null;
+
+  ordenadas.forEach((v) => {
+    const key = fechaVentaKey(v) || 'sin-fecha';
+    if (!actual || actual.fechaKey !== key) {
+      actual = {
+        fechaKey: key,
+        fechaLabel: key === 'sin-fecha' ? 'Sin fecha' : formatFechaReporte(key),
+        ventas: [],
+      };
+      grupos.push(actual);
+    }
+    actual.ventas.push(v);
+  });
+
+  return grupos;
+}
+
 export function filtrarVentasCaja(ventas, filtros = {}) {
   let lista = Array.isArray(ventas) ? [...ventas] : [];
   const { fechaDesde, fechaHasta, vendedorId, tipoTurno, mesaId } = filtros;
@@ -71,7 +119,7 @@ export function filtrarVentasCaja(ventas, filtros = {}) {
     lista = lista.filter((v) => v.mesa_id === mesaId);
   }
 
-  return lista;
+  return ordenarVentasCaja(lista);
 }
 
 function agruparPor(lista, keyFn, labelFn) {
@@ -150,7 +198,7 @@ function filtrosTexto(filtros) {
 }
 
 function filasDetalleExcel(ventas) {
-  return ventas.map((v) => ({
+  return ordenarVentasCaja(ventas).map((v) => ({
     'Fecha venta': formatFechaReporte(fechaVentaKey(v)),
     'Hora venta': formatHoraVentaGt(v.pago_confirmado_en || v.updated_at),
     Turno: v.numero_turno ?? '—',
@@ -256,6 +304,7 @@ function barChartHtml(items, maxTotal) {
 }
 
 function buildReporteCajaHtml({ ventas, resumen, filtros = {}, orgNombre = '' }) {
+  const ventasOrdenadas = ordenarVentasCaja(ventas);
   const generado = new Intl.DateTimeFormat('es-GT', {
     dateStyle: 'long',
     timeStyle: 'short',
@@ -330,11 +379,11 @@ function buildReporteCajaHtml({ ventas, resumen, filtros = {}, orgNombre = '' })
   </div>
   <div class="panel" style="margin-bottom:24px"><h2>Ventas por día</h2>${barChartHtml(resumen.porDia, maxD)}</div>
   <div class="panel">
-    <h2>Detalle (${ventas.length} registros)</h2>
+    <h2>Detalle (${ventasOrdenadas.length} registros)</h2>
     <table>
       <thead><tr><th>Fecha</th><th>Hora</th><th>Turno</th><th>Tipo</th><th>Boleta</th><th>Operador</th><th>Pago</th><th>Ofrenda</th></tr></thead>
       <tbody>
-        ${ventas
+        ${ventasOrdenadas
           .slice(0, 500)
           .map(
             (v) => `<tr>
@@ -351,7 +400,7 @@ function buildReporteCajaHtml({ ventas, resumen, filtros = {}, orgNombre = '' })
           .join('')}
       </tbody>
     </table>
-    ${ventas.length > 500 ? `<p><em>… y ${ventas.length - 500} filas más (exporte Excel para el listado completo).</em></p>` : ''}
+    ${ventasOrdenadas.length > 500 ? `<p><em>… y ${ventasOrdenadas.length - 500} filas más (exporte Excel para el listado completo).</em></p>` : ''}
   </div>
   <script>
     window.addEventListener('load', function () {

@@ -22,6 +22,7 @@ import {
   labelTipoTurno,
   formatFechaReporte,
   fechaVentaKey,
+  agruparVentasPorDia,
 } from '../utils/cajaReportUtils';
 import { formatHoraVentaGt } from '../utils/turnoHorarioUtils';
 
@@ -99,6 +100,11 @@ export default function CajaSaaS() {
   const tiposTurno = useMemo(
     () => tiposTurnoDisponibles(finanzas?.ventas),
     [finanzas?.ventas]
+  );
+
+  const ventasPorDia = useMemo(
+    () => agruparVentasPorDia(ventasFiltradas),
+    [ventasFiltradas]
   );
 
   const filtrosMeta = useMemo(() => {
@@ -446,6 +452,9 @@ export default function CajaSaaS() {
 
       <section className="panel">
         <h3 className="panel__title">Detalle de ventas ({ventasFiltradas.length})</h3>
+        <p className="text-muted config-hint caja-detalle-hint">
+          Ordenado por fecha y hora de venta (día a día, de la más temprana a la más reciente).
+        </p>
         <div className="table-wrap table-wrap--cards">
           <table className="data-table data-table--stack">
             <thead>
@@ -463,7 +472,19 @@ export default function CajaSaaS() {
               </tr>
             </thead>
             <tbody>
-              {ventasFiltradas.map((v) => (
+              {ventasPorDia.map((grupo) => (
+                <React.Fragment key={grupo.fechaKey}>
+                  <tr className="caja-detalle__dia">
+                    <td colSpan={10}>
+                      <strong>{grupo.fechaLabel}</strong>
+                      <span className="text-muted">
+                        {' '}
+                        · {grupo.ventas.length} venta(s) ·{' '}
+                        {formatQ(grupo.ventas.reduce((s, v) => s + Number(v.precio_pagado || 0), 0))}
+                      </span>
+                    </td>
+                  </tr>
+                  {grupo.ventas.map((v) => (
                 <tr key={v.id}>
                   <td data-label="Fecha">{formatFechaReporte(fechaVentaKey(v))}</td>
                   <td data-label="Hora">{formatHoraVentaGt(v.pago_confirmado_en || v.updated_at) || '—'}</td>
@@ -505,6 +526,8 @@ export default function CajaSaaS() {
                     </button>
                   </td>
                 </tr>
+                  ))}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
