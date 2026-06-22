@@ -20,6 +20,7 @@ import BoletaPublica from './views/BoletaPublica';
 import MisTurnosPublico from './views/MisTurnosPublico';
 import ConsultaTurnosDevoto from './views/ConsultaTurnosDevoto';
 import ListadoTurnos from './views/ListadoTurnos';
+import DisponibilidadTurnos from './views/DisponibilidadTurnos';
 
 function App() {
   return (
@@ -130,6 +131,14 @@ function App() {
             element={
               <PrivateRoute permission="listado_turnos">
                 <ListadoTurnos />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/disponibilidad-turnos"
+            element={
+              <PrivateRoute permission="disponibilidad_turnos">
+                <DisponibilidadTurnos />
               </PrivateRoute>
             }
           />

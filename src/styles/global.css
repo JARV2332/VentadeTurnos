@@ -2445,6 +2445,28 @@ html {
   grid-template-columns: repeat(4, 1fr);
 }
 
+.metrics-grid--5 {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.disponibilidad-turnos__libres {
+  color: #047857;
+}
+
+.disponibilidad-turnos__fila-llena {
+  opacity: 0.72;
+}
+
+.disponibilidad-turnos__detalle-brazos {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.disponibilidad-turnos__tabla td:nth-child(6) {
+  background: #f0fdf4;
+}
+
 .caja-filters__total {
   margin-left: auto;
   padding: 0.65rem 1rem;

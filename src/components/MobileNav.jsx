@@ -13,6 +13,7 @@ const LABEL_CORTO = {
   devotos: 'Devotos',
   consulta_turnos: 'Consulta',
   listado_turnos: 'Listado',
+  disponibilidad_turnos: 'Libres',
   config: 'Procesiones',
   config_correo: 'Correo',
   config_recibo: 'Recibos',
