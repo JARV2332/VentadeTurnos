@@ -1,8 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
-import BoletaContraseñaTurno from '../components/BoletaContraseñaTurno';
+import VerBoletaModal from '../components/VerBoletaModal';
 import { useAuth } from '../context/AuthContext';
 import { buscarTurnosDevoto, buscarBoletaPorCodigo } from '../services/dataService';
 import { formatQ } from '../utils/cajaReportUtils';
@@ -91,23 +90,6 @@ export default function ConsultaTurnosDevoto() {
     }
   }, [resultado]);
 
-  useEffect(() => {
-    if (!boletaModal || typeof document === 'undefined') return undefined;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [boletaModal]);
-
-  const handleImprimirBoleta = () => {
-    document.body.classList.add('consulta-devoto--imprimiendo');
-    const cleanup = () => document.body.classList.remove('consulta-devoto--imprimiendo');
-    window.addEventListener('afterprint', cleanup, { once: true });
-    window.print();
-    setTimeout(cleanup, 1000);
-  };
-
   const abrirBoleta = async (item) => {
     const codigo = item.brazo.codigo_boleta_qr;
     if (!codigo || item.brazo.estado !== 'vendido') return;
@@ -126,13 +108,6 @@ export default function ConsultaTurnosDevoto() {
       setCargandoBoleta(false);
     }
   };
-
-  const itemsBoletaModal =
-    boletaModal?.items?.length > 0
-      ? boletaModal.items
-      : boletaModal?.brazo
-        ? [{ brazo: boletaModal.brazo, turno: boletaModal.turno }]
-        : [];
 
   return (
     <Layout
@@ -334,60 +309,12 @@ export default function ConsultaTurnosDevoto() {
           </section>
         )}
 
-      {boletaModal &&
-        !boletaModal.error &&
-        itemsBoletaModal.length > 0 &&
-        createPortal(
-          <div
-            className="modal-overlay consulta-devoto__overlay"
-            role="presentation"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) setBoletaModal(null);
-            }}
-          >
-            <div
-              className="consulta-devoto__modal-boleta"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="consulta-boleta-titulo"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="consulta-devoto__modal-boleta-header no-print">
-                <h2 id="consulta-boleta-titulo">Boleta</h2>
-                <div className="consulta-devoto__modal-boleta-acciones">
-                  <button
-                    type="button"
-                    className="btn btn--primary btn--sm"
-                    onClick={handleImprimirBoleta}
-                  >
-                    Imprimir
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn--ghost btn--sm"
-                    onClick={() => setBoletaModal(null)}
-                  >
-                    Cerrar
-                  </button>
-                </div>
-              </div>
-              <div className="consulta-devoto__modal-boleta-body print-area">
-                <BoletaContraseñaTurno
-                  organizacion={organizacion}
-                  cortejo={boletaModal.cortejo}
-                  cargador={boletaModal.cargador}
-                  items={itemsBoletaModal}
-                  compra={boletaModal.compra}
-                />
-                <p className="text-muted impresion-print-tip no-print consulta-devoto__print-tip">
-                  Al imprimir: desactive <strong>Encabezados y pies de página</strong>, active{' '}
-                  <strong>Gráficos en segundo plano</strong> y elija <strong>Guardar como PDF</strong>.
-                </p>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+      <VerBoletaModal
+        abierto={Boolean(boletaModal)}
+        boleta={boletaModal}
+        organizacion={organizacion}
+        onCerrar={() => setBoletaModal(null)}
+      />
     </Layout>
   );
 }

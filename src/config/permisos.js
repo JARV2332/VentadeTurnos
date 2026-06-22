@@ -25,6 +25,14 @@ export const PANTALLAS = [
     grupo: 'Operación',
     visibleConPermisos: ['devotos', 'taquilla', 'entrega', 'impresion', 'caja', 'dashboard'],
   },
+  {
+    id: 'listado_turnos',
+    label: 'Listado turnos',
+    path: '/listado-turnos',
+    icon: '☰',
+    grupo: 'Operación',
+    visibleConPermisos: ['devotos', 'taquilla', 'entrega', 'impresion', 'caja', 'dashboard', 'consulta_turnos'],
+  },
   { id: 'config', label: 'Procesiones', path: '/config', icon: '⚙', grupo: 'Administración' },
   { id: 'config_correo', label: 'Correo y boletas', path: '/config/correo', icon: '✉', grupo: 'Administración' },
   {

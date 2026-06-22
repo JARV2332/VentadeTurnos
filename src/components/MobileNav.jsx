@@ -12,6 +12,7 @@ const LABEL_CORTO = {
   impresion: 'Imprimir',
   devotos: 'Devotos',
   consulta_turnos: 'Consulta',
+  listado_turnos: 'Listado',
   config: 'Procesiones',
   config_correo: 'Correo',
   config_recibo: 'Recibos',

@@ -19,6 +19,7 @@ import PlataformaAdmin from './views/PlataformaAdmin';
 import BoletaPublica from './views/BoletaPublica';
 import MisTurnosPublico from './views/MisTurnosPublico';
 import ConsultaTurnosDevoto from './views/ConsultaTurnosDevoto';
+import ListadoTurnos from './views/ListadoTurnos';
 
 function App() {
   return (
@@ -121,6 +122,14 @@ function App() {
             element={
               <PrivateRoute permission="consulta_turnos">
                 <ConsultaTurnosDevoto />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/listado-turnos"
+            element={
+              <PrivateRoute permission="listado_turnos">
+                <ListadoTurnos />
               </PrivateRoute>
             }
           />

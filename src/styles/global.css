@@ -2659,6 +2659,91 @@ html {
   margin: 0 auto;
 }
 
+.listado-turnos__filtros-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.75rem 1rem;
+  margin-top: 0.75rem;
+}
+
+.listado-turnos__filtros-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.listado-turnos__filtros-grid select,
+.listado-turnos__filtros-grid input {
+  font-weight: 400;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.listado-turnos__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  margin-top: 0.85rem;
+}
+
+.listado-turnos__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-right: auto;
+}
+
+.listado-turnos__resumen {
+  margin: 0.75rem 0 0;
+}
+
+.listado-turnos__grupos {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.listado-turnos__grupo-titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.listado-turnos__grupo-count {
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.listado-turnos__print-head {
+  display: none;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.listado-turnos__print-head h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+}
+
+.listado-turnos__print-head p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.only-print {
+  display: none !important;
+}
+
 /* ── Impresión ── */
 .impresion-controls {
   display: flex;
@@ -4717,6 +4802,30 @@ html {
   body.consulta-devoto--imprimiendo .consulta-devoto__modal-boleta-body {
     padding: 0 !important;
     overflow: visible !important;
+  }
+
+  body.listado-turnos--imprimiendo .sidebar,
+  body.listado-turnos--imprimiendo .navbar,
+  body.listado-turnos--imprimiendo .mobile-nav,
+  body.listado-turnos--imprimiendo .app-footer,
+  body.listado-turnos--imprimiendo .listado-turnos__filtros {
+    display: none !important;
+  }
+
+  body.listado-turnos--imprimiendo .only-print {
+    display: block !important;
+  }
+
+  body.listado-turnos--imprimiendo .listado-turnos__grupo {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    border: none;
+    box-shadow: none;
+    margin-bottom: 0.75rem;
+  }
+
+  body.listado-turnos--imprimiendo .listado-turnos__tabla {
+    font-size: 0.75rem;
   }
 
   body:not(.mis-turnos-publico--print-all) .mis-turnos-publico__todas--solo-print {
