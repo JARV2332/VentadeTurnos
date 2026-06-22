@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { PANTALLAS } from '../config/permisos';
+import { PANTALLAS, puedeVerPantalla } from '../config/permisos';
 import BrandLogo from './BrandLogo';
 
 export default function Sidebar({ mobileOpen = false, onClose }) {
@@ -12,7 +12,7 @@ export default function Sidebar({ mobileOpen = false, onClose }) {
     if (p.id === 'config_recibo') {
       return hasPermiso('config_recibo') || hasPermiso('config_correo');
     }
-    return hasPermiso(p.id);
+    return puedeVerPantalla(hasPermiso, p);
   });
 
   const handleLogout = async () => {

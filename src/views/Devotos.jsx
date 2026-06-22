@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import Loader from '../components/Loader';
 import EditDevotoModal from '../components/EditDevotoModal';
@@ -172,7 +173,8 @@ export default function Devotos() {
         </div>
         <p className="text-muted config-hint">
           {devotosFiltrados.length} de {devotos.length} registrado(s). El CUI es único por devoto;
-          teléfono y correo pueden repetirse. Los cambios se reflejan en boletas, correos y entrega.
+          teléfono y correo pueden repetirse. Los cambios se reflejan en boletas, correos y entrega.{' '}
+          <Link to="/consulta-turnos">Consultar turnos asignados →</Link>
         </p>
 
         <div className="table-wrap">

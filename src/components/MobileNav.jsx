@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { PANTALLAS } from '../config/permisos';
+import { PANTALLAS, puedeVerPantalla } from '../config/permisos';
 import MobileMenuSheet from './MobileMenuSheet';
 
 const LABEL_CORTO = {
@@ -11,6 +11,7 @@ const LABEL_CORTO = {
   caja: 'Caja',
   impresion: 'Imprimir',
   devotos: 'Devotos',
+  consulta_turnos: 'Consulta',
   config: 'Procesiones',
   config_correo: 'Correo',
   config_recibo: 'Recibos',
@@ -42,7 +43,7 @@ export default function MobileNav() {
         if (p.id === 'config_recibo') {
           return hasPermiso('config_recibo') || hasPermiso('config_correo');
         }
-        return hasPermiso(p.id);
+        return puedeVerPantalla(hasPermiso, p);
       }),
     [hasPermiso]
   );

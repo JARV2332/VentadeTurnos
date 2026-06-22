@@ -17,6 +17,12 @@ import { isValidCui, normalizarCui } from '../utils/cuiUtils';
 import { aplicarAsignacionBrazos } from '../utils/aplicarAsignacionBrazos';
 import { RESET_BRAZO_VENTA, RESET_BRAZO_APARTADO, esBrazoReservadoLiberable, normalizarCodigoBoleta } from '../utils/ventaAnulacionUtils';
 import { normalizarHoraInput, calcularHoraTurno } from '../utils/turnoHorarioUtils';
+import {
+  filtrarCargadoresPorBusqueda,
+  apartadoSinCargadorCoincide,
+  enriquecerAsignaciones,
+  queryValidaBusquedaDevoto,
+} from '../utils/consultaDevotoUtils';
 
 let store = crearStoreInicial();
 const listeners = new Set();
@@ -1690,4 +1696,59 @@ export function quitarApartadosMock(organizacionId, cortejoId, { brazoIds = [], 
     total: ids.length,
     mensaje: `${quitables.length} reserva(s) liberada(s)${omitidos ? ` · ${omitidos} omitida(s)` : ''}.`,
   };
+}
+
+export function buscarTurnosDevotoMock(organizacionId, query) {
+  const q = String(query || '').trim();
+  if (!queryValidaBusquedaDevoto(q)) {
+    return { error: 'Ingrese al menos 2 letras, un correo o 4 dígitos de DPI/WhatsApp.' };
+  }
+
+  const cargadores = store.cargadores.filter((c) => c.organizacion_id === organizacionId);
+  const cargadoresMatch = filtrarCargadoresPorBusqueda(cargadores, q);
+  const cargadorIds = new Set(cargadoresMatch.map((c) => c.id));
+  const cargadoresPorId = Object.fromEntries(cargadores.map((c) => [c.id, c]));
+  const turnosPorId = Object.fromEntries(
+    store.turnos.filter((t) => t.organizacion_id === organizacionId).map((t) => [t.id, t])
+  );
+  const cortejosPorId = Object.fromEntries(
+    store.cortejos.filter((c) => c.organizacion_id === organizacionId).map((c) => [c.id, c])
+  );
+
+  const brazos = store.brazos.filter(
+    (b) =>
+      b.organizacion_id === organizacionId &&
+      (b.estado === 'vendido' || (b.estado === 'reservado' && b.reserva_apartado)) &&
+      ((b.cargador_id && cargadorIds.has(b.cargador_id)) || apartadoSinCargadorCoincide(b, q))
+  );
+
+  const asignaciones = enriquecerAsignaciones({
+    brazos,
+    cargadoresPorId,
+    turnosPorId,
+    cortejosPorId,
+  });
+
+  const cargadoresEnResultado = [
+    ...new Set(asignaciones.map((a) => a.cargador?.id).filter(Boolean)),
+  ]
+    .map((id) => cargadoresPorId[id])
+    .filter(Boolean);
+
+  const perfiles =
+    cargadoresEnResultado.length > 0
+      ? cargadoresEnResultado
+      : cargadoresMatch.length
+        ? cargadoresMatch
+        : [];
+
+  if (!asignaciones.length && !perfiles.length) {
+    return {
+      cargadores: [],
+      asignaciones: [],
+      mensaje: 'No se encontraron turnos ni apartados para esa búsqueda.',
+    };
+  }
+
+  return { cargadores: perfiles, asignaciones, mensaje: null };
 }

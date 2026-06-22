@@ -22,6 +22,12 @@ import { aplicarAsignacionBrazos } from '../utils/aplicarAsignacionBrazos';
 import { RESET_BRAZO_VENTA, RESET_BRAZO_APARTADO, esBrazoReservadoLiberable, normalizarCodigoBoleta } from '../utils/ventaAnulacionUtils';
 import { PERMISOS_ADMIN_COMPLETO } from '../config/permisos';
 import { normalizarHoraInput, calcularHoraTurno } from '../utils/turnoHorarioUtils';
+import {
+  filtrarCargadoresPorBusqueda,
+  apartadoSinCargadorCoincide,
+  enriquecerAsignaciones,
+  queryValidaBusquedaDevoto,
+} from '../utils/consultaDevotoUtils';
 
 function err(error) {
   if (!error) return null;
@@ -874,6 +880,87 @@ export async function buscarCargadorPorWhatsapp(organizacionId, whatsapp) {
     .limit(1)
     .maybeSingle();
   return data;
+}
+
+/** Turnos asignados a un devoto(a): vendidos y apartados. */
+export async function buscarTurnosDevoto(organizacionId, query) {
+  const q = String(query || '').trim();
+  if (!queryValidaBusquedaDevoto(q)) {
+    return { error: 'Ingrese al menos 2 letras, un correo o 4 dígitos de DPI/WhatsApp.' };
+  }
+
+  const [cargadores, brazosVendidosRes, brazosApartadosRes, turnosRaw, cortejosRaw] =
+    await Promise.all([
+      getCargadoresByOrg(organizacionId),
+      supabase
+        .from('brazos')
+        .select('*')
+        .eq('organizacion_id', organizacionId)
+        .eq('estado', 'vendido'),
+      supabase
+        .from('brazos')
+        .select('*')
+        .eq('organizacion_id', organizacionId)
+        .eq('estado', 'reservado')
+        .eq('reserva_apartado', true),
+      supabase.from('turnos').select('*').eq('organizacion_id', organizacionId),
+      getCortejosByOrg(organizacionId, { incluirInactivas: true }),
+    ]);
+
+  if (brazosVendidosRes.error) return err(brazosVendidosRes.error);
+  if (brazosApartadosRes.error) return err(brazosApartadosRes.error);
+  if (turnosRaw.error) return err(turnosRaw.error);
+
+  const brazosRaw = [...(brazosVendidosRes.data || []), ...(brazosApartadosRes.data || [])];
+
+  const cargadoresMatch = filtrarCargadoresPorBusqueda(cargadores, q);
+  const cargadorIds = new Set(cargadoresMatch.map((c) => c.id));
+  const cargadoresPorId = Object.fromEntries(cargadores.map((c) => [c.id, c]));
+  const turnosPorId = Object.fromEntries((turnosRaw.data || []).map((t) => [t.id, t]));
+  const cortejosPorId = Object.fromEntries((cortejosRaw || []).map((c) => [c.id, c]));
+
+  const brazos = brazosRaw.filter(
+    (b) =>
+      (b.cargador_id && cargadorIds.has(b.cargador_id)) || apartadoSinCargadorCoincide(b, q)
+  );
+
+  const asignaciones = enriquecerAsignaciones({
+    brazos,
+    cargadoresPorId,
+    turnosPorId,
+    cortejosPorId,
+  });
+
+  const cargadoresEnResultado = [
+    ...new Set(
+      asignaciones.map((a) => a.cargador?.id).filter(Boolean)
+    ),
+  ]
+    .map((id) => cargadoresPorId[id])
+    .filter(Boolean);
+
+  const perfiles =
+    cargadoresEnResultado.length > 0
+      ? cargadoresEnResultado
+      : cargadoresMatch.length
+        ? cargadoresMatch
+        : asignaciones.length
+          ? []
+          : [];
+
+  if (!asignaciones.length && !perfiles.length) {
+    return {
+      cargadores: [],
+      asignaciones: [],
+      mensaje: 'No se encontraron turnos ni apartados para esa búsqueda.',
+    };
+  }
+
+  return {
+    cargadores: perfiles,
+    asignaciones,
+    mensaje: null,
+  };
 }
 
 export async function reservarBrazo(brazoId, mesaId, vendedorId) {

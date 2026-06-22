@@ -18,6 +18,7 @@ import PerfilUsuario from './views/PerfilUsuario';
 import PlataformaAdmin from './views/PlataformaAdmin';
 import BoletaPublica from './views/BoletaPublica';
 import MisTurnosPublico from './views/MisTurnosPublico';
+import ConsultaTurnosDevoto from './views/ConsultaTurnosDevoto';
 
 function App() {
   return (
@@ -112,6 +113,14 @@ function App() {
             element={
               <PrivateRoute permission="impresion">
                 <Impresion />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/consulta-turnos"
+            element={
+              <PrivateRoute permission="consulta_turnos">
+                <ConsultaTurnosDevoto />
               </PrivateRoute>
             }
           />

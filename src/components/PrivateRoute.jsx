@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { PANTALLAS, puedeVerPantalla } from '../config/permisos';
 import Loader from './Loader';
 
 export default function PrivateRoute({ children, permission, adminOnly = false }) {
@@ -12,8 +13,14 @@ export default function PrivateRoute({ children, permission, adminOnly = false }
 
   if (!isAuthenticated) return <Navigate to="/" replace />;
 
-  if (permisoRequerido && !hasPermiso(permisoRequerido)) {
-    return <Navigate to={rutaInicio} replace />;
+  if (permisoRequerido) {
+    const pantalla = PANTALLAS.find((p) => p.id === permisoRequerido);
+    const permitido = pantalla
+      ? puedeVerPantalla(hasPermiso, pantalla)
+      : hasPermiso(permisoRequerido);
+    if (!permitido) {
+      return <Navigate to={rutaInicio} replace />;
+    }
   }
 
   return children;

@@ -257,6 +257,11 @@ export const quitarApartados = (organizacionId, cortejoId, opts) =>
     ? sb.quitarApartados(organizacionId, cortejoId, opts)
     : Promise.resolve(mock.quitarApartadosMock(organizacionId, cortejoId, opts));
 
+export const buscarTurnosDevoto = (organizacionId, query) =>
+  isSupabaseBackend()
+    ? sb.buscarTurnosDevoto(organizacionId, query)
+    : Promise.resolve(mock.buscarTurnosDevotoMock(organizacionId, query));
+
 export const updatePerfil = (userId, orgId, datos, email) =>
   isSupabaseBackend()
     ? sb.updatePerfilSupabase(userId, orgId, datos, email)

@@ -17,6 +17,14 @@ export const PANTALLAS = [
   { id: 'caja', label: 'Caja', path: '/caja', icon: '◈', grupo: 'Operación' },
   { id: 'impresion', label: 'Impresión', path: '/impresion', icon: '▣', grupo: 'Operación' },
   { id: 'devotos', label: 'Devotos', path: '/devotos', icon: '👤', grupo: 'Operación' },
+  {
+    id: 'consulta_turnos',
+    label: 'Consulta turnos',
+    path: '/consulta-turnos',
+    icon: '⌕',
+    grupo: 'Operación',
+    visibleConPermisos: ['devotos', 'taquilla', 'entrega', 'impresion', 'caja', 'dashboard'],
+  },
   { id: 'config', label: 'Procesiones', path: '/config', icon: '⚙', grupo: 'Administración' },
   { id: 'config_correo', label: 'Correo y boletas', path: '/config/correo', icon: '✉', grupo: 'Administración' },
   {
@@ -46,10 +54,17 @@ export const PANTALLAS = [
 export const PERMISO_GESTION_USUARIOS = 'usuarios';
 
 /** Permisos al crear una org nueva (devotos se asigna explícitamente al rol). */
-export const PERMISOS_ADMIN_COMPLETO = PANTALLAS.filter((p) => p.id !== 'devotos').map((p) => p.id);
+export const PERMISOS_ADMIN_COMPLETO = PANTALLAS.filter(
+  (p) => p.id !== 'devotos'
+).map((p) => p.id);
 
 export function tienePermiso(permisos, permisoId) {
   return Array.isArray(permisos) && permisos.includes(permisoId);
+}
+
+export function puedeVerPantalla(hasPermisoFn, pantalla) {
+  if (hasPermisoFn(pantalla.id)) return true;
+  return (pantalla.visibleConPermisos || []).some((id) => hasPermisoFn(id));
 }
 
 export function rutaInicioPorPermisos(permisos, esSuperAdmin = false) {
