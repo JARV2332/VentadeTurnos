@@ -262,8 +262,9 @@ export default function ListadoTurnos() {
         </div>
         <p className="text-muted config-hint listado-turnos__resumen">
           {cortejoSel?.nombre_evento || '—'} · <strong>{totalFilas}</strong> registro(s) en{' '}
-          <strong>{grupos.length}</strong> turno(s). Excel descarga directo; PDF abre el reporte
-          compacto (elija <strong>Guardar como PDF</strong> en el diálogo).
+          <strong>{grupos.length}</strong> turno(s), ordenados por fecha y hora de operación (más
+          antiguo primero). Excel descarga directo; PDF abre el reporte compacto (elija{' '}
+          <strong>Guardar como PDF</strong> en el diálogo).
         </p>
       </section>
 

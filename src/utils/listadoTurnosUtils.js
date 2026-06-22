@@ -4,6 +4,7 @@ import {
   formatFechaReporte,
   fechaVentaKey,
   formatQ,
+  timestampVenta,
 } from './cajaReportUtils';
 import { labelMetodoPago } from './pagoUtils';
 import { formatHoraVentaGt } from './turnoHorarioUtils';
@@ -43,6 +44,31 @@ function filaPasaFiltros(brazo, filtros) {
   }
 
   return true;
+}
+
+function timestampOperacion(brazo) {
+  return timestampVenta(brazo);
+}
+
+/** Más antiguo primero; sin fecha al final; desempate por n.º de brazo. */
+export function ordenarFilasListadoPorFechaHora(filas) {
+  return [...(filas || [])].sort((a, b) => {
+    const ta = timestampOperacion(a.brazo);
+    const tb = timestampOperacion(b.brazo);
+    if (ta == null && tb == null) {
+      return (
+        (a.brazo.numero_brazo || 0) - (b.brazo.numero_brazo || 0) ||
+        String(a.brazo.lado || '').localeCompare(String(b.brazo.lado || ''))
+      );
+    }
+    if (ta == null) return 1;
+    if (tb == null) return -1;
+    if (ta !== tb) return ta - tb;
+    return (
+      (a.brazo.numero_brazo || 0) - (b.brazo.numero_brazo || 0) ||
+      String(a.brazo.lado || '').localeCompare(String(b.brazo.lado || ''))
+    );
+  });
 }
 
 export function construirFilaListado(brazo, turno, comprasPorId = {}, mapaUsuarios = {}) {
@@ -88,14 +114,11 @@ export function construirListadoTurnos(turnosAgrupados, comprasPorId, filtros = 
       return true;
     })
     .map((turno) => {
-      const filas = brazosDeTurnoAgrupado(turno)
-        .filter((b) => filaPasaFiltros(b, filtros))
-        .map((b) => construirFilaListado(b, turno, compras, mapaUsuarios))
-        .sort(
-          (a, b) =>
-            (a.brazo.numero_brazo || 0) - (b.brazo.numero_brazo || 0) ||
-            String(a.brazo.lado || '').localeCompare(String(b.brazo.lado || ''))
-        );
+      const filas = ordenarFilasListadoPorFechaHora(
+        brazosDeTurnoAgrupado(turno)
+          .filter((b) => filaPasaFiltros(b, filtros))
+          .map((b) => construirFilaListado(b, turno, compras, mapaUsuarios))
+      );
 
       return {
         turno,
@@ -107,6 +130,17 @@ export function construirListadoTurnos(turnosAgrupados, comprasPorId, filtros = 
     .filter((grupo) => {
       if (filtros.ocultarVacios && !grupo.filas.length) return false;
       return true;
+    })
+    .sort((a, b) => {
+      const minTs = (filas) =>
+        filas.reduce((m, f) => {
+          const t = timestampOperacion(f.brazo);
+          return t == null ? m : Math.min(m, t);
+        }, Infinity);
+      const ta = minTs(a.filas);
+      const tb = minTs(b.filas);
+      if (ta !== tb) return ta - tb;
+      return (a.numero || 0) - (b.numero || 0);
     });
 
   return lista;
