@@ -15,6 +15,7 @@ import {
   construirListadoTurnos,
   tiposTurnoEnListado,
   exportListadoTurnosExcel,
+  exportListadoTurnosPdf,
 } from '../utils/listadoTurnosUtils';
 
 export default function ListadoTurnos() {
@@ -159,6 +160,21 @@ export default function ListadoTurnos() {
     });
   };
 
+  const handleExportPdf = () => {
+    exportListadoTurnosPdf({
+      grupos,
+      cortejoNombre: cortejoSel?.nombre_evento,
+      orgNombre: organizacion?.nombre_oficial,
+      filtros: {
+        tipoTurno: filtroTipo,
+        numeroTurno: filtroNumero,
+        estado: filtroEstado,
+        fechaDesde,
+        fechaHasta,
+      },
+    });
+  };
+
   return (
     <Layout
       title="Listado de turnos"
@@ -240,6 +256,14 @@ export default function ListadoTurnos() {
           <button
             type="button"
             className="btn btn--primary btn--sm"
+            onClick={handleExportPdf}
+            disabled={!totalFilas}
+          >
+            Guardar PDF
+          </button>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
             onClick={handleImprimirListado}
             disabled={!totalFilas}
           >
@@ -248,7 +272,8 @@ export default function ListadoTurnos() {
         </div>
         <p className="text-muted config-hint listado-turnos__resumen">
           {cortejoSel?.nombre_evento || '—'} · <strong>{totalFilas}</strong> registro(s) en{' '}
-          <strong>{grupos.length}</strong> turno(s)
+          <strong>{grupos.length}</strong> turno(s). Excel descarga directo; PDF abre el reporte y el
+          diálogo de impresión (elija <strong>Guardar como PDF</strong>).
         </p>
       </section>
 
