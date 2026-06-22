@@ -7,10 +7,12 @@ import {
   getCortejosByOrg,
   getTurnosAgrupados,
   getComprasByOrg,
+  getUsuariosByOrg,
   buscarBoletaPorCodigo,
   subscribeData,
 } from '../services/dataService';
 import { labelTipoTurno } from '../utils/cajaReportUtils';
+import { construirMapaUsuariosAuth } from '../utils/operadorVentaUtils';
 import {
   construirListadoTurnos,
   tiposTurnoEnListado,
@@ -24,6 +26,7 @@ export default function ListadoTurnos() {
   const [cortejoId, setCortejoId] = useState('');
   const [turnosAgrupados, setTurnosAgrupados] = useState([]);
   const [comprasPorId, setComprasPorId] = useState({});
+  const [mapaUsuarios, setMapaUsuarios] = useState({});
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
 
@@ -57,12 +60,14 @@ export default function ListadoTurnos() {
     setCargando(true);
     setError('');
     try {
-      const [turnos, compras] = await Promise.all([
+      const [turnos, compras, usuarios] = await Promise.all([
         getTurnosAgrupados(cortejoId, organizacionId),
         getComprasByOrg(organizacionId),
+        getUsuariosByOrg(organizacionId),
       ]);
       setTurnosAgrupados(turnos || []);
       setComprasPorId(Object.fromEntries((compras || []).map((c) => [c.id, c])));
+      setMapaUsuarios(construirMapaUsuariosAuth(usuarios || []));
     } catch (err) {
       setError(err.message || 'No se pudo cargar el listado.');
       setTurnosAgrupados([]);
@@ -98,10 +103,11 @@ export default function ListadoTurnos() {
         soloAsignados,
         soloPagadosEnFecha: Boolean(fechaDesde || fechaHasta),
         ocultarVacios: soloAsignados || filtroEstado !== 'all',
-      }),
+      }, mapaUsuarios),
     [
       turnosAgrupados,
       comprasPorId,
+      mapaUsuarios,
       filtroTipo,
       filtroNumero,
       filtroEstado,
@@ -289,6 +295,7 @@ export default function ListadoTurnos() {
                       <th>Estado</th>
                       <th>Fecha operación</th>
                       <th>Hora</th>
+                      <th>Operador</th>
                       <th>Pago</th>
                       <th>Boleta</th>
                       <th>Ofrenda</th>
@@ -309,6 +316,7 @@ export default function ListadoTurnos() {
                         </td>
                         <td>{fila.fechaOperacion}</td>
                         <td>{fila.horaOperacion}</td>
+                        <td>{fila.operador}</td>
                         <td>{fila.metodoPago}</td>
                         <td>
                           <code>{fila.codigoBoleta}</code>

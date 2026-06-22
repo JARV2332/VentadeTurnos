@@ -9,6 +9,7 @@ import { labelMetodoPago } from './pagoUtils';
 import { formatHoraVentaGt } from './turnoHorarioUtils';
 import { codigoReciboDisplay } from './compraUtils';
 import { etiquetaEstadoAsignacion, claseEstadoAsignacion } from './consultaDevotoUtils';
+import { resolverOperadorNombre } from './operadorVentaUtils';
 
 export function nombreAsignado(brazo, cargador) {
   if (cargador?.nombre_completo?.trim()) return cargador.nombre_completo.trim();
@@ -44,10 +45,12 @@ function filaPasaFiltros(brazo, filtros) {
   return true;
 }
 
-export function construirFilaListado(brazo, turno, comprasPorId = {}) {
+export function construirFilaListado(brazo, turno, comprasPorId = {}, mapaUsuarios = {}) {
   const cargador = brazo.cargador || null;
   const compra = brazo.compra_id ? comprasPorId[brazo.compra_id] : null;
   const esVendido = brazo.estado === 'vendido';
+  const operador =
+    resolverOperadorNombre({ brazo, compra, mapaUsuarios }) || '—';
 
   return {
     id: brazo.id,
@@ -64,6 +67,7 @@ export function construirFilaListado(brazo, turno, comprasPorId = {}) {
     horaOperacion: esVendido
       ? formatHoraVentaGt(brazo.pago_confirmado_en || brazo.updated_at) || '—'
       : '—',
+    operador,
     codigoBoleta: esVendido ? codigoReciboDisplay(compra, [brazo]) : '—',
     ofrenda: esVendido ? formatQ(brazo.precio_pagado) : '—',
     puedeVerBoleta: esVendido && Boolean(brazo.codigo_boleta_qr),
@@ -71,7 +75,7 @@ export function construirFilaListado(brazo, turno, comprasPorId = {}) {
   };
 }
 
-export function construirListadoTurnos(turnosAgrupados, comprasPorId, filtros = {}) {
+export function construirListadoTurnos(turnosAgrupados, comprasPorId, filtros = {}, mapaUsuarios = {}) {
   const compras = comprasPorId || {};
   const lista = (turnosAgrupados || [])
     .filter((turno) => {
@@ -86,7 +90,7 @@ export function construirListadoTurnos(turnosAgrupados, comprasPorId, filtros = 
     .map((turno) => {
       const filas = brazosDeTurnoAgrupado(turno)
         .filter((b) => filaPasaFiltros(b, filtros))
-        .map((b) => construirFilaListado(b, turno, compras))
+        .map((b) => construirFilaListado(b, turno, compras, mapaUsuarios))
         .sort(
           (a, b) =>
             (a.brazo.numero_brazo || 0) - (b.brazo.numero_brazo || 0) ||
@@ -134,6 +138,7 @@ export function exportListadoTurnosExcel({ grupos, cortejoNombre, orgNombre = ''
         Estado: f.estadoLabel,
         'Fecha operación': f.fechaOperacion,
         Hora: f.horaOperacion,
+        Operador: f.operador,
         Pago: f.metodoPago,
         Boleta: f.codigoBoleta,
         Ofrenda: f.ofrenda,
@@ -210,6 +215,7 @@ function buildListadoTurnosHtml({ grupos, cortejoNombre, orgNombre = '', filtros
             <th class="col-estado">Estado</th>
             <th class="col-fecha">Fecha</th>
             <th class="col-hora">Hora</th>
+            <th class="col-operador">Operador</th>
             <th class="col-pago">Pago</th>
             <th class="col-boleta">Boleta</th>
             <th class="col-ofrenda">Ofrenda</th>
@@ -229,6 +235,7 @@ function buildListadoTurnosHtml({ grupos, cortejoNombre, orgNombre = '', filtros
               <td>${escapeHtml(f.estadoLabel)}</td>
               <td>${escapeHtml(fechaCorta)}</td>
               <td>${escapeHtml(f.horaOperacion)}</td>
+              <td>${escapeHtml(f.operador)}</td>
               <td>${escapeHtml(f.metodoPago)}</td>
               <td class="col-boleta">${escapeHtml(f.codigoBoleta)}</td>
               <td>${escapeHtml(f.ofrenda)}</td>
@@ -324,13 +331,14 @@ function buildListadoTurnosHtml({ grupos, cortejoNombre, orgNombre = '', filtros
       font-weight: 700;
     }
     .col-brazo { width: 5%; }
-    .col-persona { width: 22%; }
-    .col-estado { width: 8%; }
-    .col-fecha { width: 9%; }
-    .col-hora { width: 9%; }
-    .col-pago { width: 10%; }
-    .col-boleta { width: 22%; font-family: Consolas, monospace; font-size: 7.5px; }
-    .col-ofrenda { width: 8%; text-align: right; }
+    .col-persona { width: 18%; }
+    .col-estado { width: 7%; }
+    .col-fecha { width: 8%; }
+    .col-hora { width: 8%; }
+    .col-operador { width: 12%; }
+    .col-pago { width: 9%; }
+    .col-boleta { width: 20%; font-family: Consolas, monospace; font-size: 7.5px; }
+    .col-ofrenda { width: 7%; text-align: right; }
     td.col-boleta { font-family: Consolas, monospace; font-size: 7.5px; }
     @media print {
       .toolbar { display: none !important; }
