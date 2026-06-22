@@ -179,6 +179,13 @@ function filtrosListadoTexto(filtros = {}) {
   return partes.length ? partes.join(' · ') : 'Todos los registros';
 }
 
+function formatFechaCompacta(key) {
+  if (!key) return '—';
+  const [y, m, d] = key.split('-');
+  if (!y || !m || !d) return key;
+  return `${d}/${m}/${y}`;
+}
+
 function buildListadoTurnosHtml({ grupos, cortejoNombre, orgNombre = '', filtros = {} }) {
   const generado = new Intl.DateTimeFormat('es-GT', {
     dateStyle: 'long',
@@ -194,35 +201,39 @@ function buildListadoTurnosHtml({ grupos, cortejoNombre, orgNombre = '', filtros
     .map(
       (g) => `
     <section class="grupo">
-      <h2>Turno #${escapeHtml(g.numero)} · ${escapeHtml(g.honor)} <small>(${g.filas.length})</small></h2>
+      <h2>Turno #${escapeHtml(g.numero)} · ${escapeHtml(g.honor)} <span class="grupo-count">${g.filas.length} reg.</span></h2>
       <table>
         <thead>
           <tr>
-            <th>Brazo</th>
-            <th>Persona</th>
-            <th>Estado</th>
-            <th>Fecha</th>
-            <th>Hora</th>
-            <th>Pago</th>
-            <th>Boleta</th>
-            <th>Ofrenda</th>
+            <th class="col-brazo">Brazo</th>
+            <th class="col-persona">Persona</th>
+            <th class="col-estado">Estado</th>
+            <th class="col-fecha">Fecha</th>
+            <th class="col-hora">Hora</th>
+            <th class="col-pago">Pago</th>
+            <th class="col-boleta">Boleta</th>
+            <th class="col-ofrenda">Ofrenda</th>
           </tr>
         </thead>
         <tbody>
           ${g.filas
-            .map(
-              (f) => `
+            .map((f) => {
+              const fechaCorta =
+                f.brazo?.estado === 'vendido'
+                  ? formatFechaCompacta(fechaVentaKey(f.brazo))
+                  : '—';
+              return `
             <tr>
               <td>${escapeHtml(f.brazoLabel)}</td>
-              <td><strong>${escapeHtml(f.nombre)}</strong></td>
+              <td>${escapeHtml(f.nombre)}</td>
               <td>${escapeHtml(f.estadoLabel)}</td>
-              <td>${escapeHtml(f.fechaOperacion)}</td>
+              <td>${escapeHtml(fechaCorta)}</td>
               <td>${escapeHtml(f.horaOperacion)}</td>
               <td>${escapeHtml(f.metodoPago)}</td>
-              <td><code>${escapeHtml(f.codigoBoleta)}</code></td>
+              <td class="col-boleta">${escapeHtml(f.codigoBoleta)}</td>
               <td>${escapeHtml(f.ofrenda)}</td>
-            </tr>`
-            )
+            </tr>`;
+            })
             .join('')}
         </tbody>
       </table>
@@ -234,50 +245,114 @@ function buildListadoTurnosHtml({ grupos, cortejoNombre, orgNombre = '', filtros
 <html lang="es">
 <head>
   <meta charset="utf-8"/>
-  <title>Listado turnos — ${org}</title>
+  <title>Listado turnos — ${procesion}</title>
   <style>
-    body { font-family: 'Segoe UI', system-ui, sans-serif; color: #0f172a; margin: 24px; font-size: 11px; }
-    h1 { font-size: 1.25rem; margin: 0 0 4px; }
-    .meta { color: #64748b; margin-bottom: 18px; line-height: 1.5; }
+    @page { size: A4 portrait; margin: 10mm 8mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: #0f172a;
+      margin: 0;
+      padding: 0;
+      font-size: 9px;
+      line-height: 1.35;
+    }
+    h1 { font-size: 13px; margin: 0 0 3px; font-weight: 700; }
+    .meta {
+      color: #475569;
+      margin: 0 0 10px;
+      font-size: 9px;
+      line-height: 1.4;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #cbd5e1;
+    }
+    .meta strong { color: #0f172a; }
     .toolbar {
-      padding: 12px 14px; margin-bottom: 18px; background: #eff6ff;
-      border: 1px solid #bfdbfe; border-radius: 8px; line-height: 1.45;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      font-size: 10px;
+      line-height: 1.4;
     }
     .toolbar button {
-      margin-top: 8px; padding: 8px 14px; border: none; border-radius: 6px;
-      background: #2563eb; color: #fff; font-weight: 600; cursor: pointer;
+      margin-top: 6px;
+      padding: 6px 12px;
+      border: none;
+      border-radius: 5px;
+      background: #2563eb;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 10px;
     }
-    .grupo { margin-bottom: 20px; page-break-inside: avoid; break-inside: avoid; }
-    .grupo h2 { font-size: 0.95rem; margin: 0 0 8px; color: #1e293b; }
-    .grupo h2 small { font-weight: 500; color: #64748b; }
-    table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 8px; }
-    th, td { border: 1px solid #e2e8f0; padding: 5px 7px; text-align: left; vertical-align: top; }
-    th { background: #f1f5f9; font-size: 9px; text-transform: uppercase; }
-    code { font-size: 9px; }
+    .grupo { margin: 0 0 12px; }
+    .grupo h2 {
+      font-size: 10px;
+      margin: 0 0 4px;
+      padding: 4px 6px;
+      background: #f1f5f9;
+      border-left: 3px solid #2563eb;
+      color: #1e293b;
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+    .grupo-count { font-weight: 500; color: #64748b; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 8.5px;
+      table-layout: fixed;
+      page-break-inside: auto;
+    }
+    thead { display: table-header-group; }
+    tr { page-break-inside: avoid; break-inside: avoid; }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 3px 4px;
+      text-align: left;
+      vertical-align: top;
+      overflow: hidden;
+      word-wrap: break-word;
+    }
+    th {
+      background: #e2e8f0;
+      font-size: 7.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      font-weight: 700;
+    }
+    .col-brazo { width: 5%; }
+    .col-persona { width: 22%; }
+    .col-estado { width: 8%; }
+    .col-fecha { width: 9%; }
+    .col-hora { width: 9%; }
+    .col-pago { width: 10%; }
+    .col-boleta { width: 22%; font-family: Consolas, monospace; font-size: 7.5px; }
+    .col-ofrenda { width: 8%; text-align: right; }
+    td.col-boleta { font-family: Consolas, monospace; font-size: 7.5px; }
     @media print {
-      body { margin: 12px; }
       .toolbar { display: none !important; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
   </style>
 </head>
 <body>
   <div class="toolbar">
-    <strong>Reporte listo</strong><br/>
-    Para guardar como PDF: pulse el botón o use <strong>Ctrl+P</strong> → Destino: <em>Guardar como PDF</em> → Guardar.
+    <strong>Reporte listo</strong> — Para PDF: <strong>Ctrl+P</strong> → Destino: <em>Guardar como PDF</em>.
     <br/>
     <button type="button" onclick="window.print()">Imprimir / Guardar PDF</button>
   </div>
   <h1>Listado de turnos asignados</h1>
   <p class="meta">
-    <strong>${org}</strong><br/>
-    ${procesion}<br/>
-    ${filtrosLinea}<br/>
-    ${totalFilas} registro(s) en ${(grupos || []).length} turno(s) · Generado: ${escapeHtml(generado)}
+    <strong>${org}</strong> · ${procesion}<br/>
+    ${filtrosLinea} · ${totalFilas} registro(s) · ${escapeHtml(generado)}
   </p>
   ${bloques || '<p>Sin registros.</p>'}
   <script>
     window.addEventListener('load', function () {
-      setTimeout(function () { window.print(); }, 450);
+      setTimeout(function () { window.print(); }, 400);
     });
   </script>
 </body>

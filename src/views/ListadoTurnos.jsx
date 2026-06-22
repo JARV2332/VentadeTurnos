@@ -144,14 +144,6 @@ export default function ListadoTurnos() {
     setSoloAsignados(true);
   };
 
-  const handleImprimirListado = () => {
-    document.body.classList.add('listado-turnos--imprimiendo');
-    const cleanup = () => document.body.classList.remove('listado-turnos--imprimiendo');
-    window.addEventListener('afterprint', cleanup, { once: true });
-    window.print();
-    setTimeout(cleanup, 1000);
-  };
-
   const handleExportExcel = () => {
     exportListadoTurnosExcel({
       grupos,
@@ -259,21 +251,13 @@ export default function ListadoTurnos() {
             onClick={handleExportPdf}
             disabled={!totalFilas}
           >
-            Guardar PDF
-          </button>
-          <button
-            type="button"
-            className="btn btn--ghost btn--sm"
-            onClick={handleImprimirListado}
-            disabled={!totalFilas}
-          >
-            Imprimir listado
+            Imprimir / Guardar PDF
           </button>
         </div>
         <p className="text-muted config-hint listado-turnos__resumen">
           {cortejoSel?.nombre_evento || '—'} · <strong>{totalFilas}</strong> registro(s) en{' '}
-          <strong>{grupos.length}</strong> turno(s). Excel descarga directo; PDF abre el reporte y el
-          diálogo de impresión (elija <strong>Guardar como PDF</strong>).
+          <strong>{grupos.length}</strong> turno(s). Excel descarga directo; PDF abre el reporte
+          compacto (elija <strong>Guardar como PDF</strong> en el diálogo).
         </p>
       </section>
 
@@ -287,17 +271,7 @@ export default function ListadoTurnos() {
           <p className="text-muted">No hay turnos que coincidan con los filtros seleccionados.</p>
         </section>
       ) : (
-        <div className="listado-turnos__grupos print-area">
-          <div className="listado-turnos__print-head only-print">
-            <h1>Listado de turnos — {organizacion?.nombre_oficial}</h1>
-            <p>
-              {cortejoSel?.nombre_evento} · {totalFilas} registro(s) ·{' '}
-              {new Intl.DateTimeFormat('es-GT', { dateStyle: 'long', timeStyle: 'short' }).format(
-                new Date()
-              )}
-            </p>
-          </div>
-
+        <div className="listado-turnos__grupos">
           {grupos.map((grupo) => (
             <section key={grupo.turno.id} className="panel listado-turnos__grupo">
               <h3 className="panel__title listado-turnos__grupo-titulo">

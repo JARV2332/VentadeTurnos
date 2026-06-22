@@ -4817,15 +4817,32 @@ html {
   }
 
   body.listado-turnos--imprimiendo .listado-turnos__grupo {
-    page-break-inside: avoid;
-    break-inside: avoid;
     border: none;
     box-shadow: none;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
+    padding: 0;
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+
+  body.listado-turnos--imprimiendo .listado-turnos__grupo-titulo {
+    page-break-after: avoid;
+    break-after: avoid;
+    margin-bottom: 0.25rem;
+    font-size: 0.85rem;
   }
 
   body.listado-turnos--imprimiendo .listado-turnos__tabla {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
+  }
+
+  body.listado-turnos--imprimiendo .listado-turnos__tabla thead {
+    display: table-header-group;
+  }
+
+  body.listado-turnos--imprimiendo .listado-turnos__tabla tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   body:not(.mis-turnos-publico--print-all) .mis-turnos-publico__todas--solo-print {
