@@ -89,6 +89,42 @@ export function claseEstadoAsignacion(brazo) {
   return '';
 }
 
+export const APARTADOS_SIN_REGISTRO_ID = '__apartado_sin_registro__';
+
+export function listarPersonasConsulta(cargadores, asignaciones) {
+  const personas = (cargadores || []).map((c) => ({
+    id: c.id,
+    tipo: 'registrado',
+    cargador: c,
+    nombre: c.nombre_completo,
+    turnosCount: (asignaciones || []).filter((a) => a.cargador?.id === c.id).length,
+  }));
+
+  const huerfanos = (asignaciones || []).filter((a) => !a.cargador?.id);
+  if (huerfanos.length > 0) {
+    const nombres = [
+      ...new Set(huerfanos.map((a) => a.brazo.asignado_nombre?.trim()).filter(Boolean)),
+    ];
+    personas.push({
+      id: APARTADOS_SIN_REGISTRO_ID,
+      tipo: 'apartado',
+      cargador: null,
+      nombre: nombres.length ? nombres.join(' · ') : 'Apartado sin registro',
+      turnosCount: huerfanos.length,
+    });
+  }
+
+  return personas;
+}
+
+export function filtrarAsignacionesPorPersona(asignaciones, personaId) {
+  if (!personaId) return [];
+  if (personaId === APARTADOS_SIN_REGISTRO_ID) {
+    return (asignaciones || []).filter((a) => !a.cargador?.id);
+  }
+  return (asignaciones || []).filter((a) => a.cargador?.id === personaId);
+}
+
 export function enriquecerAsignaciones({ brazos, cargadoresPorId, turnosPorId, cortejosPorId }) {
   return (brazos || [])
     .map((brazo) => {

@@ -2557,6 +2557,108 @@ html {
   font-size: 0.78rem;
 }
 
+.consulta-devoto__perfil--btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.consulta-devoto__perfil--btn:hover {
+  border-color: var(--primary, #2563eb);
+}
+
+.consulta-devoto__perfil--activo {
+  border-color: var(--primary, #2563eb);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  background: #eff6ff;
+}
+
+.consulta-devoto__perfil-cabecera {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.consulta-devoto__turnos-badge {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: var(--surface-alt, #f1f5f9);
+  color: var(--text-muted);
+}
+
+.consulta-devoto__perfil--activo .consulta-devoto__turnos-badge {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.consulta-devoto__apartado-nota {
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+}
+
+.consulta-devoto__seleccion-hint,
+.consulta-devoto__sin-seleccion {
+  margin: 0 0 0.75rem;
+}
+
+.consulta-devoto__enlace-devotos {
+  margin: 0.75rem 0 0;
+}
+
+.consulta-devoto__modal-boleta {
+  background: white;
+  border-radius: var(--radius);
+  max-width: min(920px, 96vw);
+  width: 100%;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.consulta-devoto__modal-boleta-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.consulta-devoto__modal-boleta-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.consulta-devoto__modal-boleta-acciones {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.consulta-devoto__print-tip {
+  max-width: 8.5in;
+  margin: 1rem auto 0;
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.consulta-devoto__modal-boleta-body {
+  padding: 1rem 1.25rem 1.25rem;
+  overflow: auto;
+}
+
+.consulta-devoto__modal-boleta-body .boleta-contraseña {
+  margin: 0 auto;
+}
+
 /* ── Impresión ── */
 .impresion-controls {
   display: flex;
@@ -4590,6 +4692,31 @@ html {
   .mis-turnos-publico__devoto,
   .mis-turnos-publico__share {
     display: none !important;
+  }
+
+  body.consulta-devoto--imprimiendo .app-layout {
+    display: none !important;
+  }
+
+  body.consulta-devoto--imprimiendo .consulta-devoto__overlay {
+    position: static !important;
+    inset: auto !important;
+    background: transparent !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+
+  body.consulta-devoto--imprimiendo .consulta-devoto__modal-boleta {
+    max-width: none !important;
+    max-height: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+  }
+
+  body.consulta-devoto--imprimiendo .consulta-devoto__modal-boleta-body {
+    padding: 0 !important;
+    overflow: visible !important;
   }
 
   body:not(.mis-turnos-publico--print-all) .mis-turnos-publico__todas--solo-print {
