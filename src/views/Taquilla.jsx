@@ -34,6 +34,11 @@ import {
   agruparApartadosPorDevoto,
   formDesdeApartado,
 } from '../utils/taquillaApartadosUtils';
+import {
+  resolverCortejoInicial,
+  cambiarCortejoPreferido,
+  guardarCortejoPreferido,
+} from '../utils/cortejoPreferidoUtils';
 
 export default function Taquilla() {
   const { organizacionId, organizacion, user } = useAuth();
@@ -206,13 +211,11 @@ export default function Taquilla() {
     const ultimo = sessionStorage.getItem('vtd_ultimo_cortejo');
     if (ultimo && lista.some((c) => c.id === ultimo)) {
       setCortejoId(ultimo);
+      guardarCortejoPreferido(organizacionId, ultimo);
       sessionStorage.removeItem('vtd_ultimo_cortejo');
       return;
     }
-    setCortejoId((prev) => {
-      if (prev && lista.some((c) => c.id === prev)) return prev;
-      return lista.length ? lista[0].id : '';
-    });
+    setCortejoId((prev) => resolverCortejoInicial(lista, organizacionId, prev));
   }, [organizacionId]);
 
   const refresh = useCallback(async () => {

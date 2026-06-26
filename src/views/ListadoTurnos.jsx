@@ -19,6 +19,10 @@ import {
   exportListadoTurnosExcel,
   exportListadoTurnosPdf,
 } from '../utils/listadoTurnosUtils';
+import {
+  resolverCortejoInicial,
+  cambiarCortejoPreferido,
+} from '../utils/cortejoPreferidoUtils';
 
 export default function ListadoTurnos() {
   const { organizacionId, organizacion } = useAuth();
@@ -45,11 +49,7 @@ export default function ListadoTurnos() {
     try {
       const data = await getCortejosByOrg(organizacionId, { incluirInactivas: true });
       setCortejos(data || []);
-      setCortejoId((prev) => {
-        if (prev && data.some((c) => c.id === prev)) return prev;
-        const activa = data.find((c) => c.estado === 'activa') || data[0];
-        return activa?.id || '';
-      });
+      setCortejoId((prev) => resolverCortejoInicial(data, organizacionId, prev));
     } catch (err) {
       setError(err.message || 'No se pudieron cargar las procesiones.');
     }
@@ -183,7 +183,10 @@ export default function ListadoTurnos() {
         <div className="listado-turnos__filtros-grid">
           <label>
             Procesión
-            <select value={cortejoId} onChange={(e) => setCortejoId(e.target.value)}>
+            <select
+              value={cortejoId}
+              onChange={(e) => cambiarCortejoPreferido(organizacionId, e.target.value, setCortejoId)}
+            >
               {cortejos.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.nombre_evento}
