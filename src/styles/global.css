@@ -4625,6 +4625,58 @@ html {
 
 .entrega-btn { margin-top: 1rem; }
 
+.entrega-pendientes { margin-bottom: 1.25rem; }
+.entrega-pendientes__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  margin-left: 0.5rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: var(--primary-soft, #eff6ff);
+  color: var(--primary);
+  font-size: 0.85rem;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.entrega-pendientes__filtros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+.entrega-pendientes__filtros label {
+  display: block;
+  font-size: 0.8rem;
+}
+.entrega-pendientes__filtros select,
+.entrega-pendientes__filtros input {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+}
+.entrega-pendientes__busqueda { grid-column: 1 / -1; }
+@media (min-width: 640px) {
+  .entrega-pendientes__busqueda { grid-column: span 2; }
+}
+.entrega-pendientes__honor,
+.entrega-pendientes__hora { font-size: 0.85em; }
+.entrega-pendientes__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+.entrega-pendientes__fila--activa {
+  background: rgba(37, 99, 235, 0.06);
+}
+
 .entrega-scanner-off {
   padding: 2rem;
   text-align: center;
