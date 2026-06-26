@@ -28,6 +28,7 @@ import {
   enriquecerAsignaciones,
   queryValidaBusquedaDevoto,
 } from '../utils/consultaDevotoUtils';
+import { enriquecerDashboardMetrics } from '../utils/dashboardMetricsUtils';
 
 function err(error) {
   if (!error) return null;
@@ -1535,14 +1536,19 @@ export async function getFinanzasByOrg(organizacionId) {
 
 export async function getDashboardMetrics(organizacionId) {
   const fin = await getFinanzasByOrg(organizacionId);
-  const cortejos = await getCortejosByOrg(organizacionId);
-  const totalBrazos = (await getBrazosByOrg(organizacionId)).length;
-  const vendidos = fin.brazosVendidos;
-  return {
-    ...fin,
-    cortejosActivos: cortejos.length,
-    ocupacion: totalBrazos ? Math.round((vendidos / totalBrazos) * 100) : 0,
-  };
+  const cortejos = await getCortejosByOrg(organizacionId, { incluirInactivas: true });
+  const brazos = await getBrazosByOrg(organizacionId);
+  const { data: turnos } = await supabase
+    .from('turnos')
+    .select('id, cortejo_id, precio, numero_turno')
+    .eq('organizacion_id', organizacionId);
+
+  return enriquecerDashboardMetrics({
+    fin,
+    brazos,
+    cortejos,
+    turnos: turnos || [],
+  });
 }
 
 const EMAIL_CONFIG_PUBLIC =

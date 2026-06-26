@@ -23,6 +23,7 @@ import {
   enriquecerAsignaciones,
   queryValidaBusquedaDevoto,
 } from '../utils/consultaDevotoUtils';
+import { enriquecerDashboardMetrics } from '../utils/dashboardMetricsUtils';
 
 let store = crearStoreInicial();
 const listeners = new Set();
@@ -1218,7 +1219,14 @@ export function getFinanzasByOrg(organizacionId) {
 export function getDashboardMetrics(organizacionId) {
   const fin = getFinanzasByOrg(organizacionId);
   const cortejos = getCortejosByOrg(organizacionId);
-  return { ...fin, cortejosActivos: cortejos.length };
+  const brazos = getBrazosByOrg(organizacionId);
+  const turnos = store.turnos.filter((t) => t.organizacion_id === organizacionId);
+  return enriquecerDashboardMetrics({
+    fin: { ...fin, brazosVendidos: fin.vendidos, ventas: fin.ventas },
+    brazos,
+    cortejos,
+    turnos,
+  });
 }
 
 // ── Roles y usuarios (RBAC) ──
