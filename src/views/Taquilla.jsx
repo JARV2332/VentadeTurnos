@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { TurnoCartulina } from '../components/TurnoCartulina';
 import { useAuth } from '../context/AuthContext';
@@ -36,8 +37,10 @@ import {
 
 export default function Taquilla() {
   const { organizacionId, organizacion, user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [cortejoId, setCortejoId] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('all');
+  const [turnoFoco, setTurnoFoco] = useState(() => searchParams.get('turno') || '');
   const [turnosTodos, setTurnosTodos] = useState([]);
   const [busquedaApartado, setBusquedaApartado] = useState('');
   const [extraApartadosCui, setExtraApartadosCui] = useState([]);
@@ -137,12 +140,15 @@ export default function Taquilla() {
     if (filtroTipo !== 'all') {
       lista = lista.filter((t) => t.tipo_turno === filtroTipo);
     }
+    if (turnoFoco?.trim()) {
+      lista = lista.filter((t) => String(t.numero_turno) === String(turnoFoco).trim());
+    }
     if (busquedaApartado.trim().length >= 2 && brazosDestacadosIds.length > 0) {
       const idsTurnos = new Set(resultadosBusqueda.map((r) => r.turno.id));
       lista = lista.filter((t) => idsTurnos.has(t.id));
     }
     return lista;
-  }, [turnosTodos, filtroTipo, busquedaApartado, brazosDestacadosIds, resultadosBusqueda]);
+  }, [turnosTodos, filtroTipo, turnoFoco, busquedaApartado, brazosDestacadosIds, resultadosBusqueda]);
 
   const itemsCarrito = carrito.map((b) => ({
     brazo: b,
@@ -268,6 +274,33 @@ export default function Taquilla() {
     });
     return unsub;
   }, [organizacionId, refreshCortejos, refresh]);
+
+  useEffect(() => {
+    const cortejoParam = searchParams.get('cortejo');
+    if (cortejoParam && cortejos.some((c) => c.id === cortejoParam)) {
+      setCortejoId(cortejoParam);
+    }
+    const turnoParam = searchParams.get('turno');
+    if (turnoParam) setTurnoFoco(String(turnoParam).trim());
+  }, [cortejos, searchParams]);
+
+  useEffect(() => {
+    if (!turnoFoco?.trim() || !turnos.length) return undefined;
+    const timer = setTimeout(() => {
+      document.getElementById(`turno-${turnoFoco}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [turnoFoco, turnos, cortejoId]);
+
+  const limpiarTurnoFoco = () => {
+    setTurnoFoco('');
+    const next = new URLSearchParams(searchParams);
+    next.delete('turno');
+    setSearchParams(next, { replace: true });
+  };
 
   const handleClickBrazo = async (brazo) => {
     if (brazo.estado === 'vendido') return;
@@ -561,6 +594,15 @@ export default function Taquilla() {
         </div>
       </div>
 
+      {turnoFoco?.trim() && (
+        <div className="info-box taquilla-turno-foco no-print">
+          Mostrando turno <strong>#{turnoFoco}</strong> preseleccionado desde Disponibilidad.{' '}
+          <button type="button" className="btn btn--ghost btn--sm" onClick={limpiarTurnoFoco}>
+            Ver todos los turnos
+          </button>
+        </div>
+      )}
+
       <div className="taquilla-busqueda-apartados">
         <label className="taquilla-busqueda-apartados__label">
           Buscar apartado
@@ -623,15 +665,16 @@ export default function Taquilla() {
             </p>
           ) : (
             (turnos || []).map((turno) => (
-              <TurnoCartulina
-                key={turno.id}
-                turno={turno}
-                selectedBrazoIds={carritoIds}
-                brazosDestacadosIds={
-                  busquedaApartado.trim().length >= 2 ? brazosDestacadosIds : undefined
-                }
-                onClickBrazo={handleClickBrazo}
-              />
+              <div key={turno.id} id={`turno-${turno.numero_turno}`} className="taquilla-turno-anchor">
+                <TurnoCartulina
+                  turno={turno}
+                  selectedBrazoIds={carritoIds}
+                  brazosDestacadosIds={
+                    busquedaApartado.trim().length >= 2 ? brazosDestacadosIds : undefined
+                  }
+                  onClickBrazo={handleClickBrazo}
+                />
+              </div>
             ))
           )}
         </div>

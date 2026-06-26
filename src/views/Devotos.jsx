@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import Loader from '../components/Loader';
 import EditDevotoModal from '../components/EditDevotoModal';
@@ -35,6 +35,7 @@ function formatTelefonoGt(valor) {
 
 export default function Devotos() {
   const { organizacionId } = useAuth();
+  const [searchParams] = useSearchParams();
   const [devotos, setDevotos] = useState(null);
   const [busqueda, setBusqueda] = useState('');
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -54,6 +55,11 @@ export default function Devotos() {
     refresh();
     return subscribeData(organizacionId, refresh);
   }, [organizacionId, refresh]);
+
+  useEffect(() => {
+    const q = searchParams.get('buscar');
+    if (q?.trim()) setBusqueda(q.trim());
+  }, [searchParams]);
 
   const devotosFiltrados = useMemo(() => {
     const q = normalizarBusqueda(busqueda);

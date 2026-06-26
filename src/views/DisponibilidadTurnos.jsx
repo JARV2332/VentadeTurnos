@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import Loader from '../components/Loader';
 import { useAuth } from '../context/AuthContext';
@@ -223,6 +224,7 @@ export default function DisponibilidadTurnos() {
                   <th>Res. taquilla</th>
                   <th>% libre</th>
                   <th>Brazos libres</th>
+                  <th className="no-print">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -257,6 +259,18 @@ export default function DisponibilidadTurnos() {
                       <span className="disponibilidad-turnos__detalle-brazos">
                         {f.brazosLibresTexto}
                       </span>
+                    </td>
+                    <td className="no-print">
+                      {f.disponibles > 0 ? (
+                        <Link
+                          to={`/taquilla?cortejo=${encodeURIComponent(cortejoId)}&turno=${f.numero}`}
+                          className="btn btn--primary btn--sm"
+                        >
+                          Vender en Taquilla
+                        </Link>
+                      ) : (
+                        <span className="text-muted">Lleno</span>
+                      )}
                     </td>
                   </tr>
                 ))}

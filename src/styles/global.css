@@ -2681,6 +2681,23 @@ html {
   margin: 0 auto;
 }
 
+.consulta-devoto__acciones-celda { min-width: 9rem; }
+.consulta-devoto__acciones-fila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.consulta-devoto__btn-wa { color: #128c7e; }
+
+.taquilla-turno-foco {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.taquilla-turno-anchor { scroll-margin-top: 5rem; }
+
 .listado-turnos__filtros-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));

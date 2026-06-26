@@ -294,6 +294,7 @@ export default function ListadoTurnos() {
                       <th>Brazo</th>
                       <th>Persona</th>
                       <th>Estado</th>
+                      <th>Entrega</th>
                       <th>Fecha operación</th>
                       <th>Hora</th>
                       <th>Operador</th>
@@ -313,6 +314,11 @@ export default function ListadoTurnos() {
                         <td>
                           <span className={`consulta-devoto__estado ${fila.estadoClass}`}>
                             {fila.estadoLabel}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`consulta-devoto__estado ${fila.entregaClass}`}>
+                            {fila.entregaLabel}
                           </span>
                         </td>
                         <td>{fila.fechaOperacion}</td>

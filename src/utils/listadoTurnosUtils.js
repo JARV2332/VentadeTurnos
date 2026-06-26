@@ -9,7 +9,7 @@ import {
 import { labelMetodoPago } from './pagoUtils';
 import { formatHoraVentaGt } from './turnoHorarioUtils';
 import { codigoReciboDisplay } from './compraUtils';
-import { etiquetaEstadoAsignacion, claseEstadoAsignacion } from './consultaDevotoUtils';
+import { etiquetaEstadoAsignacion, claseEstadoAsignacion, etiquetaEntrega, claseEntrega } from './consultaDevotoUtils';
 import { resolverOperadorNombre } from './operadorVentaUtils';
 
 export function nombreAsignado(brazo, cargador) {
@@ -88,6 +88,8 @@ export function construirFilaListado(brazo, turno, comprasPorId = {}, mapaUsuari
     brazoLabel: `${brazo.numero_brazo} ${brazo.lado?.[0] || ''}`.trim(),
     estadoLabel: etiquetaEstadoAsignacion(brazo),
     estadoClass: claseEstadoAsignacion(brazo),
+    entregaLabel: etiquetaEntrega(brazo),
+    entregaClass: claseEntrega(brazo),
     metodoPago: esVendido ? labelMetodoPago(brazo.metodo_pago || compra?.metodo_pago) : '—',
     fechaOperacion: esVendido ? formatFechaReporte(fechaVentaKey(brazo)) : '—',
     horaOperacion: esVendido
@@ -170,6 +172,7 @@ export function exportListadoTurnosExcel({ grupos, cortejoNombre, orgNombre = ''
         Brazo: f.brazoLabel,
         Persona: f.nombre,
         Estado: f.estadoLabel,
+        Entrega: f.entregaLabel,
         'Fecha operación': f.fechaOperacion,
         Hora: f.horaOperacion,
         Operador: f.operador,
@@ -247,6 +250,7 @@ function buildListadoTurnosHtml({ grupos, cortejoNombre, orgNombre = '', filtros
             <th class="col-brazo">Brazo</th>
             <th class="col-persona">Persona</th>
             <th class="col-estado">Estado</th>
+            <th class="col-entrega">Entrega</th>
             <th class="col-fecha">Fecha</th>
             <th class="col-hora">Hora</th>
             <th class="col-operador">Operador</th>
@@ -267,6 +271,7 @@ function buildListadoTurnosHtml({ grupos, cortejoNombre, orgNombre = '', filtros
               <td>${escapeHtml(f.brazoLabel)}</td>
               <td>${escapeHtml(f.nombre)}</td>
               <td>${escapeHtml(f.estadoLabel)}</td>
+              <td>${escapeHtml(f.entregaLabel)}</td>
               <td>${escapeHtml(fechaCorta)}</td>
               <td>${escapeHtml(f.horaOperacion)}</td>
               <td>${escapeHtml(f.operador)}</td>
@@ -365,9 +370,10 @@ function buildListadoTurnosHtml({ grupos, cortejoNombre, orgNombre = '', filtros
       font-weight: 700;
     }
     .col-brazo { width: 5%; }
-    .col-persona { width: 18%; }
+    .col-persona { width: 16%; }
     .col-estado { width: 7%; }
-    .col-fecha { width: 8%; }
+    .col-entrega { width: 7%; }
+    .col-fecha { width: 7%; }
     .col-hora { width: 8%; }
     .col-operador { width: 12%; }
     .col-pago { width: 9%; }

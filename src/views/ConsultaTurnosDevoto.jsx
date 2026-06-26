@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { buscarTurnosDevoto, buscarBoletaPorCodigo } from '../services/dataService';
 import { formatQ } from '../utils/cajaReportUtils';
 import { labelMetodoPago } from '../utils/pagoUtils';
+import { construirEnlaceBoletaWhatsapp } from '../utils/whatsappUtils';
 import {
   listarPersonasConsulta,
   filtrarAsignacionesPorPersona,
@@ -109,6 +110,35 @@ export default function ConsultaTurnosDevoto() {
     }
   };
 
+  const reenviarWhatsapp = async (item) => {
+    const codigo = item.brazo.codigo_boleta_qr;
+    if (!codigo || item.brazo.estado !== 'vendido') return;
+    setBoletaError('');
+    try {
+      const res = await buscarBoletaPorCodigo(organizacionId, codigo);
+      if (res.error) {
+        setBoletaError(res.error);
+        return;
+      }
+      const enlace = construirEnlaceBoletaWhatsapp({
+        cargador: res.cargador,
+        brazo: res.brazo,
+        turno: res.turno,
+        cortejo: res.cortejo,
+        organizacion,
+        items: res.items,
+        compra: res.compra,
+      });
+      if (enlace) {
+        window.open(enlace, '_blank', 'noopener,noreferrer');
+      } else {
+        setBoletaError('No hay WhatsApp válido para reenviar la boleta.');
+      }
+    } catch (err) {
+      setBoletaError(err.message || 'No se pudo preparar el mensaje de WhatsApp.');
+    }
+  };
+
   return (
     <Layout
       title="Consulta de turnos"
@@ -209,7 +239,14 @@ export default function ConsultaTurnosDevoto() {
           </div>
           {personaSeleccionada?.tipo === 'registrado' && personaSeleccionada.cargador && (
             <p className="consulta-devoto__enlace-devotos">
-              <Link to="/devotos" className="btn btn--ghost btn--sm">
+              <Link
+                to={`/devotos?buscar=${encodeURIComponent(
+                  personaSeleccionada.cargador.cui_o_identificacion ||
+                    personaSeleccionada.cargador.nombre_completo ||
+                    ''
+                )}`}
+                className="btn btn--ghost btn--sm"
+              >
                 Abrir ficha en devotos
               </Link>
             </p>
@@ -241,13 +278,14 @@ export default function ConsultaTurnosDevoto() {
                   <th>Estado</th>
                   <th>Pago</th>
                   <th>Ofrenda</th>
-                  <th>Boleta</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {asignacionesFiltradas.map((item) => {
                   const tieneBoleta =
                     item.brazo.estado === 'vendido' && Boolean(item.brazo.codigo_boleta_qr);
+                  const tieneWhatsapp = Boolean(item.cargador?.whatsapp);
                   return (
                     <tr key={item.brazo.id}>
                       <td>
@@ -278,16 +316,27 @@ export default function ConsultaTurnosDevoto() {
                           ? formatQ(item.brazo.precio_pagado)
                           : '—'}
                       </td>
-                      <td>
+                      <td className="consulta-devoto__acciones-celda">
                         {tieneBoleta ? (
-                          <button
-                            type="button"
-                            className="btn btn--ghost btn--sm"
-                            disabled={cargandoBoleta}
-                            onClick={() => abrirBoleta(item)}
-                          >
-                            {cargandoBoleta ? 'Cargando…' : 'Ver boleta'}
-                          </button>
+                          <div className="consulta-devoto__acciones-fila">
+                            <button
+                              type="button"
+                              className="btn btn--ghost btn--sm"
+                              disabled={cargandoBoleta}
+                              onClick={() => abrirBoleta(item)}
+                            >
+                              {cargandoBoleta ? '…' : 'Ver / imprimir'}
+                            </button>
+                            {tieneWhatsapp && (
+                              <button
+                                type="button"
+                                className="btn btn--ghost btn--sm consulta-devoto__btn-wa"
+                                onClick={() => reenviarWhatsapp(item)}
+                              >
+                                WhatsApp
+                              </button>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-muted">—</span>
                         )}

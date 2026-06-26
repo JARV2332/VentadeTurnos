@@ -89,6 +89,16 @@ export function claseEstadoAsignacion(brazo) {
   return '';
 }
 
+export function etiquetaEntrega(brazo) {
+  if (brazo?.estado !== 'vendido') return '—';
+  return brazo.estado_entrega === 'entregado' ? 'Entregado' : 'Pendiente';
+}
+
+export function claseEntrega(brazo) {
+  if (brazo?.estado !== 'vendido') return '';
+  return brazo.estado_entrega === 'entregado' ? 'estado--entregado' : 'estado--pagado';
+}
+
 export const APARTADOS_SIN_REGISTRO_ID = '__apartado_sin_registro__';
 
 export function listarPersonasConsulta(cargadores, asignaciones) {
