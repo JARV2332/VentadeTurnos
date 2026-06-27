@@ -1,3 +1,8 @@
+import {
+  contarReservasTaquillaColgadas,
+  MINUTOS_RESERVA_TAQUILLA_COLGADA,
+} from './reservasTaquillaUtils';
+
 export function fechaHoyKey(fecha = new Date()) {
   const d = fecha instanceof Date ? fecha : new Date(fecha);
   if (Number.isNaN(d.getTime())) return null;
@@ -33,6 +38,7 @@ export function enriquecerDashboardMetrics({
   const apartadosSinPagar = (brazos || []).filter(
     (b) => b.estado === 'reservado' && b.reserva_apartado
   ).length;
+  const reservasTaquillaColgadas = contarReservasTaquillaColgadas(brazos);
 
   const hoyKey = fechaHoyKey();
   const ventasHoyList = (fin.ventas || []).filter((v) => fechaVentaKeyLocal(v) === hoyKey);
@@ -73,6 +79,8 @@ export function enriquecerDashboardMetrics({
     montoHoy,
     pendientesEntrega,
     apartadosSinPagar,
+    reservasTaquillaColgadas,
+    minutosReservaColgada: MINUTOS_RESERVA_TAQUILLA_COLGADA,
     porProcesion,
   };
 }

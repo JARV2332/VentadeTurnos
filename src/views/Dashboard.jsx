@@ -53,6 +53,15 @@ export default function Dashboard() {
           <strong className="metric-card__value">{metrics.apartadosSinPagar ?? 0}</strong>
           <small>Gestionar apartados →</small>
         </Link>
+        {(metrics.reservasTaquillaColgadas ?? 0) > 0 && (
+          <Link to="/taquilla" className="metric-card metric-card--link metric-card--warn">
+            <span className="metric-card__label">Reservas taquilla colgadas</span>
+            <strong className="metric-card__value">{metrics.reservasTaquillaColgadas}</strong>
+            <small>
+              Sin confirmar &gt; {metrics.minutosReservaColgada ?? 15} min · Ir a Taquilla →
+            </small>
+          </Link>
+        )}
         <div className="metric-card">
           <span className="metric-card__label">Ingresos recaudados</span>
           <strong className="metric-card__value">{formatQ(metrics.recaudado)}</strong>

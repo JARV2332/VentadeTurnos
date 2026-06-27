@@ -2340,6 +2340,23 @@ html {
   padding: 1rem 1.1rem;
 }
 
+.caja-filters__fechas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.5rem 0.75rem;
+}
+
+.caja-cierre-hoy { margin-bottom: 1rem; }
+
+.metric-card--warn {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+.metric-card--warn small { color: #b45309; }
+
+.taquilla-reservas-colgadas { margin-bottom: 0.75rem; }
+
 .caja-filters__clear {
   align-self: flex-end;
   margin-bottom: 0.15rem;

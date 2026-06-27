@@ -8,6 +8,7 @@ import {
   getCortejosByOrg,
   getTurnosAgrupados,
   getMesasByOrg,
+  getBrazosByOrg,
   subscribeData,
   reservarBrazo,
   confirmarVentaCompra,
@@ -39,6 +40,10 @@ import {
   cambiarCortejoPreferido,
   guardarCortejoPreferido,
 } from '../utils/cortejoPreferidoUtils';
+import {
+  contarReservasTaquillaColgadas,
+  MINUTOS_RESERVA_TAQUILLA_COLGADA,
+} from '../utils/reservasTaquillaUtils';
 
 export default function Taquilla() {
   const { organizacionId, organizacion, user } = useAuth();
@@ -67,6 +72,7 @@ export default function Taquilla() {
   const [error, setError] = useState('');
   const [cortejos, setCortejos] = useState([]);
   const [finalizando, setFinalizando] = useState(false);
+  const [reservasColgadas, setReservasColgadas] = useState(0);
   const [mesaActiva, setMesaActiva] = useState(null);
   const [esMovil, setEsMovil] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 1024px)').matches
@@ -224,6 +230,10 @@ export default function Taquilla() {
       let lista = await getTurnosAgrupados(cortejoId, organizacionId);
       if (!Array.isArray(lista)) lista = [];
       setTurnosTodos(lista);
+      if (organizacionId) {
+        const brazos = await getBrazosByOrg(organizacionId);
+        setReservasColgadas(contarReservasTaquillaColgadas(brazos));
+      }
     } catch (err) {
       console.error('Error al actualizar turnos en taquilla:', err);
     }
@@ -553,6 +563,14 @@ export default function Taquilla() {
         onCerrar={() => setVentaOk(null)}
       />
       {error && !ventaAbierta && <div className="alert alert--error">{error}</div>}
+
+      {reservasColgadas > 0 && !ventaAbierta && (
+        <div className="alert alert--warning taquilla-reservas-colgadas no-print">
+          <strong>{reservasColgadas}</strong> reserva(s) de taquilla sin confirmar hace más de{' '}
+          {MINUTOS_RESERVA_TAQUILLA_COLGADA} minutos. Los brazos reservados expirados vuelven a
+          estar libres al tocarlos; revise si algún operador dejó una venta a medias.
+        </div>
+      )}
 
       {carrito.length > 0 && pasoVenta < 1 && (
         <div className="taquilla-carrito-bar no-print">
