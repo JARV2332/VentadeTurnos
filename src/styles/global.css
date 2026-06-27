@@ -5159,6 +5159,26 @@ html {
   background: var(--primary-light);
 }
 
+.roles-plantillas {
+  margin: 0.75rem 0 1rem;
+  padding: 0.75rem;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: var(--bg, #f8fafc);
+}
+.roles-plantillas__label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+.roles-plantillas__btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
 .roles-lista {
   display: flex;
   flex-direction: column;

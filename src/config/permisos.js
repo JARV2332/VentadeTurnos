@@ -74,6 +74,45 @@ export const PANTALLAS = [
   },
 ];
 
+/** Plantillas rápidas al crear roles (incluyen pantallas de reportes nuevas). */
+export const PLANTILLAS_ROL = {
+  taquilla: {
+    nombre: 'Operador de taquilla',
+    descripcion: 'Venta, consulta de devotos y disponibilidad de turnos.',
+    permisos: [
+      'taquilla',
+      'devotos',
+      'consulta_turnos',
+      'listado_turnos',
+      'disponibilidad_turnos',
+    ],
+  },
+  caja: {
+    nombre: 'Operador de caja',
+    descripcion: 'Cierre diario, impresión y reportes de ventas.',
+    permisos: ['caja', 'impresion', 'consulta_turnos', 'listado_turnos', 'apartados_pendientes'],
+  },
+  entrega: {
+    nombre: 'Operador de entrega',
+    descripcion: 'Escaneo QR, entrega física e impresión de boletas.',
+    permisos: ['entrega', 'consulta_turnos', 'listado_turnos', 'impresion'],
+  },
+  coordinacion: {
+    nombre: 'Coordinación',
+    descripcion: 'Dashboard, reportes, apartados y consultas operativas.',
+    permisos: [
+      'dashboard',
+      'consulta_turnos',
+      'listado_turnos',
+      'disponibilidad_turnos',
+      'apartados_pendientes',
+      'caja',
+      'impresion',
+      'devotos',
+    ],
+  },
+};
+
 /** Permiso para gestionar roles y usuarios (solo administrador) */
 export const PERMISO_GESTION_USUARIOS = 'usuarios';
 

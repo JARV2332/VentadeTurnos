@@ -10,7 +10,7 @@ import {
   setUsuarioActivo,
   subscribeData,
 } from '../services/dataService';
-import { pantallasPorGrupo, labelPermiso } from '../config/permisos';
+import { pantallasPorGrupo, labelPermiso, PLANTILLAS_ROL } from '../config/permisos';
 
 const ROL_VACIO = {
   nombre: '',
@@ -53,6 +53,18 @@ export default function ConfigUsuarios() {
   }, [organizacionId, refresh]);
 
   const gruposPantallas = pantallasPorGrupo();
+
+  const aplicarPlantillaRol = (clave) => {
+    const plantilla = PLANTILLAS_ROL[clave];
+    if (!plantilla) return;
+    setRolForm({
+      nombre: plantilla.nombre,
+      descripcion: plantilla.descripcion,
+      permisos: [...plantilla.permisos],
+    });
+    setRolFormVisible(true);
+    setError('');
+  };
 
   const togglePermisoRol = (permisoId) => {
     setRolForm((prev) => {
@@ -243,9 +255,26 @@ export default function ConfigUsuarios() {
               </button>
             </div>
             <p className="text-muted config-hint">
-              Marque qué pantallas del menú lateral puede ver cada rol. Ejemplo: caja solo
-              Taquilla, Entrega e Impresión.
+              Marque qué pantallas del menú lateral puede ver cada rol. Use una plantilla para
+              incluir Consulta, Listado y Disponibilidad sin marcarlas una a una.
             </p>
+
+            <div className="roles-plantillas">
+              <span className="roles-plantillas__label">Plantillas rápidas</span>
+              <div className="roles-plantillas__btns">
+                {Object.entries(PLANTILLAS_ROL).map(([clave, p]) => (
+                  <button
+                    key={clave}
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={() => aplicarPlantillaRol(clave)}
+                    title={p.descripcion}
+                  >
+                    {p.nombre}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div className="roles-lista">
               {roles.map((rol) => (
