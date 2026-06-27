@@ -2747,6 +2747,39 @@ html {
 }
 .taquilla-turno-anchor { scroll-margin-top: 5rem; }
 
+.listado-turnos__grupo-titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+.listado-turnos__imprimir-turno { margin-left: auto; }
+
+.imprimir-masivo__body { max-height: min(85vh, 900px); }
+.imprimir-masivo__item {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px dashed var(--border);
+}
+.imprimir-masivo__item:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+@media print {
+  .imprimir-masivo__item {
+    page-break-after: always;
+    break-after: page;
+    border: none;
+    margin: 0;
+    padding: 0;
+  }
+  .imprimir-masivo__item:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+}
+
 .apartados-pendientes__dias { font-size: 0.85em; }
 
 .listado-turnos__filtros-grid {

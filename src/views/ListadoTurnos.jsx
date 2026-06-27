@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Layout from '../components/Layout';
 import Loader from '../components/Loader';
 import VerBoletaModal from '../components/VerBoletaModal';
+import ImprimirBoletasMasivoModal from '../components/ImprimirBoletasMasivoModal';
 import { useAuth } from '../context/AuthContext';
 import {
   getCortejosByOrg,
@@ -23,6 +24,11 @@ import {
   resolverCortejoInicial,
   cambiarCortejoPreferido,
 } from '../utils/cortejoPreferidoUtils';
+import { fechaHoyKey } from '../utils/dashboardMetricsUtils';
+import {
+  cargarBoletasPorCodigos,
+  codigosBoletaDesdeFilas,
+} from '../utils/imprimirBoletasUtils';
 
 export default function ListadoTurnos() {
   const { organizacionId, organizacion } = useAuth();
@@ -42,6 +48,8 @@ export default function ListadoTurnos() {
   const [soloAsignados, setSoloAsignados] = useState(true);
 
   const [boletaModal, setBoletaModal] = useState(null);
+  const [boletasMasivas, setBoletasMasivas] = useState(null);
+  const [tituloMasivo, setTituloMasivo] = useState('');
   const [cargandoBoleta, setCargandoBoleta] = useState(false);
   const [boletaError, setBoletaError] = useState('');
 
@@ -140,6 +148,43 @@ export default function ListadoTurnos() {
       setCargandoBoleta(false);
     }
   };
+
+  const imprimirBoletas = async (filas, titulo) => {
+    const codigos = codigosBoletaDesdeFilas(filas);
+    if (!codigos.length) {
+      setBoletaError('No hay boletas pagadas para imprimir en esta selección.');
+      return;
+    }
+    setCargandoBoleta(true);
+    setBoletaError('');
+    try {
+      const boletas = await cargarBoletasPorCodigos(
+        organizacionId,
+        codigos,
+        buscarBoletaPorCodigo
+      );
+      if (!boletas.length) {
+        setBoletaError('No se pudieron cargar las boletas.');
+        return;
+      }
+      setTituloMasivo(titulo);
+      setBoletasMasivas(boletas);
+    } catch (err) {
+      setBoletaError(err.message || 'Error al preparar impresión masiva.');
+    } finally {
+      setCargandoBoleta(false);
+    }
+  };
+
+  const filasPagadasVisibles = useMemo(
+    () => grupos.flatMap((g) => g.filas.filter((f) => f.puedeVerBoleta)),
+    [grupos]
+  );
+
+  const esFiltroHoy =
+    fechaDesde === fechaHasta &&
+    fechaDesde === fechaHoyKey() &&
+    Boolean(fechaDesde);
 
   const limpiarFiltros = () => {
     setFiltroTipo('all');
@@ -262,6 +307,21 @@ export default function ListadoTurnos() {
           >
             Imprimir / Guardar PDF
           </button>
+          {filasPagadasVisibles.length > 0 && (
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              disabled={cargandoBoleta}
+              onClick={() =>
+                imprimirBoletas(
+                  filasPagadasVisibles,
+                  esFiltroHoy ? 'Boletas del día' : 'Boletas del listado filtrado'
+                )
+              }
+            >
+              {cargandoBoleta ? 'Cargando…' : 'Imprimir boletas (filtro)'}
+            </button>
+          )}
         </div>
         <p className="text-muted config-hint listado-turnos__resumen">
           {cortejoSel?.nombre_evento || '—'} · <strong>{totalFilas}</strong> registro(s) en{' '}
@@ -289,6 +349,21 @@ export default function ListadoTurnos() {
                 <span className="text-muted listado-turnos__grupo-count">
                   {grupo.filas.length} asignación(es)
                 </span>
+                {grupo.filas.some((f) => f.puedeVerBoleta) && (
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm listado-turnos__imprimir-turno no-print"
+                    disabled={cargandoBoleta}
+                    onClick={() =>
+                      imprimirBoletas(
+                        grupo.filas.filter((f) => f.puedeVerBoleta),
+                        `Boletas turno #${grupo.numero}`
+                      )
+                    }
+                  >
+                    Imprimir boletas del turno
+                  </button>
+                )}
               </h3>
               <div className="table-wrap">
                 <table className="data-table data-table--compact listado-turnos__tabla">
@@ -361,6 +436,14 @@ export default function ListadoTurnos() {
         boleta={boletaModal}
         organizacion={organizacion}
         onCerrar={() => setBoletaModal(null)}
+      />
+
+      <ImprimirBoletasMasivoModal
+        abierto={Boolean(boletasMasivas?.length)}
+        boletas={boletasMasivas || []}
+        organizacion={organizacion}
+        titulo={tituloMasivo}
+        onCerrar={() => setBoletasMasivas(null)}
       />
     </Layout>
   );
