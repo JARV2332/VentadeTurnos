@@ -1999,6 +1999,15 @@ html {
   word-break: break-all;
 }
 
+.mis-turnos-enlace-admin__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+
+.dashboard-mis-turnos { margin-bottom: 1rem; }
+
 .caja-editar-pago__metodo-label {
   display: block;
   margin: 1rem 0 0.5rem;

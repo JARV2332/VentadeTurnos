@@ -29,6 +29,7 @@ import { normalizarCui, isValidCui, CUI_DIGITS } from '../utils/cuiUtils';
 import { TERMINO_DEVOTO, TERMINO_DEVOTO_ARTICULO } from '../constants/terminologia';
 import PhoneInput502 from '../components/PhoneInput502';
 import VentaExitoModal from '../components/VentaExitoModal';
+import MisTurnosEnlaceAdmin from '../components/MisTurnosEnlaceAdmin';
 import {
   buscarApartadosEnTurnos,
   agruparApartadosBusqueda,
@@ -563,6 +564,8 @@ export default function Taquilla() {
         onCerrar={() => setVentaOk(null)}
       />
       {error && !ventaAbierta && <div className="alert alert--error">{error}</div>}
+
+      {!ventaAbierta && <MisTurnosEnlaceAdmin organizacion={organizacion} />}
 
       {reservasColgadas > 0 && !ventaAbierta && (
         <div className="alert alert--warning taquilla-reservas-colgadas no-print">

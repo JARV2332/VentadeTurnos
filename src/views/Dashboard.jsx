@@ -10,9 +10,10 @@ import {
   subscribeData,
 } from '../services/dataService';
 import HorarioTurnosPanel from '../components/HorarioTurnosPanel';
+import MisTurnosEnlaceAdmin from '../components/MisTurnosEnlaceAdmin';
 
 export default function Dashboard() {
-  const { organizacionId } = useAuth();
+  const { organizacionId, organizacion } = useAuth();
   const [metrics, setMetrics] = useState(null);
   const [cortejos, setCortejos] = useState([]);
 
@@ -37,6 +38,7 @@ export default function Dashboard() {
         <Loader text="Cargando métricas..." />
       ) : (
       <>
+      <MisTurnosEnlaceAdmin organizacion={organizacion} className="dashboard-mis-turnos" />
       <div className="metrics-grid metrics-grid--5 dashboard-operacion">
         <div className="metric-card metric-card--primary">
           <span className="metric-card__label">Ventas de hoy</span>
