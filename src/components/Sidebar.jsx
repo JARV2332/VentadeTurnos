@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { PANTALLAS, puedeVerPantalla } from '../config/permisos';
 import BrandLogo from './BrandLogo';
+
+const ORDEN_GRUPOS = ['Plataforma', 'Operación', 'Reportes', 'Administración'];
 
 export default function Sidebar({ mobileOpen = false, onClose }) {
   const { organizacion, rolNombre, logout, hasPermiso, esSuperAdmin } = useAuth();
@@ -14,6 +16,16 @@ export default function Sidebar({ mobileOpen = false, onClose }) {
     }
     return puedeVerPantalla(hasPermiso, p);
   });
+
+  const navPorGrupo = useMemo(() => {
+    const map = new Map();
+    navItems.forEach((item) => {
+      const g = item.grupo || 'Otros';
+      if (!map.has(g)) map.set(g, []);
+      map.get(g).push(item);
+    });
+    return ORDEN_GRUPOS.filter((g) => map.has(g)).map((g) => [g, map.get(g)]);
+  }, [navItems]);
 
   const handleLogout = async () => {
     onClose?.();
@@ -43,18 +55,23 @@ export default function Sidebar({ mobileOpen = false, onClose }) {
       </div>
 
       <nav className="sidebar__nav">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.id}
-            to={item.path}
-            onClick={handleNav}
-            className={({ isActive }) =>
-              `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`
-            }
-          >
-            <span className="sidebar__icon">{item.icon}</span>
-            {item.label}
-          </NavLink>
+        {navPorGrupo.map(([grupo, items]) => (
+          <div key={grupo} className="sidebar__section">
+            <span className="sidebar__section-label">{grupo}</span>
+            {items.map((item) => (
+              <NavLink
+                key={item.id}
+                to={item.path}
+                onClick={handleNav}
+                className={({ isActive }) =>
+                  `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`
+                }
+              >
+                <span className="sidebar__icon">{item.icon}</span>
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
         ))}
       </nav>
 
