@@ -24,6 +24,7 @@ import {
   fechaVentaKey,
   agruparVentasPorDia,
 } from '../utils/cajaReportUtils';
+import { fechaHoyKey } from '../utils/dashboardMetricsUtils';
 import { formatHoraVentaGt } from '../utils/turnoHorarioUtils';
 
 export default function CajaSaaS() {
@@ -106,6 +107,18 @@ export default function CajaSaaS() {
     () => agruparVentasPorDia(ventasFiltradas),
     [ventasFiltradas]
   );
+
+  const hoyKey = useMemo(() => fechaHoyKey(), []);
+  const esFiltroHoy = fechaDesde === hoyKey && fechaHasta === hoyKey;
+
+  const resumenMetodosDia = useMemo(() => {
+    const m = { efectivo: 0, transferencia: 0, tarjeta: 0 };
+    ventasFiltradas.forEach((v) => {
+      const met = v.metodo_pago || 'efectivo';
+      if (m[met] !== undefined) m[met] += Number(v.precio_pagado || 0);
+    });
+    return m;
+  }, [ventasFiltradas]);
 
   const filtrosMeta = useMemo(() => {
     const mesa =
@@ -264,6 +277,12 @@ export default function CajaSaaS() {
     setFiltroTipoTurno('all');
   };
 
+  const filtrarHoy = () => {
+    const hoy = fechaHoyKey();
+    setFechaDesde(hoy);
+    setFechaHasta(hoy);
+  };
+
   return (
     <Layout title="Caja y Finanzas" subtitle="Cuadre, análisis y reportes de ventas">
       {okMsg && <div className="alert alert--success">{okMsg}</div>}
@@ -304,14 +323,23 @@ export default function CajaSaaS() {
       </div>
 
       <div className="caja-filters caja-filters--reporte">
-        <label>
-          Desde
-          <input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} />
-        </label>
-        <label>
-          Hasta
-          <input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} />
-        </label>
+        <div className="caja-filters__fechas">
+          <button
+            type="button"
+            className={`btn btn--sm ${esFiltroHoy ? 'btn--primary' : 'btn--ghost'}`}
+            onClick={filtrarHoy}
+          >
+            Hoy
+          </button>
+          <label>
+            Desde
+            <input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} />
+          </label>
+          <label>
+            Hasta
+            <input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} />
+          </label>
+        </div>
         <label>
           Vendedor / operador
           <select value={filtroVendedor} onChange={(e) => setFiltroVendedor(e.target.value)}>
@@ -357,6 +385,30 @@ export default function CajaSaaS() {
           <strong>{formatQ(totalFiltrado)}</strong>
         </div>
       </div>
+
+      {esFiltroHoy && (
+        <div className="metrics-grid metrics-grid--3 caja-cierre-hoy no-print">
+          <div className="metric-card metric-card--primary">
+            <span className="metric-card__label">Cierre de hoy — ventas</span>
+            <strong className="metric-card__value">{ventasFiltradas.length}</strong>
+            <small>Total {formatQ(totalFiltrado)}</small>
+          </div>
+          <div className="metric-card">
+            <span className="metric-card__label">Efectivo hoy</span>
+            <strong className="metric-card__value">{formatQ(resumenMetodosDia.efectivo)}</strong>
+          </div>
+          <div className="metric-card">
+            <span className="metric-card__label">Transferencia / tarjeta</span>
+            <strong className="metric-card__value">
+              {formatQ(resumenMetodosDia.transferencia + resumenMetodosDia.tarjeta)}
+            </strong>
+            <small>
+              Transf. {formatQ(resumenMetodosDia.transferencia)} · Tarj.{' '}
+              {formatQ(resumenMetodosDia.tarjeta)}
+            </small>
+          </div>
+        </div>
+      )}
 
       <CajaReportePanel
         ventasFiltradas={ventasFiltradas}
