@@ -282,10 +282,11 @@ export default function Taquilla() {
     const cortejoParam = searchParams.get('cortejo');
     if (cortejoParam && cortejos.some((c) => c.id === cortejoParam)) {
       setCortejoId(cortejoParam);
+      guardarCortejoPreferido(organizacionId, cortejoParam);
     }
     const turnoParam = searchParams.get('turno');
     if (turnoParam) setTurnoFoco(String(turnoParam).trim());
-  }, [cortejos, searchParams]);
+  }, [cortejos, searchParams, organizacionId]);
 
   useEffect(() => {
     if (!turnoFoco?.trim() || !turnos.length) return undefined;
@@ -572,7 +573,10 @@ export default function Taquilla() {
       <div className="taquilla-toolbar">
         <label>
           Procesión
-          <select value={cortejoId} onChange={(e) => setCortejoId(e.target.value)}>
+          <select
+            value={cortejoId}
+            onChange={(e) => cambiarCortejoPreferido(organizacionId, e.target.value, setCortejoId)}
+          >
             {(cortejos || []).map((c) => (
               <option key={c.id} value={c.id}>{c.nombre_evento}</option>
             ))}

@@ -2713,6 +2713,8 @@ html {
 }
 .taquilla-turno-anchor { scroll-margin-top: 5rem; }
 
+.apartados-pendientes__dias { font-size: 0.85em; }
+
 .listado-turnos__filtros-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));

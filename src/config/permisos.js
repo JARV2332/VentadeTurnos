@@ -64,6 +64,14 @@ export const PANTALLAS = [
     icon: '▤',
     grupo: 'Administración',
   },
+  {
+    id: 'apartados_pendientes',
+    label: 'Apartados por cobrar',
+    path: '/apartados-pendientes',
+    icon: '◫',
+    grupo: 'Operación',
+    visibleConPermisos: ['import_reservas', 'taquilla', 'caja', 'dashboard', 'listado_turnos'],
+  },
 ];
 
 /** Permiso para gestionar roles y usuarios (solo administrador) */
