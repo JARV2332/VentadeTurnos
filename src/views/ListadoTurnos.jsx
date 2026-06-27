@@ -20,6 +20,7 @@ import {
   exportListadoTurnosExcel,
   exportListadoTurnosPdf,
 } from '../utils/listadoTurnosUtils';
+import { construirEnlaceBoletaWhatsapp } from '../utils/whatsappUtils';
 import {
   resolverCortejoInicial,
   cambiarCortejoPreferido,
@@ -173,6 +174,35 @@ export default function ListadoTurnos() {
       setBoletaError(err.message || 'Error al preparar impresión masiva.');
     } finally {
       setCargandoBoleta(false);
+    }
+  };
+
+  const reenviarWhatsapp = async (fila) => {
+    const codigo = fila.codigoBusqueda;
+    if (!codigo) return;
+    setBoletaError('');
+    try {
+      const res = await buscarBoletaPorCodigo(organizacionId, codigo);
+      if (res.error) {
+        setBoletaError(res.error);
+        return;
+      }
+      const enlace = construirEnlaceBoletaWhatsapp({
+        cargador: res.cargador,
+        brazo: res.brazo,
+        turno: res.turno,
+        cortejo: res.cortejo,
+        organizacion,
+        items: res.items,
+        compra: res.compra,
+      });
+      if (enlace) {
+        window.open(enlace, '_blank', 'noopener,noreferrer');
+      } else {
+        setBoletaError('No hay WhatsApp válido para enviar la boleta.');
+      }
+    } catch (err) {
+      setBoletaError(err.message || 'No se pudo preparar el mensaje de WhatsApp.');
     }
   };
 
@@ -409,14 +439,25 @@ export default function ListadoTurnos() {
                         <td>{fila.ofrenda}</td>
                         <td className="no-print">
                           {fila.puedeVerBoleta ? (
-                            <button
-                              type="button"
-                              className="btn btn--ghost btn--sm"
-                              disabled={cargandoBoleta}
-                              onClick={() => abrirBoleta(fila)}
-                            >
-                              Ver boleta
-                            </button>
+                            <div className="consulta-devoto__acciones-fila">
+                              <button
+                                type="button"
+                                className="btn btn--ghost btn--sm"
+                                disabled={cargandoBoleta}
+                                onClick={() => abrirBoleta(fila)}
+                              >
+                                Ver boleta
+                              </button>
+                              {fila.cargador?.whatsapp && (
+                                <button
+                                  type="button"
+                                  className="btn btn--ghost btn--sm consulta-devoto__btn-wa"
+                                  onClick={() => reenviarWhatsapp(fila)}
+                                >
+                                  WhatsApp
+                                </button>
+                              )}
+                            </div>
                           ) : (
                             <span className="text-muted">—</span>
                           )}
