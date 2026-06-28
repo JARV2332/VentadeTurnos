@@ -439,6 +439,11 @@ export default function ConfigSaaS() {
   const procesionesActivas = procesiones.filter((p) => p.estado !== 'inactiva');
   const procesionesInactivas = procesiones.filter((p) => p.estado === 'inactiva');
 
+  const abrirAgregarTurno = (cortejoId) => {
+    setVerCortejoId(cortejoId);
+    setAgregarTurnoAbierto(true);
+  };
+
   const renderProcesionCard = (p) => (
     <div
       key={p.id}
@@ -466,10 +471,17 @@ export default function ConfigSaaS() {
           className="btn btn--ghost btn--sm"
           onClick={() => setVerCortejoId(verCortejoId === p.id ? null : p.id)}
         >
-          {verCortejoId === p.id ? 'Ocultar' : 'Ver turnos'}
+          {verCortejoId === p.id ? 'Ocultar turnos' : 'Ver turnos'}
+        </button>
+        <button
+          type="button"
+          className="btn btn--primary btn--sm"
+          onClick={() => abrirAgregarTurno(p.id)}
+        >
+          + Agregar turno
         </button>
         {p.estado !== 'inactiva' && (
-          <Link to="/taquilla" className="btn btn--primary btn--sm">
+          <Link to="/taquilla" className="btn btn--ghost btn--sm">
             Taquilla
           </Link>
         )}
@@ -571,7 +583,9 @@ export default function ConfigSaaS() {
           Procesiones activas ({procesionesActivas.length})
         </h3>
         <p className="text-muted config-hint">
-          Las activas aparecen en Taquilla, Dashboard e Impresión. Puedes desactivarlas sin borrar datos.
+          Las activas aparecen en Taquilla, Dashboard e Impresión. Use{' '}
+          <strong>+ Agregar turno</strong> en una procesión para crear un turno manual (número,
+          nombre, melodía y brazos). Puede desactivar procesiones sin borrar datos.
         </p>
         {procesionesActivas.length === 0 ? (
           <p className="text-muted">No hay procesiones activas. Crea una abajo o reactiva una inactiva.</p>
@@ -607,7 +621,7 @@ export default function ConfigSaaS() {
               <button
                 type="button"
                 className="btn btn--primary btn--sm"
-                onClick={() => setAgregarTurnoAbierto(true)}
+                onClick={() => abrirAgregarTurno(procesionVer.id)}
               >
                 Agregar turno
               </button>
