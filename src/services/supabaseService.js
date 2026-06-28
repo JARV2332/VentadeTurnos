@@ -979,6 +979,48 @@ export async function reservarBrazo(brazoId, mesaId, vendedorId) {
   return { data };
 }
 
+/** Libera en BD reservas de taquilla cuyos 5 minutos ya vencieron (no toca apartados formales). */
+export async function liberarReservasTaquillaExpiradas(organizacionId) {
+  if (!organizacionId) return { liberados: 0 };
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('brazos')
+    .update({
+      estado: 'disponible',
+      bloqueado_hasta: null,
+      mesa_id: null,
+      vendedor_id: null,
+    })
+    .eq('organizacion_id', organizacionId)
+    .eq('estado', 'reservado')
+    .eq('reserva_apartado', false)
+    .not('bloqueado_hasta', 'is', null)
+    .lt('bloqueado_hasta', now)
+    .select('id');
+
+  if (error) {
+    if (isMissingColumn(error, 'reserva_apartado')) {
+      const { data: data2, error: error2 } = await supabase
+        .from('brazos')
+        .update({
+          estado: 'disponible',
+          bloqueado_hasta: null,
+          mesa_id: null,
+          vendedor_id: null,
+        })
+        .eq('organizacion_id', organizacionId)
+        .eq('estado', 'reservado')
+        .not('bloqueado_hasta', 'is', null)
+        .lt('bloqueado_hasta', now)
+        .select('id');
+      if (error2) return err(error2);
+      return { liberados: data2?.length || 0 };
+    }
+    return err(error);
+  }
+  return { liberados: data?.length || 0 };
+}
+
 async function upsertDevotoVenta(orgId, cargadorData) {
   const whatsapp = cargadorData.whatsapp?.replace(/\D/g, '');
   const cuiNorm = normalizarCui(cargadorData.cui_o_identificacion);

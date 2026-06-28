@@ -860,6 +860,33 @@ export function reservarBrazoMock(brazoId, mesaId, vendedorId, organizacionId) {
   return { data: actualizado };
 }
 
+export function liberarReservasTaquillaExpiradasMock(organizacionId) {
+  const now = Date.now();
+  let liberados = 0;
+  store.brazos = store.brazos.map((b) => {
+    if (
+      b.organizacion_id !== organizacionId ||
+      b.estado !== 'reservado' ||
+      b.reserva_apartado ||
+      !b.bloqueado_hasta ||
+      new Date(b.bloqueado_hasta).getTime() >= now
+    ) {
+      return b;
+    }
+    liberados += 1;
+    const libre = {
+      ...b,
+      estado: 'disponible',
+      bloqueado_hasta: null,
+      mesa_id: null,
+      vendedor_id: null,
+    };
+    emit('brazos', { eventType: 'UPDATE', new: libre });
+    return libre;
+  });
+  return { liberados };
+}
+
 export function confirmarVentaMock(brazoId, cargadorData, precioPagado, organizacionId, pagoData = {}) {
   const brazo = store.brazos.find(
     (b) => b.id === brazoId && b.organizacion_id === organizacionId

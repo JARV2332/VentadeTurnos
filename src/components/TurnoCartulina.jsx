@@ -4,9 +4,11 @@ import { repertorioTurnoLista } from '../utils/turnoUtils';
 import { combinarFechaHoraTurno } from '../utils/turnoHorarioUtils';
 import { etiquetaAsignado } from '../utils/importReservasUtils';
 import { resumenApartadosTurno } from '../utils/apartadosDisplayUtils';
+import { esReservaTaquillaExpirada } from '../utils/reservasTaquillaUtils';
 
 /** Prioridad visual: vendido > apartado formal > reserva taquilla > disponible */
 function claseEstadoVisualBrazo(brazo) {
+  if (esReservaTaquillaExpirada(brazo)) return 'espacio--disponible';
   switch (brazo.estado) {
     case 'vendido':
       return 'espacio--vendido';
@@ -20,12 +22,15 @@ function claseEstadoVisualBrazo(brazo) {
 }
 
 export default function EspacioBrazo({ brazo, selected, destacado, onClick, readOnly = false }) {
+  const reservaExpirada = esReservaTaquillaExpirada(brazo);
   const vendido = brazo.estado === 'vendido';
   const asignado = etiquetaAsignado(brazo, brazo.cargador);
-  const esApartado = brazo.estado === 'reservado' && brazo.reserva_apartado;
+  const esApartado = brazo.estado === 'reservado' && brazo.reserva_apartado && !reservaExpirada;
   const estadoLegible =
     brazo.estado === 'vendido'
       ? 'Vendido'
+      : reservaExpirada
+        ? 'Libre (reserva expirada)'
       : esApartado
         ? 'Apartado'
         : brazo.estado === 'reservado'

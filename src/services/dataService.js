@@ -105,6 +105,11 @@ export const reservarBrazo = (brazoId, mesaId, vendedorId, organizacionId) =>
     ? sb.reservarBrazo(brazoId, mesaId, vendedorId)
     : Promise.resolve(mock.reservarBrazoMock(brazoId, mesaId, vendedorId, organizacionId));
 
+export const liberarReservasTaquillaExpiradas = (organizacionId) =>
+  isSupabaseBackend()
+    ? sb.liberarReservasTaquillaExpiradas(organizacionId)
+    : Promise.resolve(mock.liberarReservasTaquillaExpiradasMock(organizacionId));
+
 export const confirmarVenta = (brazoId, cargadorData, precio, organizacionId, pagoData) =>
   isSupabaseBackend()
     ? sb.confirmarVenta(brazoId, { ...cargadorData, organizacion_id: organizacionId }, precio, pagoData)

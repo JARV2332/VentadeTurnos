@@ -11,6 +11,7 @@ import {
   getBrazosByOrg,
   subscribeData,
   reservarBrazo,
+  liberarReservasTaquillaExpiradas,
   confirmarVentaCompra,
   buscarCargadorPorCui,
   getCargadorById,
@@ -228,6 +229,9 @@ export default function Taquilla() {
   const refresh = useCallback(async () => {
     if (!cortejoId) return;
     try {
+      if (organizacionId) {
+        await liberarReservasTaquillaExpiradas(organizacionId);
+      }
       let lista = await getTurnosAgrupados(cortejoId, organizacionId);
       if (!Array.isArray(lista)) lista = [];
       setTurnosTodos(lista);
@@ -288,6 +292,14 @@ export default function Taquilla() {
     });
     return unsub;
   }, [organizacionId, refreshCortejos, refresh]);
+
+  useEffect(() => {
+    if (!organizacionId || pasoVenta >= 1) return undefined;
+    const id = setInterval(() => {
+      refresh();
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [organizacionId, pasoVenta, refresh]);
 
   useEffect(() => {
     const cortejoParam = searchParams.get('cortejo');
@@ -570,8 +582,8 @@ export default function Taquilla() {
       {reservasColgadas > 0 && !ventaAbierta && (
         <div className="alert alert--warning taquilla-reservas-colgadas no-print">
           <strong>{reservasColgadas}</strong> reserva(s) de taquilla sin confirmar hace más de{' '}
-          {MINUTOS_RESERVA_TAQUILLA_COLGADA} minutos. Los brazos reservados expirados vuelven a
-          estar libres al tocarlos; revise si algún operador dejó una venta a medias.
+          {MINUTOS_RESERVA_TAQUILLA_COLGADA} minutos. Las reservas de taquilla expiran a los 5 minutos
+          y se liberan solas; los <strong>apartados formales</strong> (naranja) no expiran por tiempo.
         </div>
       )}
 
