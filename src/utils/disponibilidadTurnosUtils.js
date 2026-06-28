@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import { labelTipoTurno, formatQ } from './cajaReportUtils';
 import { formatHoraDisplay } from './turnoHorarioUtils';
+import { etiquetaHonorTurno, textoMelodiaTurno } from './turnoUtils';
 
 function brazosDeTurno(turno) {
   return [...(turno?.izquierda || []), ...(turno?.derecha || [])];
@@ -45,7 +46,9 @@ export function construirFilaDisponibilidad(turno) {
   return {
     turno,
     numero: turno.numero_turno,
+    nombre: etiquetaHonorTurno(turno),
     honor: turno.etiqueta || labelTipoTurno(turno.tipo_turno),
+    melodias: textoMelodiaTurno(turno) || '—',
     tipo: turno.tipo_turno,
     hora: turno.hora_estimada ? formatHoraDisplay(turno.hora_estimada) : '—',
     precio: formatQ(turno.precio),
@@ -119,7 +122,8 @@ export function exportDisponibilidadExcel({ filas, cortejoNombre, orgNombre = ''
     XLSX.utils.json_to_sheet(
       (filas || []).map((f) => ({
         Turno: f.numero,
-        Honor: f.honor,
+        Nombre: f.nombre,
+        'Melodías / son': f.melodias === '—' ? '' : f.melodias,
         Hora: f.hora,
         Precio: f.precio,
         'Total brazos': f.total,
@@ -157,7 +161,8 @@ function buildDisponibilidadHtml({ filas, cortejoNombre, orgNombre = '', resumen
       (f) => `
     <tr class="${f.disponibles === 0 ? 'fila-llena' : ''}">
       <td><strong>#${escapeHtml(f.numero)}</strong></td>
-      <td>${escapeHtml(f.honor)}</td>
+      <td>${escapeHtml(f.nombre)}</td>
+      <td class="melodias">${escapeHtml(f.melodias)}</td>
       <td>${escapeHtml(f.hora)}</td>
       <td>${escapeHtml(f.precio)}</td>
       <td class="num">${f.total}</td>
@@ -196,6 +201,7 @@ function buildDisponibilidadHtml({ filas, cortejoNombre, orgNombre = '', resumen
     .num { text-align: center; }
     .num--libre { background: #ecfdf5; color: #047857; }
     .detalle { font-size: 7.5px; }
+    .melodias { font-size: 7.5px; line-height: 1.35; }
     .fila-llena td { color: #94a3b8; }
     @media print { .toolbar { display: none !important; } }
   </style>
@@ -217,20 +223,21 @@ function buildDisponibilidadHtml({ filas, cortejoNombre, orgNombre = '', resumen
   <table>
     <thead>
       <tr>
-        <th style="width:5%">Turno</th>
-        <th style="width:14%">Honor</th>
-        <th style="width:7%">Hora</th>
-        <th style="width:7%">Precio</th>
-        <th style="width:5%">Total</th>
-        <th style="width:5%">Libres</th>
-        <th style="width:5%">Vend.</th>
-        <th style="width:5%">Apart.</th>
-        <th style="width:5%">Res.</th>
-        <th style="width:5%">% libre</th>
-        <th style="width:37%">Brazos libres (detalle)</th>
+        <th style="width:4%">Turno</th>
+        <th style="width:12%">Nombre</th>
+        <th style="width:22%">Melodías / son</th>
+        <th style="width:6%">Hora</th>
+        <th style="width:6%">Precio</th>
+        <th style="width:4%">Total</th>
+        <th style="width:4%">Libres</th>
+        <th style="width:4%">Vend.</th>
+        <th style="width:4%">Apart.</th>
+        <th style="width:4%">Res.</th>
+        <th style="width:4%">% libre</th>
+        <th style="width:26%">Brazos libres (detalle)</th>
       </tr>
     </thead>
-    <tbody>${rows || '<tr><td colspan="11">Sin turnos.</td></tr>'}</tbody>
+    <tbody>${rows || '<tr><td colspan="12">Sin turnos.</td></tr>'}</tbody>
   </table>
   <script>window.addEventListener('load', function(){ setTimeout(function(){ window.print(); }, 400); });</script>
 </body>

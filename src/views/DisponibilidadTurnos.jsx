@@ -217,7 +217,8 @@ export default function DisponibilidadTurnos() {
               <thead>
                 <tr>
                   <th>Turno</th>
-                  <th>Honor / tipo</th>
+                  <th>Nombre</th>
+                  <th>Melodías / son</th>
                   <th>Hora</th>
                   <th>Precio</th>
                   <th>Total</th>
@@ -239,11 +240,14 @@ export default function DisponibilidadTurnos() {
                     <td>
                       <strong>#{f.numero}</strong>
                     </td>
-                    <td>{f.honor}</td>
+                    <td>{f.nombre}</td>
+                    <td>
+                      <span className="disponibilidad-turnos__melodias">{f.melodias}</span>
+                    </td>
                     <td>{f.hora}</td>
                     <td>{f.precio}</td>
                     <td>{f.total}</td>
-                    <td>
+                    <td className={f.disponibles > 0 ? 'disponibilidad-turnos__celda-libres' : undefined}>
                       <strong
                         className={
                           f.disponibles > 0

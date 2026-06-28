@@ -2565,7 +2565,16 @@ html {
   word-break: break-word;
 }
 
-.disponibilidad-turnos__tabla td:nth-child(6) {
+.disponibilidad-turnos__melodias {
+  display: block;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  word-break: break-word;
+  max-width: 16rem;
+}
+
+.disponibilidad-turnos__celda-libres,
+.disponibilidad-turnos__tabla td.disponibilidad-turnos__celda-libres {
   background: #f0fdf4;
 }
 
