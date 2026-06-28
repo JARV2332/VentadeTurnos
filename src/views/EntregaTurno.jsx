@@ -58,8 +58,8 @@ export default function EntregaTurno() {
       setComprasPorId(Object.fromEntries((compras || []).map((c) => [c.id, c])));
 
       const turnoIds = [...new Set((vendidos || []).map((b) => b.turno_id).filter(Boolean))];
-      const turnos = turnoIds.length ? await getTurnosByIds(turnoIds) : [];
-      setTurnosPorId(Object.fromEntries((turnos || []).map((t) => [t.id, t])));
+      const turnosMap = turnoIds.length ? await getTurnosByIds(turnoIds) : {};
+      setTurnosPorId(turnosMap && typeof turnosMap === 'object' ? turnosMap : {});
 
       setFiltroCortejo((prev) => {
         if (prev && (cortejosData || []).some((c) => c.id === prev)) return prev;

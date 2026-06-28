@@ -48,8 +48,8 @@ export default function ApartadosPendientes() {
             .filter(Boolean)
         ),
       ];
-      const turnos = turnoIds.length ? await getTurnosByIds(turnoIds) : [];
-      setTurnosPorId(Object.fromEntries((turnos || []).map((t) => [t.id, t])));
+      const turnosMap = turnoIds.length ? await getTurnosByIds(turnoIds) : {};
+      setTurnosPorId(turnosMap && typeof turnosMap === 'object' ? turnosMap : {});
     } catch (err) {
       setError(err.message || 'No se pudo cargar el reporte de apartados.');
     } finally {
