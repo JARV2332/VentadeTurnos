@@ -2559,12 +2559,6 @@ html {
   opacity: 0.72;
 }
 
-.disponibilidad-turnos__detalle-brazos {
-  font-size: 0.78rem;
-  line-height: 1.35;
-  word-break: break-word;
-}
-
 .disponibilidad-turnos__melodias {
   display: block;
   font-size: 0.78rem;

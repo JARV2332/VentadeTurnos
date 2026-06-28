@@ -227,7 +227,6 @@ export default function DisponibilidadTurnos() {
                   <th>Apartados</th>
                   <th>Res. taquilla</th>
                   <th>% libre</th>
-                  <th>Brazos libres</th>
                   <th className="no-print">Acciones</th>
                 </tr>
               </thead>
@@ -262,11 +261,6 @@ export default function DisponibilidadTurnos() {
                     <td>{f.apartados}</td>
                     <td>{f.reservaTaquilla}</td>
                     <td>{f.pctLibre}%</td>
-                    <td>
-                      <span className="disponibilidad-turnos__detalle-brazos">
-                        {f.brazosLibresTexto}
-                      </span>
-                    </td>
                     <td className="no-print">
                       {f.disponibles > 0 ? (
                         <Link

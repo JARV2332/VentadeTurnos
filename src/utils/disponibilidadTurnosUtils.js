@@ -7,11 +7,6 @@ function brazosDeTurno(turno) {
   return [...(turno?.izquierda || []), ...(turno?.derecha || [])];
 }
 
-function etiquetaBrazoCorto(brazo) {
-  const lado = brazo.lado?.[0] || '';
-  return `${brazo.numero_brazo}${lado ? ` ${lado}` : ''}`;
-}
-
 export function contarBrazosTurno(turno) {
   const brazos = brazosDeTurno(turno);
   const disponibles = brazos.filter((b) => b.estado === 'disponible');
@@ -28,13 +23,6 @@ export function contarBrazosTurno(turno) {
     apartados: apartados.length,
     reservaTaquilla: reservaTaquilla.length,
     ocupados: brazos.length - disponibles.length,
-    brazosLibres: disponibles
-      .sort(
-        (a, b) =>
-          (a.numero_brazo || 0) - (b.numero_brazo || 0) ||
-          String(a.lado || '').localeCompare(String(b.lado || ''))
-      )
-      .map(etiquetaBrazoCorto),
   };
 }
 
@@ -55,7 +43,6 @@ export function construirFilaDisponibilidad(turno) {
     ...c,
     pctLibre,
     pctOcupado,
-    brazosLibresTexto: c.brazosLibres.length ? c.brazosLibres.join(', ') : '—',
     estadoTurno: c.disponibles === 0 ? 'lleno' : c.disponibles === c.total ? 'libre' : 'parcial',
   };
 }
@@ -132,7 +119,6 @@ export function exportDisponibilidadExcel({ filas, cortejoNombre, orgNombre = ''
         Apartados: f.apartados,
         'Reserva taquilla': f.reservaTaquilla,
         '% libre': f.pctLibre,
-        'Brazos libres': f.brazosLibresTexto,
       }))
     ),
     'Por turno'
@@ -171,7 +157,6 @@ function buildDisponibilidadHtml({ filas, cortejoNombre, orgNombre = '', resumen
       <td class="num">${f.apartados}</td>
       <td class="num">${f.reservaTaquilla}</td>
       <td class="num">${f.pctLibre}%</td>
-      <td class="detalle">${escapeHtml(f.brazosLibresTexto)}</td>
     </tr>`
     )
     .join('');
@@ -200,7 +185,6 @@ function buildDisponibilidadHtml({ filas, cortejoNombre, orgNombre = '', resumen
     th { background: #e2e8f0; font-size: 7.5px; text-transform: uppercase; }
     .num { text-align: center; }
     .num--libre { background: #ecfdf5; color: #047857; }
-    .detalle { font-size: 7.5px; }
     .melodias { font-size: 7.5px; line-height: 1.35; }
     .fila-llena td { color: #94a3b8; }
     @media print { .toolbar { display: none !important; } }
@@ -223,21 +207,20 @@ function buildDisponibilidadHtml({ filas, cortejoNombre, orgNombre = '', resumen
   <table>
     <thead>
       <tr>
-        <th style="width:4%">Turno</th>
-        <th style="width:12%">Nombre</th>
-        <th style="width:22%">Melodías / son</th>
-        <th style="width:6%">Hora</th>
-        <th style="width:6%">Precio</th>
-        <th style="width:4%">Total</th>
-        <th style="width:4%">Libres</th>
-        <th style="width:4%">Vend.</th>
-        <th style="width:4%">Apart.</th>
-        <th style="width:4%">Res.</th>
-        <th style="width:4%">% libre</th>
-        <th style="width:26%">Brazos libres (detalle)</th>
+        <th style="width:5%">Turno</th>
+        <th style="width:14%">Nombre</th>
+        <th style="width:32%">Melodías / son</th>
+        <th style="width:7%">Hora</th>
+        <th style="width:7%">Precio</th>
+        <th style="width:5%">Total</th>
+        <th style="width:5%">Libres</th>
+        <th style="width:5%">Vend.</th>
+        <th style="width:5%">Apart.</th>
+        <th style="width:5%">Res.</th>
+        <th style="width:5%">% libre</th>
       </tr>
     </thead>
-    <tbody>${rows || '<tr><td colspan="12">Sin turnos.</td></tr>'}</tbody>
+    <tbody>${rows || '<tr><td colspan="11">Sin turnos.</td></tr>'}</tbody>
   </table>
   <script>window.addEventListener('load', function(){ setTimeout(function(){ window.print(); }, 400); });</script>
 </body>
