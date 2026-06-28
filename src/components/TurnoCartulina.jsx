@@ -5,16 +5,32 @@ import { combinarFechaHoraTurno } from '../utils/turnoHorarioUtils';
 import { etiquetaAsignado } from '../utils/importReservasUtils';
 import { resumenApartadosTurno } from '../utils/apartadosDisplayUtils';
 
-const ESTADO_CLASS = {
-  disponible: 'espacio--disponible',
-  reservado: 'espacio--reservado',
-  vendido: 'espacio--vendido',
-};
+/** Prioridad visual: vendido > apartado formal > reserva taquilla > disponible */
+function claseEstadoVisualBrazo(brazo) {
+  switch (brazo.estado) {
+    case 'vendido':
+      return 'espacio--vendido';
+    case 'disponible':
+      return 'espacio--disponible';
+    case 'reservado':
+      return brazo.reserva_apartado ? 'espacio--apartado' : 'espacio--reservado';
+    default:
+      return '';
+  }
+}
 
 export default function EspacioBrazo({ brazo, selected, destacado, onClick, readOnly = false }) {
   const vendido = brazo.estado === 'vendido';
   const asignado = etiquetaAsignado(brazo, brazo.cargador);
-  const esApartado = brazo.reserva_apartado && brazo.estado === 'reservado';
+  const esApartado = brazo.estado === 'reservado' && brazo.reserva_apartado;
+  const estadoLegible =
+    brazo.estado === 'vendido'
+      ? 'Vendido'
+      : esApartado
+        ? 'Apartado'
+        : brazo.estado === 'reservado'
+          ? 'Reserva taquilla'
+          : brazo.estado;
   const displayNombre =
     asignado && asignado !== 'Apartado'
       ? asignado.split(' ').slice(0, 2).join(' ')
@@ -23,7 +39,7 @@ export default function EspacioBrazo({ brazo, selected, destacado, onClick, read
         : null;
   const titleParts = [
     `Brazo ${brazo.numero_brazo} ${brazo.lado}`,
-    brazo.estado,
+    estadoLegible,
     asignado ? `→ ${asignado}` : '',
     brazo.apartado_notas ? `(${brazo.apartado_notas})` : '',
   ].filter(Boolean);
@@ -31,9 +47,7 @@ export default function EspacioBrazo({ brazo, selected, destacado, onClick, read
   return (
     <button
       type="button"
-      className={`espacio-brazo ${ESTADO_CLASS[brazo.estado] || ''} ${
-        brazo.reserva_apartado ? 'espacio-brazo--apartado' : ''
-      } ${selected ? 'espacio-brazo--selected' : ''} ${
+      className={`espacio-brazo ${claseEstadoVisualBrazo(brazo)} ${selected ? 'espacio-brazo--selected' : ''} ${
         destacado ? 'espacio-brazo--destacado' : ''
       } ${readOnly ? 'espacio-brazo--readonly' : ''}`}
       onClick={() => !readOnly && onClick(brazo)}

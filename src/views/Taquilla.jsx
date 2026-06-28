@@ -613,11 +613,19 @@ export default function Taquilla() {
             <option value="Salida">Salida</option>
           </select>
         </label>
-        <div className="taquilla-legend">
-          <span className="legend-dot legend-dot--disponible" /> Libre
-          <span className="legend-dot legend-dot--apartado" /> Apartado
-          <span className="legend-dot legend-dot--reservado" /> Reservado
-          <span className="legend-dot legend-dot--vendido" /> Vendido
+        <div className="taquilla-legend" aria-label="Leyenda de colores de brazos">
+          <span className="taquilla-legend__item">
+            <span className="legend-dot legend-dot--disponible" aria-hidden /> Libre
+          </span>
+          <span className="taquilla-legend__item">
+            <span className="legend-dot legend-dot--apartado" aria-hidden /> Apartado
+          </span>
+          <span className="taquilla-legend__item">
+            <span className="legend-dot legend-dot--reservado" aria-hidden /> Reserva taquilla
+          </span>
+          <span className="taquilla-legend__item">
+            <span className="legend-dot legend-dot--vendido" aria-hidden /> Vendido
+          </span>
           <span className="taquilla-legend__hint">Toque varios brazos para una misma compra</span>
         </div>
       </div>

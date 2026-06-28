@@ -1097,9 +1097,16 @@ html {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
   font-size: 0.8rem;
   color: var(--text-muted);
+}
+
+.taquilla-legend__item {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
 }
 
 .legend-dot {
@@ -1110,10 +1117,10 @@ html {
   margin-right: 0.35rem;
 }
 
-.legend-dot--disponible { background: #e2e8f0; }
-.legend-dot--apartado { background: #fbbf24; border: 1px solid #b45309; }
-.legend-dot--reservado { background: #fde68a; }
-.legend-dot--vendido { background: #475569; }
+.legend-dot--disponible { background: #f1f5f9; border: 1px solid #cbd5e1; }
+.legend-dot--apartado { background: #fffbeb; border: 1px solid #b45309; }
+.legend-dot--reservado { background: #fef9c3; border: 1px solid #fbbf24; }
+.legend-dot--vendido { background: #1e293b; border: 1px solid #0f172a; }
 
 .taquilla-busqueda-apartados {
   margin: -0.5rem 0 1.25rem;
@@ -1208,6 +1215,37 @@ html {
   flex: 1 0 auto;
   min-height: 0;
   overflow: visible;
+}
+
+/* Taquilla: colores de brazo más contrastados (evita confundir apartado/reservado/vendido) */
+.app-content--taquilla .espacio--disponible {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #334155;
+}
+
+.app-content--taquilla .espacio--apartado {
+  background: #fffbeb;
+  border-color: #b45309;
+  color: #78350f;
+  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.35);
+}
+
+.app-content--taquilla .espacio--reservado {
+  background: #fef9c3;
+  border-color: #eab308;
+  color: #854d0e;
+}
+
+.app-content--taquilla .espacio--vendido {
+  background: #1e293b;
+  border-color: #0f172a;
+  color: #e2e8f0;
+  opacity: 1;
+}
+
+.app-content--taquilla .espacio--vendido .espacio-brazo__asignado {
+  color: #cbd5e1;
 }
 
 .taquilla-layout {
@@ -1575,8 +1613,14 @@ html {
   transform: scale(1.08);
 }
 
+.espacio--apartado {
+  background: #fffbeb;
+  border-color: #b45309;
+  color: #92400e;
+}
+
 .espacio--reservado {
-  background: var(--warning-bg);
+  background: #fef9c3;
   border-color: #fbbf24;
   color: #92400e;
 }
@@ -1585,7 +1629,7 @@ html {
   background: #334155;
   border-color: #1e293b;
   color: #94a3b8;
-  opacity: 0.7;
+  opacity: 0.85;
 }
 
 .espacio-brazo--selected {
@@ -5770,11 +5814,6 @@ html {
   font-size: 0.78rem;
 }
 
-.espacio-brazo--apartado {
-  border-color: #b45309 !important;
-  background: #fffbeb !important;
-}
-
 .espacio-brazo--destacado {
   box-shadow: 0 0 0 2px #2563eb, 0 0 0 4px rgba(37, 99, 235, 0.25);
   z-index: 1;
@@ -5789,8 +5828,16 @@ html {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #92400e;
   font-weight: 600;
+}
+
+.espacio--vendido .espacio-brazo__asignado {
+  color: #cbd5e1;
+}
+
+.espacio--apartado .espacio-brazo__asignado,
+.espacio--reservado .espacio-brazo__asignado {
+  color: #92400e;
 }
 
 /* ── Perfil de usuario ── */
