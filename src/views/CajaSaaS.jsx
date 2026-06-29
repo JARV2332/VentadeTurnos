@@ -8,12 +8,17 @@ import EditDevotoModal from '../components/EditDevotoModal';
 import { useAuth } from '../context/AuthContext';
 import {
   getFinanzasByOrg,
+  getComprasByOrg,
   subscribeData,
   buscarBoletaPorCodigo,
   anularVentaPorCodigo,
   actualizarPagoPorCodigo,
   updateDevoto,
 } from '../services/dataService';
+import {
+  auditarVentasCaja,
+  formatAlertaReciboRapido,
+} from '../utils/cajaAuditoriaUtils';
 import { labelMetodoPago } from '../utils/pagoUtils';
 import {
   filtrarVentasCaja,
@@ -30,6 +35,7 @@ import { formatHoraVentaGt } from '../utils/turnoHorarioUtils';
 export default function CajaSaaS() {
   const { organizacionId, organizacion } = useAuth();
   const [finanzas, setFinanzas] = useState(null);
+  const [compras, setCompras] = useState([]);
   const [filtroMesa, setFiltroMesa] = useState('all');
   const [filtroVendedor, setFiltroVendedor] = useState('all');
   const [filtroTipoTurno, setFiltroTipoTurno] = useState('all');
@@ -54,7 +60,11 @@ export default function CajaSaaS() {
 
   const refreshFinanzas = useCallback(async () => {
     try {
-      const data = await getFinanzasByOrg(organizacionId);
+      const [data, comprasData] = await Promise.all([
+        getFinanzasByOrg(organizacionId),
+        getComprasByOrg(organizacionId),
+      ]);
+      setCompras(Array.isArray(comprasData) ? comprasData : []);
       setFinanzas({
         ventas: [],
         recaudado: 0,
@@ -119,6 +129,22 @@ export default function CajaSaaS() {
     });
     return m;
   }, [ventasFiltradas]);
+
+  const comprasFiltradas = useMemo(() => {
+    let lista = Array.isArray(compras) ? [...compras] : [];
+    if (fechaDesde) {
+      lista = lista.filter((c) => fechaVentaKey(c) >= fechaDesde);
+    }
+    if (fechaHasta) {
+      lista = lista.filter((c) => fechaVentaKey(c) <= fechaHasta);
+    }
+    return lista;
+  }, [compras, fechaDesde, fechaHasta]);
+
+  const auditoria = useMemo(
+    () => auditarVentasCaja({ ventas: ventasFiltradas, compras: comprasFiltradas }),
+    [ventasFiltradas, comprasFiltradas]
+  );
 
   const filtrosMeta = useMemo(() => {
     const mesa =
@@ -385,6 +411,107 @@ export default function CajaSaaS() {
           <strong>{formatQ(totalFiltrado)}</strong>
         </div>
       </div>
+
+      {(fechaDesde || fechaHasta) && ventasFiltradas.length > 0 && (
+        <section className="panel caja-auditoria no-print">
+          <h3 className="panel__title">Auditoría del período filtrado</h3>
+          <p className="text-muted config-hint">
+            Busca posibles dobles cobros por desconexión. Cada brazo físico solo puede venderse una
+            vez; si hay alertas, revíselas contra el efectivo en caja.
+          </p>
+          <div className="caja-auditoria__kpis">
+            <div className="metric-card">
+              <span className="metric-card__label">Ventas (brazos)</span>
+              <strong className="metric-card__value">{auditoria.resumen.ventas}</strong>
+            </div>
+            <div className="metric-card">
+              <span className="metric-card__label">Brazos duplicados</span>
+              <strong
+                className={`metric-card__value ${auditoria.resumen.alertasDuplicadoBrazo ? 'caja-auditoria__alerta' : ''}`}
+              >
+                {auditoria.resumen.alertasDuplicadoBrazo}
+              </strong>
+            </div>
+            <div className="metric-card">
+              <span className="metric-card__label">Recibos rápidos mismo devoto</span>
+              <strong
+                className={`metric-card__value ${auditoria.resumen.alertasRecibosRapidos ? 'caja-auditoria__alerta' : ''}`}
+              >
+                {auditoria.resumen.alertasRecibosRapidos}
+              </strong>
+              {auditoria.resumen.montoSospechosoRecibos > 0 && (
+                <small>~{formatQ(auditoria.resumen.montoSospechosoRecibos)} en alertas</small>
+              )}
+            </div>
+            <div className="metric-card">
+              <span className="metric-card__label">Compras huérfanas</span>
+              <strong
+                className={`metric-card__value ${auditoria.resumen.comprasHuerfanas ? 'caja-auditoria__alerta' : ''}`}
+              >
+                {auditoria.resumen.comprasHuerfanas}
+              </strong>
+              {auditoria.resumen.montoComprasHuerfanas > 0 && (
+                <small>{formatQ(auditoria.resumen.montoComprasHuerfanas)}</small>
+              )}
+            </div>
+          </div>
+
+          {auditoria.brazosDuplicados.length > 0 && (
+            <div className="caja-auditoria__bloque">
+              <h4>Brazos vendidos dos veces (error grave)</h4>
+              <ul>
+                {auditoria.brazosDuplicados.map((d) => (
+                  <li key={`${d.turno}-${d.brazo}`}>
+                    Turno #{d.turno} brazo {d.brazo} — boletas:{' '}
+                    {d.registros.map((r) => r.codigo_boleta_qr).join(', ')}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {auditoria.recibosRapidos.length > 0 && (
+            <div className="caja-auditoria__bloque">
+              <h4>Mismo devoto — varios recibos en &lt; 5 min</h4>
+              <ul>
+                {auditoria.recibosRapidos.slice(0, 15).map((a) => (
+                  <li key={`${a.cargador_id}-${a.compras[0]?.ts}-${a.compras[1]?.ts}`}>
+                    {formatAlertaReciboRapido(a)} · recibos:{' '}
+                    {a.compras.map((c) => c.codigo || c.compra_id?.slice(0, 8)).join(' + ')}
+                  </li>
+                ))}
+              </ul>
+              {auditoria.recibosRapidos.length > 15 && (
+                <p className="text-muted">… y {auditoria.recibosRapidos.length - 15} más</p>
+              )}
+            </div>
+          )}
+
+          {auditoria.comprasHuerfanas.length > 0 && (
+            <div className="caja-auditoria__bloque">
+              <h4>Compras en sistema sin brazos vendidos</h4>
+              <ul>
+                {auditoria.comprasHuerfanas.map((c) => (
+                  <li key={c.id}>
+                    {c.codigo_recibo} · {formatQ(c.total_pagado)} ·{' '}
+                    {formatHoraVentaGt(c.pago_confirmado_en)} · {c.operador_nombre || '—'}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {auditoria.resumen.alertasDuplicadoBrazo === 0 &&
+            auditoria.resumen.alertasRecibosRapidos === 0 &&
+            auditoria.resumen.comprasHuerfanas === 0 && (
+              <p className="caja-auditoria__ok">
+                No se detectaron anomalías obvias de duplicado en este período. Si el cuadre sigue
+                fallando, compare efectivo físico vs «Efectivo hoy» y revise ventas marcadas como
+                transferencia.
+              </p>
+            )}
+        </section>
+      )}
 
       {esFiltroHoy && (
         <div className="metrics-grid metrics-grid--3 caja-cierre-hoy no-print">
