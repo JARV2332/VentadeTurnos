@@ -119,7 +119,19 @@ export default function CajaSaaS() {
   );
 
   const hoyKey = useMemo(() => fechaHoyKey(), []);
-  const esFiltroHoy = fechaDesde === hoyKey && fechaHasta === hoyKey;
+  const esUnSoloDia = Boolean(fechaDesde && fechaHasta && fechaDesde === fechaHasta);
+  const esFiltroHoy = esUnSoloDia && fechaDesde === hoyKey;
+  const tieneFiltroFecha = Boolean(fechaDesde || fechaHasta);
+
+  const tituloCierreFiltrado = useMemo(() => {
+    if (esFiltroHoy) return 'Cierre de hoy — ventas';
+    if (esUnSoloDia) return `Cierre del ${formatFechaReporte(fechaDesde)} — ventas`;
+    if (fechaDesde && fechaHasta) {
+      return `Cierre ${formatFechaReporte(fechaDesde)} – ${formatFechaReporte(fechaHasta)} — ventas`;
+    }
+    if (fechaDesde) return `Cierre desde ${formatFechaReporte(fechaDesde)} — ventas`;
+    return `Cierre hasta ${formatFechaReporte(fechaHasta)} — ventas`;
+  }, [esFiltroHoy, esUnSoloDia, fechaDesde, fechaHasta]);
 
   const resumenMetodosDia = useMemo(() => {
     const m = { efectivo: 0, transferencia: 0, tarjeta: 0 };
@@ -412,7 +424,33 @@ export default function CajaSaaS() {
         </div>
       </div>
 
-      {(fechaDesde || fechaHasta) && ventasFiltradas.length > 0 && (
+      {tieneFiltroFecha && ventasFiltradas.length > 0 && (
+        <div className="metrics-grid metrics-grid--3 caja-cierre-hoy no-print">
+          <div className="metric-card metric-card--primary">
+            <span className="metric-card__label">{tituloCierreFiltrado}</span>
+            <strong className="metric-card__value">{ventasFiltradas.length}</strong>
+            <small>Total {formatQ(totalFiltrado)}</small>
+          </div>
+          <div className="metric-card">
+            <span className="metric-card__label">
+              {esFiltroHoy ? 'Efectivo hoy' : 'Efectivo (filtrado)'}
+            </span>
+            <strong className="metric-card__value">{formatQ(resumenMetodosDia.efectivo)}</strong>
+          </div>
+          <div className="metric-card">
+            <span className="metric-card__label">Transferencia / tarjeta</span>
+            <strong className="metric-card__value">
+              {formatQ(resumenMetodosDia.transferencia + resumenMetodosDia.tarjeta)}
+            </strong>
+            <small>
+              Transf. {formatQ(resumenMetodosDia.transferencia)} · Tarj.{' '}
+              {formatQ(resumenMetodosDia.tarjeta)}
+            </small>
+          </div>
+        </div>
+      )}
+
+      {tieneFiltroFecha && ventasFiltradas.length > 0 && (
         <section className="panel caja-auditoria no-print">
           <h3 className="panel__title">Auditoría del período filtrado</h3>
           <p className="text-muted config-hint">
@@ -515,35 +553,11 @@ export default function CajaSaaS() {
               <p className="caja-auditoria__ok">
                 No hay brazos físicos duplicados ni doble cobro del mismo brazo. Las filas seguidas
                 del mismo turno con distinto brazo (mismo VR) son compras normales. Si el cuadre
-                falla, compare efectivo físico vs «Efectivo hoy» y revise transferencias mal
+                falla, compare efectivo físico vs «Efectivo (filtrado)» y revise transferencias mal
                 clasificadas.
               </p>
             )}
         </section>
-      )}
-
-      {esFiltroHoy && (
-        <div className="metrics-grid metrics-grid--3 caja-cierre-hoy no-print">
-          <div className="metric-card metric-card--primary">
-            <span className="metric-card__label">Cierre de hoy — ventas</span>
-            <strong className="metric-card__value">{ventasFiltradas.length}</strong>
-            <small>Total {formatQ(totalFiltrado)}</small>
-          </div>
-          <div className="metric-card">
-            <span className="metric-card__label">Efectivo hoy</span>
-            <strong className="metric-card__value">{formatQ(resumenMetodosDia.efectivo)}</strong>
-          </div>
-          <div className="metric-card">
-            <span className="metric-card__label">Transferencia / tarjeta</span>
-            <strong className="metric-card__value">
-              {formatQ(resumenMetodosDia.transferencia + resumenMetodosDia.tarjeta)}
-            </strong>
-            <small>
-              Transf. {formatQ(resumenMetodosDia.transferencia)} · Tarj.{' '}
-              {formatQ(resumenMetodosDia.tarjeta)}
-            </small>
-          </div>
-        </div>
       )}
 
       <CajaReportePanel
