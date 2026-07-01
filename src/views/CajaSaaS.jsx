@@ -17,7 +17,7 @@ import {
 } from '../services/dataService';
 import {
   auditarVentasCaja,
-  formatAlertaReciboRapido,
+  formatAlertaDobleCobro,
 } from '../utils/cajaAuditoriaUtils';
 import { labelMetodoPago } from '../utils/pagoUtils';
 import {
@@ -416,16 +416,25 @@ export default function CajaSaaS() {
         <section className="panel caja-auditoria no-print">
           <h3 className="panel__title">Auditoría del período filtrado</h3>
           <p className="text-muted config-hint">
-            Busca posibles dobles cobros por desconexión. Cada brazo físico solo puede venderse una
-            vez; si hay alertas, revíselas contra el efectivo en caja.
+            El detalle y el Excel listan <strong>cada brazo en una fila</strong>. Una compra con 2
+            brazos del mismo turno (ej. izquierda y derecha) aparece como 2 filas seguidas con el
+            mismo recibo VR — eso es normal. Solo se alerta si el <strong>mismo brazo físico</strong>{' '}
+            fue cobrado dos veces.
           </p>
           <div className="caja-auditoria__kpis">
             <div className="metric-card">
-              <span className="metric-card__label">Ventas (brazos)</span>
+              <span className="metric-card__label">Brazos vendidos (filas)</span>
               <strong className="metric-card__value">{auditoria.resumen.ventas}</strong>
             </div>
             <div className="metric-card">
-              <span className="metric-card__label">Brazos duplicados</span>
+              <span className="metric-card__label">Compras únicas (VR)</span>
+              <strong className="metric-card__value">{auditoria.resumen.comprasUnicas}</strong>
+              {auditoria.resumen.comprasMultiplesBrazos > 0 && (
+                <small>{auditoria.resumen.comprasMultiplesBrazos} con varios brazos</small>
+              )}
+            </div>
+            <div className="metric-card">
+              <span className="metric-card__label">Brazo físico duplicado</span>
               <strong
                 className={`metric-card__value ${auditoria.resumen.alertasDuplicadoBrazo ? 'caja-auditoria__alerta' : ''}`}
               >
@@ -433,14 +442,14 @@ export default function CajaSaaS() {
               </strong>
             </div>
             <div className="metric-card">
-              <span className="metric-card__label">Recibos rápidos mismo devoto</span>
+              <span className="metric-card__label">Doble cobro mismo brazo</span>
               <strong
-                className={`metric-card__value ${auditoria.resumen.alertasRecibosRapidos ? 'caja-auditoria__alerta' : ''}`}
+                className={`metric-card__value ${auditoria.resumen.alertasDobleCobro ? 'caja-auditoria__alerta' : ''}`}
               >
-                {auditoria.resumen.alertasRecibosRapidos}
+                {auditoria.resumen.alertasDobleCobro}
               </strong>
-              {auditoria.resumen.montoSospechosoRecibos > 0 && (
-                <small>~{formatQ(auditoria.resumen.montoSospechosoRecibos)} en alertas</small>
+              {auditoria.resumen.montoDobleCobro > 0 && (
+                <small>~{formatQ(auditoria.resumen.montoDobleCobro)} en alertas</small>
               )}
             </div>
             <div className="metric-card">
@@ -470,19 +479,18 @@ export default function CajaSaaS() {
             </div>
           )}
 
-          {auditoria.recibosRapidos.length > 0 && (
+          {auditoria.dobleCobroBrazo.length > 0 && (
             <div className="caja-auditoria__bloque">
-              <h4>Mismo devoto — varios recibos en &lt; 5 min</h4>
+              <h4>Mismo brazo cobrado en dos compras distintas</h4>
               <ul>
-                {auditoria.recibosRapidos.slice(0, 15).map((a) => (
+                {auditoria.dobleCobroBrazo.slice(0, 15).map((a) => (
                   <li key={`${a.cargador_id}-${a.compras[0]?.ts}-${a.compras[1]?.ts}`}>
-                    {formatAlertaReciboRapido(a)} · recibos:{' '}
-                    {a.compras.map((c) => c.codigo || c.compra_id?.slice(0, 8)).join(' + ')}
+                    {formatAlertaDobleCobro(a)} · {formatQ(a.totalCombinado)}
                   </li>
                 ))}
               </ul>
-              {auditoria.recibosRapidos.length > 15 && (
-                <p className="text-muted">… y {auditoria.recibosRapidos.length - 15} más</p>
+              {auditoria.dobleCobroBrazo.length > 15 && (
+                <p className="text-muted">… y {auditoria.dobleCobroBrazo.length - 15} más</p>
               )}
             </div>
           )}
@@ -502,12 +510,13 @@ export default function CajaSaaS() {
           )}
 
           {auditoria.resumen.alertasDuplicadoBrazo === 0 &&
-            auditoria.resumen.alertasRecibosRapidos === 0 &&
+            auditoria.resumen.alertasDobleCobro === 0 &&
             auditoria.resumen.comprasHuerfanas === 0 && (
               <p className="caja-auditoria__ok">
-                No se detectaron anomalías obvias de duplicado en este período. Si el cuadre sigue
-                fallando, compare efectivo físico vs «Efectivo hoy» y revise ventas marcadas como
-                transferencia.
+                No hay brazos físicos duplicados ni doble cobro del mismo brazo. Las filas seguidas
+                del mismo turno con distinto brazo (mismo VR) son compras normales. Si el cuadre
+                falla, compare efectivo físico vs «Efectivo hoy» y revise transferencias mal
+                clasificadas.
               </p>
             )}
         </section>

@@ -1,13 +1,17 @@
 import { timestampVenta, formatQ } from './cajaReportUtils';
 import { formatHoraVentaGt } from './turnoHorarioUtils';
 
+function claveBrazoFisico(v) {
+  return `${v.turno_id}|${v.numero_brazo}|${v.lado}`;
+}
+
 /** Mismo brazo físico vendido más de una vez (no debería ocurrir). */
 export function detectarBrazosDuplicados(ventas) {
   const mapa = new Map();
   const duplicados = [];
 
   (ventas || []).forEach((v) => {
-    const key = `${v.turno_id}|${v.numero_brazo}|${v.lado}`;
+    const key = claveBrazoFisico(v);
     if (mapa.has(key)) {
       duplicados.push({
         turno: v.numero_turno,
@@ -22,56 +26,85 @@ export function detectarBrazosDuplicados(ventas) {
   return duplicados;
 }
 
-/**
- * Mismo devoto con varios recibos (VR) en pocos minutos — posible doble cobro por reconexión.
- * ventanaMs default 5 min.
- */
-export function detectarRecibosRapidosMismoDevoto(ventas, ventanaMs = 5 * 60 * 1000) {
-  const porDevoto = new Map();
+/** Agrupa filas del detalle (1 fila = 1 brazo) en compras lógicas VR/VT. */
+export function agruparVentasPorCompra(ventas, compras = []) {
+  const recibosPorId = Object.fromEntries(
+    (compras || []).map((c) => [c.id, c.codigo_recibo])
+  );
+  const mapa = new Map();
 
   (ventas || []).forEach((v) => {
-    if (!v.cargador_id) return;
-    if (!porDevoto.has(v.cargador_id)) porDevoto.set(v.cargador_id, []);
-    porDevoto.get(v.cargador_id).push(v);
+    const key = v.compra_id ? `c:${v.compra_id}` : `vt:${v.codigo_boleta_qr || v.id}`;
+    if (!mapa.has(key)) {
+      mapa.set(key, {
+        compra_id: v.compra_id || null,
+        codigo_recibo: v.compra_id ? recibosPorId[v.compra_id] || null : null,
+        cargador_id: v.cargador_id || null,
+        ts: timestampVenta(v),
+        total: 0,
+        brazos: [],
+        clavesBrazo: new Set(),
+        turnos: new Set(),
+        operador: v.operador_nombre || '—',
+      });
+    }
+    const g = mapa.get(key);
+    g.total += Number(v.precio_pagado || 0);
+    g.brazos.push({
+      turno: v.numero_turno,
+      numero: v.numero_brazo,
+      lado: v.lado,
+      codigo: v.codigo_boleta_qr,
+    });
+    g.clavesBrazo.add(claveBrazoFisico(v));
+    g.turnos.add(v.numero_turno);
+    const ts = timestampVenta(v);
+    if (ts != null && (g.ts == null || ts < g.ts)) g.ts = ts;
+  });
+
+  return [...mapa.values()].sort((a, b) => (a.ts || 0) - (b.ts || 0));
+}
+
+function resumenBrazosCompra(compra) {
+  const partes = compra.brazos.map((b) => `#${b.turno} · ${b.numero}${b.lado?.[0] || ''}`);
+  return partes.join(', ');
+}
+
+/**
+ * Mismo devoto, dos compras distintas (VR) en pocos minutos Y el mismo brazo físico en ambas.
+ * Mismo turno con brazos distintos en una o varias compras NO es alerta.
+ */
+export function detectarDobleCobroMismoBrazo(ventas, compras = [], ventanaMs = 5 * 60 * 1000) {
+  const comprasLog = agruparVentasPorCompra(ventas, compras);
+  const porDevoto = new Map();
+
+  comprasLog.forEach((c) => {
+    if (!c.cargador_id) return;
+    if (!porDevoto.has(c.cargador_id)) porDevoto.set(c.cargador_id, []);
+    porDevoto.get(c.cargador_id).push(c);
   });
 
   const alertas = [];
 
   porDevoto.forEach((lista, cargadorId) => {
-    const porCompra = new Map();
-    lista.forEach((v) => {
-      const compraKey = v.compra_id || v.codigo_boleta_qr || v.id;
-      if (!porCompra.has(compraKey)) {
-        porCompra.set(compraKey, {
-          compra_id: v.compra_id,
-          codigo: v.codigo_boleta_qr,
-          ts: timestampVenta(v),
-          total: 0,
-          turnos: new Set(),
-          operador: v.operador_nombre || '—',
-        });
-      }
-      const entry = porCompra.get(compraKey);
-      entry.total += Number(v.precio_pagado || 0);
-      entry.turnos.add(v.numero_turno);
-      const ts = timestampVenta(v);
-      if (ts != null && (entry.ts == null || ts < entry.ts)) entry.ts = ts;
-    });
+    const ordenadas = [...lista].sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    for (let i = 0; i < ordenadas.length; i += 1) {
+      for (let j = i + 1; j < ordenadas.length; j += 1) {
+        const a = ordenadas[i];
+        const b = ordenadas[j];
+        if (a.ts == null || b.ts == null) continue;
+        const diff = b.ts - a.ts;
+        if (diff <= 0 || diff > ventanaMs) continue;
 
-    const compras = [...porCompra.values()].sort((a, b) => (a.ts || 0) - (b.ts || 0));
-    if (compras.length < 2) return;
+        const solapados = [...a.clavesBrazo].filter((k) => b.clavesBrazo.has(k));
+        if (!solapados.length) continue;
 
-    for (let i = 1; i < compras.length; i += 1) {
-      const prev = compras[i - 1];
-      const curr = compras[i];
-      if (prev.ts == null || curr.ts == null) continue;
-      const diff = curr.ts - prev.ts;
-      if (diff > 0 && diff <= ventanaMs) {
         alertas.push({
           cargador_id: cargadorId,
           minutosEntre: Math.max(1, Math.round(diff / 60000)),
-          compras: [prev, curr],
-          totalCombinado: prev.total + curr.total,
+          compras: [a, b],
+          brazosSolapados: solapados.length,
+          totalCombinado: a.total + b.total,
         });
       }
     }
@@ -95,34 +128,49 @@ export function detectarComprasHuerfanas(compras, ventas) {
 
 export function auditarVentasCaja({ ventas, compras = [] }) {
   const lista = ventas || [];
+  const comprasAgrupadas = agruparVentasPorCompra(lista, compras);
   const brazosDuplicados = detectarBrazosDuplicados(lista);
-  const recibosRapidos = detectarRecibosRapidosMismoDevoto(lista);
+  const dobleCobroBrazo = detectarDobleCobroMismoBrazo(lista, compras);
   const comprasHuerfanas = detectarComprasHuerfanas(compras, lista);
 
-  const totalRecibosRapidos = recibosRapidos.reduce((s, a) => s + a.totalCombinado, 0);
+  const totalDobleCobro = dobleCobroBrazo.reduce((s, a) => s + a.totalCombinado, 0);
   const totalHuerfanas = comprasHuerfanas.reduce(
     (s, c) => s + Number(c.total_pagado || 0),
     0
   );
 
+  const comprasMultiplesBrazos = comprasAgrupadas.filter((c) => c.brazos.length > 1).length;
+
   return {
+    comprasAgrupadas,
     brazosDuplicados,
-    recibosRapidos,
+    dobleCobroBrazo,
     comprasHuerfanas,
     resumen: {
       ventas: lista.length,
+      comprasUnicas: comprasAgrupadas.length,
+      comprasMultiplesBrazos,
       alertasDuplicadoBrazo: brazosDuplicados.length,
-      alertasRecibosRapidos: recibosRapidos.length,
+      alertasDobleCobro: dobleCobroBrazo.length,
       comprasHuerfanas: comprasHuerfanas.length,
-      montoSospechosoRecibos: totalRecibosRapidos,
+      montoDobleCobro: totalDobleCobro,
       montoComprasHuerfanas: totalHuerfanas,
     },
   };
 }
 
-export function formatAlertaReciboRapido(alerta) {
+export function formatAlertaDobleCobro(alerta) {
   const [a, b] = alerta.compras;
   const horaA = a.ts ? formatHoraVentaGt(new Date(a.ts).toISOString()) : '—';
   const horaB = b.ts ? formatHoraVentaGt(new Date(b.ts).toISOString()) : '—';
-  return `${horaA} y ${horaB} (${alerta.minutosEntre} min) · ${formatQ(alerta.totalCombinado)}`;
+  const recA = a.codigo_recibo || a.brazos[0]?.codigo || '—';
+  const recB = b.codigo_recibo || b.brazos[0]?.codigo || '—';
+  return `${horaA} (${recA}: ${resumenBrazosCompra(a)}) y ${horaB} (${recB}: ${resumenBrazosCompra(b)}) · ${alerta.brazosSolapados} brazo(s) repetido(s)`;
+}
+
+export function formatCompraAgrupada(compra) {
+  const hora = compra.ts ? formatHoraVentaGt(new Date(compra.ts).toISOString()) : '—';
+  const recibo = compra.codigo_recibo || compra.brazos[0]?.codigo || '—';
+  const turnos = [...compra.turnos].sort((a, b) => a - b).join(', ');
+  return `${hora} · ${recibo} · turno(s) ${turnos} · ${compra.brazos.length} brazo(s) · ${formatQ(compra.total)}`;
 }
