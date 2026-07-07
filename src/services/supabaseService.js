@@ -1194,7 +1194,7 @@ export async function confirmarVenta(brazoId, cargadorData, precioPagado, pagoDa
 }
 
 const COMPRA_LIST_FIELDS =
-  'id, organizacion_id, codigo_recibo, total_pagado, cargador_id, vendedor_id, operador_nombre, metodo_pago, comprobante_url, estado, pago_confirmado_en, created_at, updated_at';
+  'id, organizacion_id, codigo_recibo, total_pagado, cargador_id, vendedor_id, operador_nombre, metodo_pago, comprobante_url, estado, pago_confirmado_en, created_at';
 
 export async function getComprasByOrg(organizacionId) {
   const { data, error } = await supabase
