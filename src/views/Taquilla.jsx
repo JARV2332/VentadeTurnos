@@ -79,6 +79,8 @@ export default function Taquilla() {
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 1024px)').matches
   );
   const ventaPanelRef = useRef(null);
+  const ultimaLiberacionRef = useRef(0);
+  const LIBERAR_RESERVAS_CADA_MS = 3 * 60 * 1000;
 
   const ventaAbierta = carrito.length > 0;
   const cobroAbierto = ventaAbierta && pasoVenta >= 1;
@@ -229,7 +231,11 @@ export default function Taquilla() {
     if (!cortejoId) return;
     try {
       if (organizacionId) {
-        await liberarReservasTaquillaExpiradas(organizacionId);
+        const ahora = Date.now();
+        if (ahora - ultimaLiberacionRef.current >= LIBERAR_RESERVAS_CADA_MS) {
+          ultimaLiberacionRef.current = ahora;
+          await liberarReservasTaquillaExpiradas(organizacionId);
+        }
       }
       // Brazos del cortejo activo: getTurnosAgrupados. Colgadas org-wide: count liviano.
       let lista = await getTurnosAgrupados(cortejoId, organizacionId);
