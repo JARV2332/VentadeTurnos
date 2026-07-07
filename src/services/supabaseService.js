@@ -705,12 +705,16 @@ export async function getTurnosByCortejo(cortejoId) {
 }
 
 export async function getBrazosByOrg(organizacionId) {
-  const { data, error } = await supabase
-    .from('brazos')
-    .select('*')
-    .eq('organizacion_id', organizacionId);
-  if (error) throw error;
-  return data || [];
+  if (!organizacionId) return [];
+  return fetchPaginatedRows((from, to) =>
+    supabase
+      .from('brazos')
+      .select(BRAZO_LIST_FIELDS)
+      .eq('organizacion_id', organizacionId)
+      .order('turno_id')
+      .order('numero_brazo')
+      .range(from, to)
+  );
 }
 
 /** Solo ventas confirmadas, paginado (Impresión / finanzas). */
