@@ -8,7 +8,7 @@ import {
   getCortejosByOrg,
   getTurnosAgrupados,
   getMesasByOrg,
-  getBrazosByOrg,
+  contarReservasTaquillaColgadasOrg,
   subscribeData,
   reservarBrazo,
   liberarReservasTaquillaExpiradas,
@@ -43,7 +43,6 @@ import {
   guardarCortejoPreferido,
 } from '../utils/cortejoPreferidoUtils';
 import {
-  contarReservasTaquillaColgadas,
   MINUTOS_RESERVA_TAQUILLA_COLGADA,
 } from '../utils/reservasTaquillaUtils';
 
@@ -236,8 +235,7 @@ export default function Taquilla() {
       if (!Array.isArray(lista)) lista = [];
       setTurnosTodos(lista);
       if (organizacionId) {
-        const brazos = await getBrazosByOrg(organizacionId);
-        setReservasColgadas(contarReservasTaquillaColgadas(brazos));
+        setReservasColgadas(await contarReservasTaquillaColgadasOrg(organizacionId));
       }
     } catch (err) {
       console.error('Error al actualizar turnos en taquilla:', err);

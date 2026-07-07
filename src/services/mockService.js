@@ -24,6 +24,7 @@ import {
   queryValidaBusquedaDevoto,
 } from '../utils/consultaDevotoUtils';
 import { enriquecerDashboardMetrics } from '../utils/dashboardMetricsUtils';
+import { contarReservasTaquillaColgadas } from '../utils/reservasTaquillaUtils';
 
 let store = crearStoreInicial();
 const listeners = new Set();
@@ -885,6 +886,10 @@ export function liberarReservasTaquillaExpiradasMock(organizacionId) {
     return libre;
   });
   return { liberados };
+}
+
+export function contarReservasTaquillaColgadasOrgMock(organizacionId) {
+  return contarReservasTaquillaColgadas(getBrazosByOrg(organizacionId));
 }
 
 export function confirmarVentaMock(brazoId, cargadorData, precioPagado, organizacionId, pagoData = {}) {

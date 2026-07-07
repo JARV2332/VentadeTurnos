@@ -110,6 +110,13 @@ export const liberarReservasTaquillaExpiradas = (organizacionId) =>
     ? sb.liberarReservasTaquillaExpiradas(organizacionId)
     : Promise.resolve(mock.liberarReservasTaquillaExpiradasMock(organizacionId));
 
+export const contarReservasTaquillaColgadasOrg = (organizacionId) =>
+  isSupabaseBackend()
+    ? sb.contarReservasTaquillaColgadasOrg(organizacionId)
+    : Promise.resolve(
+        mock.contarReservasTaquillaColgadasOrgMock(organizacionId)
+      );
+
 export const confirmarVenta = (brazoId, cargadorData, precio, organizacionId, pagoData) =>
   isSupabaseBackend()
     ? sb.confirmarVenta(brazoId, { ...cargadorData, organizacion_id: organizacionId }, precio, pagoData)

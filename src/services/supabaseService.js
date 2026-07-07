@@ -29,6 +29,7 @@ import {
   queryValidaBusquedaDevoto,
 } from '../utils/consultaDevotoUtils';
 import { enriquecerDashboardMetrics } from '../utils/dashboardMetricsUtils';
+import { MINUTOS_RESERVA_TAQUILLA_COLGADA } from '../utils/reservasTaquillaUtils';
 
 function err(error) {
   if (!error) return null;
@@ -1019,6 +1020,43 @@ export async function liberarReservasTaquillaExpiradas(organizacionId) {
     return err(error);
   }
   return { liberados: data?.length || 0 };
+}
+
+/** Cuenta reservas de taquilla colgadas sin descargar todos los brazos. */
+export async function contarReservasTaquillaColgadasOrg(
+  organizacionId,
+  minutos = MINUTOS_RESERVA_TAQUILLA_COLGADA
+) {
+  if (!organizacionId) return 0;
+  const nowIso = new Date().toISOString();
+  const cutoff = new Date(Date.now() - minutos * 60 * 1000).toISOString();
+
+  let query = supabase
+    .from('brazos')
+    .select('id', { count: 'exact', head: true })
+    .eq('organizacion_id', organizacionId)
+    .eq('estado', 'reservado')
+    .eq('reserva_apartado', false)
+    .not('bloqueado_hasta', 'is', null)
+    .gt('bloqueado_hasta', nowIso)
+    .lt('updated_at', cutoff);
+
+  let { count, error } = await query;
+  if (error && isMissingColumn(error, 'reserva_apartado')) {
+    ({ count, error } = await supabase
+      .from('brazos')
+      .select('id', { count: 'exact', head: true })
+      .eq('organizacion_id', organizacionId)
+      .eq('estado', 'reservado')
+      .not('bloqueado_hasta', 'is', null)
+      .gt('bloqueado_hasta', nowIso)
+      .lt('updated_at', cutoff));
+  }
+  if (error) {
+    console.error('contarReservasTaquillaColgadasOrg:', error);
+    return 0;
+  }
+  return count || 0;
 }
 
 async function upsertDevotoVenta(orgId, cargadorData) {
