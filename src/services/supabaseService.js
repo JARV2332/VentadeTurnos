@@ -719,26 +719,16 @@ export async function getBrazosByOrg(organizacionId) {
 
 /** Solo ventas confirmadas, paginado (Impresión / finanzas). */
 export async function getBrazosVendidosByOrg(organizacionId) {
-  const PAGE = 500;
-  const all = [];
-  let from = 0;
-
-  while (true) {
-    const { data, error } = await supabase
+  if (!organizacionId) return [];
+  return fetchPaginatedRows((from, to) =>
+    supabase
       .from('brazos')
-      .select('*')
+      .select(BRAZO_VENDIDO_FIELDS)
       .eq('organizacion_id', organizacionId)
       .eq('estado', 'vendido')
       .order('updated_at', { ascending: false })
-      .range(from, from + PAGE - 1);
-    if (error) throw error;
-    if (!data?.length) break;
-    all.push(...data);
-    if (data.length < PAGE) break;
-    from += PAGE;
-  }
-
-  return all;
+      .range(from, to)
+  );
 }
 
 export async function getTurnosAgrupados(cortejoId, organizacionId) {
