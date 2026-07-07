@@ -100,3 +100,15 @@ Tras aplicar el SQL, en Supabase → **Database → Replication** activa la publ
 ## 6. Clave anon vs publishable
 
 Si `sb_publishable_...` no funciona con el cliente JS, usa la **anon key** (JWT) de Settings → API.
+
+## 7. Egress y desarrollo (importante)
+
+El plan Free incluye **5 GB/mes de egress** (datos que salen de Supabase vía PostgREST). Para no superar el límite:
+
+- **Desarrollo local:** usa `REACT_APP_MOCK_MODE=true` en `.env` o Supabase local (`docs/SETUP_SUPABASE_LOCAL.md`). No desarrolles contra el proyecto cloud con datos de prueba masivos.
+- **Una pestaña:** evita tener Taquilla, Dashboard e Impresión abiertas a la vez en producción.
+- **No corras** `npm run db:backup` contra cloud salvo respaldo real.
+- **Logos de recibo:** preferible subirlos a Supabase Storage; evita guardar imágenes base64 grandes dentro de `configuracion_recibo.diseño`.
+- **Imports / duplicar procesión:** hazlos en horario de baja actividad; generan muchos inserts y lecturas.
+
+Si el dashboard muestra egress alto en **PostgREST**, revisa que el despliegue incluya las optimizaciones de la rama `main` (consultas paginadas, Realtime con debounce, sin polling en Taquilla).
