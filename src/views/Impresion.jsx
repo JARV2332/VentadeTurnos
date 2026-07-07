@@ -12,7 +12,6 @@ import {
   getTurnoById,
   buscarBoletaPorCodigo,
   updateDevoto,
-  subscribeData,
 } from '../services/dataService';
 import EditDevotoModal from '../components/EditDevotoModal';
 import ReenvioMasivoModal from '../components/ReenvioMasivoModal';
@@ -132,7 +131,6 @@ export default function Impresion() {
 
   useEffect(() => {
     refresh();
-    return subscribeData(organizacionId, refresh);
   }, [organizacionId, refresh]);
 
   useEffect(() => {
