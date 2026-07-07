@@ -4,7 +4,7 @@ import Layout from '../components/Layout';
 import Loader from '../components/Loader';
 import { useAuth } from '../context/AuthContext';
 import {
-  getBrazosByOrg,
+  getBrazosApartadosByOrg,
   getCortejosByOrg,
   getCargadoresByOrg,
   getTurnosByIds,
@@ -33,7 +33,7 @@ export default function ApartadosPendientes() {
     try {
       const [cortejosData, todosBrazos, cargadores] = await Promise.all([
         getCortejosByOrg(organizacionId, { incluirInactivas: true }),
-        getBrazosByOrg(organizacionId),
+        getBrazosApartadosByOrg(organizacionId),
         getCargadoresByOrg(organizacionId),
       ]);
       setCortejos(cortejosData || []);

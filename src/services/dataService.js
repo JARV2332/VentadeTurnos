@@ -20,6 +20,15 @@ export const getBrazosByOrg = (organizacionId) =>
     ? sb.getBrazosByOrg(organizacionId)
     : Promise.resolve(mock.getBrazosByOrg(organizacionId));
 
+export const getBrazosApartadosByOrg = (organizacionId) =>
+  isSupabaseBackend()
+    ? sb.getBrazosApartadosByOrg(organizacionId)
+    : Promise.resolve(
+        mock.getBrazosByOrg(organizacionId).filter(
+          (b) => b.estado === 'reservado' && b.reserva_apartado
+        )
+      );
+
 export const getBrazosVendidosByOrg = (organizacionId) =>
   isSupabaseBackend()
     ? sb.getBrazosVendidosByOrg(organizacionId)

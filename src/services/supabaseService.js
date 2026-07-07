@@ -720,6 +720,21 @@ export async function getBrazosByOrg(organizacionId) {
   );
 }
 
+export async function getBrazosApartadosByOrg(organizacionId) {
+  if (!organizacionId) return [];
+  return fetchPaginatedRows((from, to) =>
+    supabase
+      .from('brazos')
+      .select(BRAZO_LIST_FIELDS)
+      .eq('organizacion_id', organizacionId)
+      .eq('estado', 'reservado')
+      .eq('reserva_apartado', true)
+      .order('turno_id')
+      .order('numero_brazo')
+      .range(from, to)
+  );
+}
+
 /** Solo ventas confirmadas, paginado (Impresión / finanzas). */
 export async function getBrazosVendidosByOrg(organizacionId) {
   if (!organizacionId) return [];
@@ -1175,10 +1190,13 @@ export async function confirmarVenta(brazoId, cargadorData, precioPagado, pagoDa
   return { data: brazo, cargador, codigo: brazo.codigo_boleta_qr };
 }
 
+const COMPRA_LIST_FIELDS =
+  'id, organizacion_id, codigo_recibo, total_pagado, cargador_id, vendedor_id, operador_nombre, metodo_pago, comprobante_url, estado, pago_confirmado_en, created_at, updated_at';
+
 export async function getComprasByOrg(organizacionId) {
   const { data, error } = await supabase
     .from('compras')
-    .select('*')
+    .select(COMPRA_LIST_FIELDS)
     .eq('organizacion_id', organizacionId)
     .order('pago_confirmado_en', { ascending: false });
   if (error) {
@@ -1756,7 +1774,7 @@ export async function saveEmailConfig(organizacionId, config) {
 export async function getReciboConfig(organizacionId) {
   const { data, error } = await supabase
     .from('configuracion_recibo')
-    .select('*')
+    .select('id, organizacion_id, formato, diseño, created_at, updated_at')
     .eq('organizacion_id', organizacionId)
     .maybeSingle();
   if (error) return err(error);
