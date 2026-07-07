@@ -292,14 +292,6 @@ export default function Taquilla() {
   }, [organizacionId, refreshCortejos, refresh]);
 
   useEffect(() => {
-    if (!organizacionId || pasoVenta >= 1) return undefined;
-    const id = setInterval(() => {
-      refresh();
-    }, 60_000);
-    return () => clearInterval(id);
-  }, [organizacionId, pasoVenta, refresh]);
-
-  useEffect(() => {
     const cortejoParam = searchParams.get('cortejo');
     if (cortejoParam && cortejos.some((c) => c.id === cortejoParam)) {
       setCortejoId(cortejoParam);
