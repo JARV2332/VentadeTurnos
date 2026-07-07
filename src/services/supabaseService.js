@@ -74,6 +74,9 @@ const BRAZO_METRICS_FIELDS =
 const BRAZO_VENDIDO_FIELDS =
   'id, turno_id, numero_turno, numero_brazo, lado, estado, precio_pagado, codigo_boleta_qr, compra_id, cargador_id, mesa_id, vendedor_id, operador_nombre, metodo_pago, comprobante_url, estado_entrega, pago_confirmado_en, updated_at, created_at';
 
+const BRAZO_DEVOTO_FIELDS =
+  'id, turno_id, numero_turno, numero_brazo, lado, estado, reserva_apartado, apartado_notas, asignado_nombre, cargador_id, precio_pagado, codigo_boleta_qr, compra_id, estado_entrega';
+
 async function fetchPaginatedRows(buildQuery, pageSize = BRAZOS_PAGE) {
   const all = [];
   let from = 0;
@@ -924,40 +927,57 @@ export async function buscarTurnosDevoto(organizacionId, query) {
     return { error: 'Ingrese al menos 2 letras, un correo o 4 dígitos de DPI/WhatsApp.' };
   }
 
-  const [cargadores, brazosVendidosRes, brazosApartadosRes, turnosRaw, cortejosRaw] =
-    await Promise.all([
-      getCargadoresByOrg(organizacionId),
-      supabase
-        .from('brazos')
-        .select('*')
-        .eq('organizacion_id', organizacionId)
-        .eq('estado', 'vendido'),
-      supabase
-        .from('brazos')
-        .select('*')
-        .eq('organizacion_id', organizacionId)
-        .eq('estado', 'reservado')
-        .eq('reserva_apartado', true),
-      supabase.from('turnos').select('*').eq('organizacion_id', organizacionId),
-      getCortejosByOrg(organizacionId, { incluirInactivas: true }),
-    ]);
-
-  if (brazosVendidosRes.error) return err(brazosVendidosRes.error);
-  if (brazosApartadosRes.error) return err(brazosApartadosRes.error);
-  if (turnosRaw.error) return err(turnosRaw.error);
-
-  const brazosRaw = [...(brazosVendidosRes.data || []), ...(brazosApartadosRes.data || [])];
+  const [cargadores, cortejosRaw] = await Promise.all([
+    getCargadoresByOrg(organizacionId),
+    getCortejosByOrg(organizacionId, { incluirInactivas: true }),
+  ]);
 
   const cargadoresMatch = filtrarCargadoresPorBusqueda(cargadores, q);
-  const cargadorIds = new Set(cargadoresMatch.map((c) => c.id));
+  const cargadorIds = cargadoresMatch.map((c) => c.id);
   const cargadoresPorId = Object.fromEntries(cargadores.map((c) => [c.id, c]));
-  const turnosPorId = Object.fromEntries((turnosRaw.data || []).map((t) => [t.id, t]));
-  const cortejosPorId = Object.fromEntries((cortejosRaw || []).map((c) => [c.id, c]));
 
-  const brazos = brazosRaw.filter(
+  const brazoQueries = [
+    supabase
+      .from('brazos')
+      .select(BRAZO_DEVOTO_FIELDS)
+      .eq('organizacion_id', organizacionId)
+      .eq('estado', 'reservado')
+      .eq('reserva_apartado', true)
+      .is('cargador_id', null),
+  ];
+
+  if (cargadorIds.length) {
+    brazoQueries.unshift(
+      supabase
+        .from('brazos')
+        .select(BRAZO_DEVOTO_FIELDS)
+        .eq('organizacion_id', organizacionId)
+        .in('cargador_id', cargadorIds)
+        .in('estado', ['vendido', 'reservado'])
+    );
+  }
+
+  const brazosResults = await Promise.all(brazoQueries);
+  for (const res of brazosResults) {
+    if (res.error) return err(res.error);
+  }
+
+  const brazosMap = new Map();
+  brazosResults.forEach((res) => {
+    (res.data || []).forEach((b) => {
+      brazosMap.set(b.id, b);
+    });
+  });
+
+  const brazos = [...brazosMap.values()].filter(
     (b) =>
-      (b.cargador_id && cargadorIds.has(b.cargador_id)) || apartadoSinCargadorCoincide(b, q)
+      (b.cargador_id && cargadorIds.includes(b.cargador_id)) ||
+      apartadoSinCargadorCoincide(b, q)
   );
+
+  const turnoIds = [...new Set(brazos.map((b) => b.turno_id).filter(Boolean))];
+  const turnosPorId = turnoIds.length ? await getTurnosByIds(turnoIds) : {};
+  const cortejosPorId = Object.fromEntries((cortejosRaw || []).map((c) => [c.id, c]));
 
   const asignaciones = enriquecerAsignaciones({
     brazos,
