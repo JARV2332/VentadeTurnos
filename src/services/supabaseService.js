@@ -1547,17 +1547,12 @@ export async function marcarEntregado(brazoId) {
 }
 
 export async function getFinanzasByOrg(organizacionId) {
-  const [{ data: brazos, error }, { data: compras }, usuarios, cortejosRaw] = await Promise.all([
-    supabase
-      .from('brazos')
-      .select('*')
-      .eq('organizacion_id', organizacionId)
-      .eq('estado', 'vendido'),
+  const [brazos, { data: compras }, usuarios, cortejosRaw] = await Promise.all([
+    getBrazosVendidosByOrg(organizacionId),
     supabase.from('compras').select('id, vendedor_id, operador_nombre').eq('organizacion_id', organizacionId),
     getUsuariosByOrg(organizacionId),
     getCortejosByOrg(organizacionId, { incluirInactivas: true }),
   ]);
-  if (error) throw error;
 
   const comprasMap = Object.fromEntries((compras || []).map((c) => [c.id, c]));
   const mapaUsuarios = {};
@@ -1650,7 +1645,17 @@ export async function getFinanzasByOrg(organizacionId) {
 export async function getDashboardMetrics(organizacionId) {
   const fin = await getFinanzasByOrg(organizacionId);
   const cortejos = await getCortejosByOrg(organizacionId, { incluirInactivas: true });
-  const brazos = await getBrazosByOrg(organizacionId);
+  const brazos = organizacionId
+    ? await fetchPaginatedRows((from, to) =>
+        supabase
+          .from('brazos')
+          .select(BRAZO_METRICS_FIELDS)
+          .eq('organizacion_id', organizacionId)
+          .order('turno_id')
+          .order('numero_brazo')
+          .range(from, to)
+      )
+    : [];
   const { data: turnos } = await supabase
     .from('turnos')
     .select('id, cortejo_id, precio, numero_turno')
