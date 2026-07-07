@@ -7,8 +7,10 @@ import * as sb from './supabaseService';
 
 const isSupabaseBackend = () => !MOCK_MODE;
 
-export const subscribeData = (organizacionId, callback) =>
-  isSupabaseBackend() ? sb.subscribeSupabase(organizacionId, callback) : mock.subscribeMock(callback);
+export const subscribeData = (organizacionId, callback, debounceMs) =>
+  isSupabaseBackend()
+    ? sb.subscribeSupabase(organizacionId, callback, debounceMs)
+    : mock.subscribeMock(callback);
 
 export const getCortejosByOrg = (organizacionId, opts) =>
   isSupabaseBackend()
