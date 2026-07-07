@@ -444,8 +444,23 @@ export async function updatePerfilSupabase(userId, organizacionId, datos, email)
   return { data };
 }
 
-export function subscribeSupabase(organizacionId, callback) {
-  return subscribeBrazos(organizacionId, () => callback());
+export function subscribeSupabase(organizacionId, callback, debounceMs = 400) {
+  if (!organizacionId || typeof callback !== 'function') return () => {};
+
+  let timer = null;
+  const debounced = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      callback();
+    }, debounceMs);
+  };
+
+  const unsub = subscribeBrazos(organizacionId, debounced);
+  return () => {
+    if (timer) clearTimeout(timer);
+    unsub();
+  };
 }
 
 export async function getCortejosByOrg(organizacionId, { incluirInactivas = false } = {}) {
