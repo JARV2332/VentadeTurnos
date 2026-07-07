@@ -231,6 +231,7 @@ export default function Taquilla() {
       if (organizacionId) {
         await liberarReservasTaquillaExpiradas(organizacionId);
       }
+      // Brazos del cortejo activo: getTurnosAgrupados. Colgadas org-wide: count liviano.
       let lista = await getTurnosAgrupados(cortejoId, organizacionId);
       if (!Array.isArray(lista)) lista = [];
       setTurnosTodos(lista);
