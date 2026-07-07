@@ -1231,6 +1231,9 @@ export async function confirmarVentaCompra(brazoIds, cargadorData, precios, pago
 
   if (error) {
     if (isMissingRpc(error)) {
+      console.warn(
+        'confirmar_venta_compra RPC no disponible; usando fallback lento (aplicar migraciones SQL).'
+      );
       return confirmarVentaCompraDirecto(ids, cargador, listaPrecios, orgId, pagoData);
     }
     return err(error);
@@ -1781,6 +1784,7 @@ export async function saveEmailConfig(organizacionId, config) {
 }
 
 export async function getReciboConfig(organizacionId) {
+  // Columnas explicitas; diseño incluye layout pero evita select(*) de metadatos extra.
   const { data, error } = await supabase
     .from('configuracion_recibo')
     .select('id, organizacion_id, formato, diseño, created_at, updated_at')
