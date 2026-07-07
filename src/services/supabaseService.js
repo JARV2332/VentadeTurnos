@@ -63,6 +63,30 @@ function sinCamposApartado(brazos) {
 
 const BRAZOS_INSERT_LOTE = 40;
 const BRAZOS_INSERT_DELAY_MS = 0;
+const BRAZOS_PAGE = 500;
+
+const BRAZO_LIST_FIELDS =
+  'id, organizacion_id, turno_id, numero_turno, numero_brazo, lado, estado, reserva_apartado, apartado_notas, asignado_nombre, cargador_id, bloqueado_hasta, mesa_id, vendedor_id, precio_pagado, codigo_boleta_qr, compra_id, metodo_pago, comprobante_url, estado_entrega, operador_nombre, pago_confirmado_en, updated_at, created_at';
+
+const BRAZO_METRICS_FIELDS =
+  'id, turno_id, estado, reserva_apartado, estado_entrega, precio_pagado, updated_at, created_at, bloqueado_hasta';
+
+const BRAZO_VENDIDO_FIELDS =
+  'id, turno_id, numero_turno, numero_brazo, lado, estado, precio_pagado, codigo_boleta_qr, compra_id, cargador_id, mesa_id, vendedor_id, operador_nombre, metodo_pago, comprobante_url, estado_entrega, pago_confirmado_en, updated_at, created_at';
+
+async function fetchPaginatedRows(buildQuery, pageSize = BRAZOS_PAGE) {
+  const all = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await buildQuery(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data?.length) break;
+    all.push(...data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -169,7 +193,7 @@ export async function getBrazosByCortejo(cortejoId, organizacionId) {
   while (true) {
     const { data, error } = await supabase
       .from('brazos')
-      .select('*')
+      .select(BRAZO_LIST_FIELDS)
       .eq('organizacion_id', organizacionId)
       .in('turno_id', turnoIds)
       .order('turno_id')
