@@ -16,7 +16,6 @@ import {
 
   getCorreosEnviados,
   updateCorreoEnviadoEstado,
-  subscribeData,
 
   getCortejosByOrg,
 
@@ -165,8 +164,6 @@ export default function ConfigCorreo() {
   useEffect(() => {
 
     refresh();
-
-    return subscribeData(organizacionId, refresh);
 
   }, [organizacionId, refresh]);
 

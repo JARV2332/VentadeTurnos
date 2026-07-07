@@ -9,7 +9,6 @@ import {
   createDevoto,
   updateDevoto,
   deleteDevoto,
-  subscribeData,
 } from '../services/dataService';
 import { TERMINO_DEVOTO } from '../constants/terminologia';
 
@@ -53,7 +52,6 @@ export default function Devotos() {
 
   useEffect(() => {
     refresh();
-    return subscribeData(organizacionId, refresh);
   }, [organizacionId, refresh]);
 
   useEffect(() => {

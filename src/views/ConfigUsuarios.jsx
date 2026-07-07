@@ -8,7 +8,6 @@ import {
   deleteRol,
   saveUsuario,
   setUsuarioActivo,
-  subscribeData,
 } from '../services/dataService';
 import { pantallasPorGrupo, labelPermiso, PLANTILLAS_ROL } from '../config/permisos';
 
@@ -49,7 +48,6 @@ export default function ConfigUsuarios() {
 
   useEffect(() => {
     refresh();
-    return subscribeData(organizacionId, refresh);
   }, [organizacionId, refresh]);
 
   const gruposPantallas = pantallasPorGrupo();
