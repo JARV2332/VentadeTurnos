@@ -77,6 +77,9 @@ const BRAZO_VENDIDO_FIELDS =
 const BRAZO_DEVOTO_FIELDS =
   'id, turno_id, numero_turno, numero_brazo, lado, estado, reserva_apartado, apartado_notas, asignado_nombre, cargador_id, precio_pagado, codigo_boleta_qr, compra_id, estado_entrega';
 
+const TURNO_LIST_FIELDS =
+  'id, cortejo_id, numero_turno, tipo_turno, etiqueta, precio, son, alabado, hora_estimada, total_brazos, organizacion_id';
+
 async function fetchPaginatedRows(buildQuery, pageSize = BRAZOS_PAGE) {
   const all = [];
   let from = 0;
@@ -507,7 +510,7 @@ export async function getTurnoById(turnoId) {
 export async function getTurnosByIds(turnoIds) {
   const ids = [...new Set((turnoIds || []).filter(Boolean))];
   if (!ids.length) return {};
-  const { data, error } = await supabase.from('turnos').select('*').in('id', ids);
+  const { data, error } = await supabase.from('turnos').select(TURNO_LIST_FIELDS).in('id', ids);
   if (error) throw error;
   return Object.fromEntries((data || []).map((t) => [t.id, t]));
 }
@@ -1681,30 +1684,36 @@ export async function getFinanzasByOrg(organizacionId) {
 }
 
 export async function getDashboardMetrics(organizacionId) {
-  const fin = await getFinanzasByOrg(organizacionId);
-  const cortejos = await getCortejosByOrg(organizacionId, { incluirInactivas: true });
-  const brazos = organizacionId
-    ? await fetchPaginatedRows((from, to) =>
-        supabase
-          .from('brazos')
-          .select(BRAZO_METRICS_FIELDS)
-          .eq('organizacion_id', organizacionId)
-          .order('turno_id')
-          .order('numero_brazo')
-          .range(from, to)
-      )
-    : [];
-  const { data: turnos } = await supabase
-    .from('turnos')
-    .select('id, cortejo_id, precio, numero_turno')
-    .eq('organizacion_id', organizacionId);
+  const [fin, cortejos, brazos, turnosRes, reservasTaquillaColgadas] = await Promise.all([
+    getFinanzasByOrg(organizacionId),
+    getCortejosByOrg(organizacionId, { incluirInactivas: true }),
+    organizacionId
+      ? fetchPaginatedRows((from, to) =>
+          supabase
+            .from('brazos')
+            .select(BRAZO_METRICS_FIELDS)
+            .eq('organizacion_id', organizacionId)
+            .order('turno_id')
+            .order('numero_brazo')
+            .range(from, to)
+        )
+      : Promise.resolve([]),
+    supabase
+      .from('turnos')
+      .select('id, cortejo_id, precio, numero_turno')
+      .eq('organizacion_id', organizacionId),
+    contarReservasTaquillaColgadasOrg(organizacionId),
+  ]);
 
-  return enriquecerDashboardMetrics({
-    fin,
-    brazos,
-    cortejos,
-    turnos: turnos || [],
-  });
+  return {
+    ...enriquecerDashboardMetrics({
+      fin,
+      brazos,
+      cortejos,
+      turnos: turnosRes.data || [],
+    }),
+    reservasTaquillaColgadas,
+  };
 }
 
 const EMAIL_CONFIG_PUBLIC =
