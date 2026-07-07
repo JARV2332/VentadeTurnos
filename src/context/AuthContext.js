@@ -14,6 +14,7 @@ import {
   setOrganizacionActiva as setOrganizacionActivaApi,
 } from '../services/dataService';
 import { getStore } from '../services/dataService';
+import { authCallbackUrl } from '../utils/authRedirect';
 
 const AuthContext = createContext(null);
 
@@ -234,8 +235,18 @@ export function AuthProvider({ children }) {
       throw new Error('Registro disponible al conectar Supabase. Use demo: admin@demo.com / demo123');
     }
 
-    const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: email.trim().toLowerCase(),
+      password,
+      options: {
+        emailRedirectTo: authCallbackUrl('/confirmar-correo'),
+      },
+    });
     if (authError) throw authError;
+
+    if (authData.user && !authData.session) {
+      return { needsEmailConfirmation: true, email: email.trim().toLowerCase() };
+    }
 
     skipAuthListenerRef.current = true;
 
@@ -286,6 +297,27 @@ export function AuthProvider({ children }) {
       skipAuthListenerRef.current = false;
       throw err;
     }
+  }
+
+  async function requestPasswordReset(email) {
+    if (MOCK_MODE) {
+      throw new Error('Recuperación de contraseña disponible con Supabase conectado.');
+    }
+    const emailNorm = email.trim().toLowerCase();
+    if (!emailNorm) throw new Error('Indique su correo electrónico.');
+    const { error } = await supabase.auth.resetPasswordForEmail(emailNorm, {
+      redirectTo: authCallbackUrl('/restablecer-contrasena'),
+    });
+    if (error) throw new Error(error.message);
+  }
+
+  async function completePasswordReset(newPassword) {
+    if (MOCK_MODE) throw new Error('No disponible en modo demo.');
+    if (!newPassword || newPassword.length < 6) {
+      throw new Error('La contraseña debe tener al menos 6 caracteres.');
+    }
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw new Error(error.message);
   }
 
   async function logout() {
@@ -351,6 +383,8 @@ export function AuthProvider({ children }) {
     salirDeOrganizacion,
     login,
     register,
+    requestPasswordReset,
+    completePasswordReset,
     logout,
     updateProfile,
   };

@@ -1,0 +1,51 @@
+name: Migrar Supabase (cloud)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Aplicar esquema (Postgres desde GitHub)
+        env:
+          DATABASE_URL_NEW: ${{ secrets.DATABASE_URL_NEW }}
+        run: npm run db:apply:cloud
+
+      - name: Backup REST proyecto viejo
+        env:
+          REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL_OLD }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_OLD }}
+        run: npm run db:backup
+
+      - name: Restore datos vía REST
+        env:
+          REACT_APP_SUPABASE_URL_NEW: ${{ secrets.REACT_APP_SUPABASE_URL_NEW }}
+          SUPABASE_SERVICE_ROLE_KEY_NEW: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_NEW }}
+          REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL_OLD }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_OLD }}
+        run: npm run db:restore:rest
+
+      - name: Verificación
+        env:
+          REACT_APP_SUPABASE_URL_NEW: ${{ secrets.REACT_APP_SUPABASE_URL_NEW }}
+          SUPABASE_SERVICE_ROLE_KEY_NEW: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_NEW }}
+        run: |
+          node -e "
+          import { createClient } from '@supabase/supabase-js';
+          const c = createClient(process.env.REACT_APP_SUPABASE_URL_NEW, process.env.SUPABASE_SERVICE_ROLE_KEY_NEW);
+          for (const t of ['organizaciones','brazos','compras','usuarios_app']) {
+            const { count, error } = await c.from(t).select('id', { count: 'exact', head: true });
+            console.log(t + ':', error ? error.message : count);
+          }
+          "

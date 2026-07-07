@@ -3,6 +3,9 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 import Landing from './views/Landing';
+import RecuperarContrasena from './views/RecuperarContrasena';
+import RestablecerContrasena from './views/RestablecerContrasena';
+import ConfirmarCorreo from './views/ConfirmarCorreo';
 import Dashboard from './views/Dashboard';
 import ConfigSaaS from './views/ConfigSaaS';
 import ConfigCorreo from './views/ConfigCorreo';
@@ -29,6 +32,9 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/recuperar-contrasena" element={<RecuperarContrasena />} />
+          <Route path="/restablecer-contrasena" element={<RestablecerContrasena />} />
+          <Route path="/confirmar-correo" element={<ConfirmarCorreo />} />
           <Route path="/boleta/:codigo" element={<BoletaPublica />} />
           <Route path="/mis-turnos/:orgSlug" element={<MisTurnosPublico />} />
           <Route

@@ -305,6 +305,93 @@ html {
   text-align: left;
 }
 
+.auth-forgot {
+  margin: -0.5rem 0 1rem;
+  text-align: right;
+  font-size: 0.85rem;
+}
+
+.auth-forgot a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.auth-forgot a:hover {
+  text-decoration: underline;
+}
+
+.auth-back-link {
+  margin-top: 1.25rem;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+.auth-back-link a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.auth-back-link a:hover {
+  color: var(--primary);
+}
+
+.auth-success-panel {
+  text-align: center;
+  padding: 0.25rem 0 0.5rem;
+}
+
+.auth-success-panel p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+.auth-success-panel .hint {
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+
+.auth-success-panel__icon {
+  width: 3rem;
+  height: 3rem;
+  margin: 0 auto 1rem;
+  border-radius: 50%;
+  background: rgba(79, 70, 229, 0.12);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+}
+
+.auth-success-panel__icon--ok {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+}
+
+.landing--auth-only {
+  grid-template-columns: 1fr;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.landing__hero--compact {
+  text-align: center;
+  padding: 2rem 1.5rem 1rem;
+}
+
+.landing__title--compact {
+  font-size: 1.5rem;
+  margin-top: 1rem;
+}
+
+.landing__desc--compact {
+  font-size: 0.95rem;
+  margin-top: 0.5rem;
+}
+
 .form-error {
   padding: 0.65rem;
   background: var(--danger-bg);

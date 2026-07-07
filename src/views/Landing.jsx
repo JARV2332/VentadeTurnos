@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { MOCK_MODE } from '../config/supabaseClient';
 import { rutaInicioPorPermisos } from '../config/permisos';
@@ -12,6 +12,7 @@ export default function Landing() {
   const [tab, setTab] = useState('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [registerPending, setRegisterPending] = useState(null);
   const [form, setForm] = useState({
     email: '',
     password: '',
@@ -25,14 +26,19 @@ export default function Landing() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setRegisterPending(null);
     setLoading(true);
     try {
       let session;
       if (tab === 'login') {
         session = await login(form.email, form.password);
       } else {
-        await register(form.email, form.password, form.orgName);
-        session = { permisos: ['dashboard', 'usuarios', 'config', 'config_correo', 'taquilla', 'entrega', 'caja', 'impresion'] };
+        const result = await register(form.email, form.password, form.orgName);
+        if (result?.needsEmailConfirmation) {
+          setRegisterPending(result.email);
+          return;
+        }
+        session = result;
       }
       navigate(
         session?.permisos
@@ -88,19 +94,50 @@ export default function Landing() {
             <button
               type="button"
               className={tab === 'login' ? 'auth-tabs__btn--active' : ''}
-              onClick={() => setTab('login')}
+              onClick={() => {
+                setTab('login');
+                setRegisterPending(null);
+                setError('');
+              }}
             >
               Iniciar sesión
             </button>
             <button
               type="button"
               className={tab === 'register' ? 'auth-tabs__btn--active' : ''}
-              onClick={() => setTab('register')}
+              onClick={() => {
+                setTab('register');
+                setRegisterPending(null);
+                setError('');
+              }}
             >
               Registrarse
             </button>
           </div>
 
+          {registerPending ? (
+            <div className="auth-success-panel">
+              <div className="auth-success-panel__icon" aria-hidden>
+                ✉
+              </div>
+              <h2>Confirma tu correo</h2>
+              <p>
+                Enviamos un enlace a <strong>{registerPending}</strong>. Ábrelo para activar tu
+                cuenta y luego inicia sesión.
+              </p>
+              <p className="hint">Si el enlace no abre, revisa spam. Debe llevarte a ventadeturnos.com, no a localhost.</p>
+              <button
+                type="button"
+                className="btn btn--primary btn--block"
+                onClick={() => {
+                  setRegisterPending(null);
+                  setTab('login');
+                }}
+              >
+                Ir a iniciar sesión
+              </button>
+            </div>
+          ) : (
           <form onSubmit={handleSubmit} className="auth-form">
             {tab === 'register' && (
               <label>
@@ -133,12 +170,19 @@ export default function Landing() {
               />
             </label>
 
+            {tab === 'login' && !MOCK_MODE && (
+              <p className="auth-forgot">
+                <Link to="/recuperar-contrasena">¿Olvidaste tu contraseña?</Link>
+              </p>
+            )}
+
             {error && <div className="form-error">{error}</div>}
 
             <button type="submit" className="btn btn--primary btn--block" disabled={loading}>
               {loading ? 'Procesando...' : tab === 'login' ? 'Entrar al panel' : 'Crear cuenta'}
             </button>
           </form>
+          )}
 
           {!MOCK_MODE && tab === 'login' && (
             <p className="auth-demo" style={{ marginTop: '1rem', fontSize: '0.85rem', opacity: 0.85 }}>
