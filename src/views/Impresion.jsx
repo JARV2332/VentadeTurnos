@@ -371,6 +371,19 @@ export default function Impresion() {
     }
   };
 
+  const compraIdUrl = searchParams.get('compra')?.trim() || '';
+  const modoVentaDirecta =
+    soloReciboVenta || Boolean(compraIdUrl) || searchParams.get('venta') === '1';
+  const unSoloRecibo = recibosLista.length <= 1;
+
+  useEffect(() => {
+    if (!modoVentaDirecta || !reciboSel || cargandoRecientes) return undefined;
+    const t = window.setTimeout(() => {
+      document.getElementById('impresion-boleta')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [modoVentaDirecta, reciboSel, cargandoRecientes]);
+
   const tituloLista = soloReciboVenta
     ? 'Boleta de esta venta'
     : reciboPorCodigo !== null
@@ -381,15 +394,21 @@ export default function Impresion() {
 
   return (
     <Layout
-      title="Impresión de boletas"
-      subtitle="Últimas ventas o búsqueda puntual por devoto(a)"
-      className="app-content--impresion"
+      title={modoVentaDirecta ? 'Boleta de la venta' : 'Impresión de boletas'}
+      subtitle={
+        modoVentaDirecta
+          ? 'Imprima o reenvíe la boleta recién generada'
+          : 'Últimas ventas o búsqueda puntual por devoto(a)'
+      }
+      className={`app-content--impresion${modoVentaDirecta ? ' app-content--impresion-venta' : ''}`}
     >
       {okDevoto && <div className="alert alert--success no-print">{okDevoto}</div>}
 
-      <div className="impresion-page">
+      <div
+        className={`impresion-page${modoVentaDirecta ? ' impresion-page--solo-venta' : ''}`}
+      >
         <aside className="impresion-page__side no-print">
-          {organizacion?.subdominio_slug && (
+          {organizacion?.subdominio_slug && !modoVentaDirecta && (
             <details className="impresion-enlace-publico">
               <summary>Enlace público «Ver mis turnos»</summary>
               <code>
@@ -429,57 +448,67 @@ export default function Impresion() {
             </div>
 
             {cargandoRecientes ? (
-              <p className="text-muted impresion-toolbar__hint">Cargando…</p>
+              <p className="text-muted impresion-toolbar__hint">Cargando boleta…</p>
             ) : recibosLista.length > 0 ? (
-              <label className="impresion-toolbar__campo">
-                Recibo
-                <select value={selectedId || ''} onChange={(e) => setSelectedId(e.target.value)}>
-                  {recibosLista.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {etiquetaRecibo(r, cargadoresPorId)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              modoVentaDirecta && unSoloRecibo ? (
+                <p className="impresion-toolbar__recibo-resumen">
+                  <strong>{etiquetaRecibo(recibosLista[0], cargadoresPorId)}</strong>
+                </p>
+              ) : (
+                <label className="impresion-toolbar__campo">
+                  Recibo
+                  <select value={selectedId || ''} onChange={(e) => setSelectedId(e.target.value)}>
+                    {recibosLista.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {etiquetaRecibo(r, cargadoresPorId)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )
             ) : (
               <p className="text-muted impresion-toolbar__hint">
                 {soloReciboVenta ? 'No se pudo cargar la boleta.' : 'Sin ventas recientes.'}
               </p>
             )}
 
-            <form onSubmit={handleBuscarDevoto} className="impresion-toolbar__busqueda">
-              <label className="impresion-toolbar__campo">
-                {TERMINO_DEVOTO}(a)
-                <input
-                  type="search"
-                  value={busquedaDevoto}
-                  onChange={(e) => setBusquedaDevoto(e.target.value)}
-                  placeholder="Nombre, CUI o WhatsApp"
-                  autoComplete="off"
-                />
-              </label>
-              <button
-                type="submit"
-                className="btn btn--primary btn--sm"
-                disabled={buscandoDevoto || !busquedaDevoto.trim()}
-              >
-                {buscandoDevoto ? '…' : 'Buscar'}
-              </button>
-            </form>
+            {!modoVentaDirecta && (
+              <>
+                <form onSubmit={handleBuscarDevoto} className="impresion-toolbar__busqueda">
+                  <label className="impresion-toolbar__campo">
+                    {TERMINO_DEVOTO}(a)
+                    <input
+                      type="search"
+                      value={busquedaDevoto}
+                      onChange={(e) => setBusquedaDevoto(e.target.value)}
+                      placeholder="Nombre, CUI o WhatsApp"
+                      autoComplete="off"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    className="btn btn--primary btn--sm"
+                    disabled={buscandoDevoto || !busquedaDevoto.trim()}
+                  >
+                    {buscandoDevoto ? '…' : 'Buscar'}
+                  </button>
+                </form>
 
-            <label className="impresion-toolbar__campo">
-              Código VR- / VT-
-              <input
-                type="search"
-                value={busquedaCodigo}
-                onChange={(e) => {
-                  setBusquedaCodigo(e.target.value);
-                  setBusquedaDevoto('');
-                }}
-                placeholder="VR-… o VT-…"
-                autoComplete="off"
-              />
-            </label>
+                <label className="impresion-toolbar__campo">
+                  Código VR- / VT-
+                  <input
+                    type="search"
+                    value={busquedaCodigo}
+                    onChange={(e) => {
+                      setBusquedaCodigo(e.target.value);
+                      setBusquedaDevoto('');
+                    }}
+                    placeholder="VR-… o VT-…"
+                    autoComplete="off"
+                  />
+                </label>
+              </>
+            )}
 
             {msgBusqueda && (
               <p className="impresion-toolbar__hint impresion-toolbar__hint--warn">{msgBusqueda}</p>
@@ -507,18 +536,25 @@ export default function Impresion() {
                   Ver digital
                 </Link>
               )}
-              {(hasPermiso('config_recibo') || hasPermiso('config_correo')) && (
+              {(hasPermiso('config_recibo') || hasPermiso('config_correo')) && !modoVentaDirecta && (
                 <Link to="/config/recibo" className="btn btn--ghost btn--sm">
                   Diseño
                 </Link>
               )}
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                onClick={() => setReenvioMasivoAbierto(true)}
-              >
-                Reenvío masivo
-              </button>
+              {!modoVentaDirecta && (
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => setReenvioMasivoAbierto(true)}
+                >
+                  Reenvío masivo
+                </button>
+              )}
+              {modoVentaDirecta && (
+                <Link to="/taquilla" className="btn btn--ghost btn--sm">
+                  Volver a taquilla
+                </Link>
+              )}
             </div>
           </div>
 
@@ -577,7 +613,7 @@ export default function Impresion() {
 
         <main className="impresion-page__main">
           {reciboSel ? (
-            <div className="impresion-boleta print-area">
+            <div id="impresion-boleta" className="impresion-boleta print-area">
               <BoletaContraseñaTurno
                 organizacion={organizacion}
                 brazo={reciboSel.brazos[0]}

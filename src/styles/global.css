@@ -3097,6 +3097,61 @@ html {
   align-items: start;
 }
 
+.impresion-page--solo-venta {
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+}
+
+.impresion-page--solo-venta .impresion-page__main {
+  order: -1;
+}
+
+.impresion-page--solo-venta .impresion-page__side {
+  position: sticky;
+  top: 0.65rem;
+}
+
+.impresion-page--solo-venta .impresion-toolbar {
+  padding: 0.55rem 0.65rem;
+  gap: 0.35rem;
+}
+
+.impresion-toolbar__recibo-resumen {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.app-content--impresion-venta {
+  padding-top: 0.5rem;
+}
+
+@media (max-width: 960px) {
+  .impresion-page--solo-venta {
+    grid-template-columns: 1fr;
+  }
+
+  .impresion-page--solo-venta .impresion-page__main {
+    order: -1;
+  }
+
+  .impresion-page--solo-venta .impresion-page__side {
+    position: static;
+  }
+}
+
+@media (min-width: 961px) {
+  .impresion-page--solo-venta .impresion-toolbar__acciones {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .impresion-page--solo-venta .impresion-toolbar__acciones .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .impresion-page__side {
   display: flex;
   flex-direction: column;

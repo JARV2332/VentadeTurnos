@@ -13,6 +13,7 @@ function urlImpresionVenta(venta, brazos) {
   const params = new URLSearchParams();
   if (compraId) params.set('compra', compraId);
   if (codigo) params.set('codigo', codigo);
+  params.set('venta', '1');
   const q = params.toString();
   return q ? `/impresion?${q}` : '/impresion';
 }
