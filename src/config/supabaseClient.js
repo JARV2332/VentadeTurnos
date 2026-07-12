@@ -3,6 +3,7 @@
  * En modo MOCK (REACT_APP_MOCK_MODE=true) no se conecta a la red.
  */
 import { createClient } from '@supabase/supabase-js';
+import { createSupabaseFetch } from './supabaseFetch';
 
 /**
  * Desarrollo: mock si REACT_APP_MOCK_MODE !== 'false'.
@@ -32,6 +33,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
     persistSession: true,
     autoRefreshToken: true,
+  },
+  global: {
+    fetch: MOCK_MODE ? undefined : createSupabaseFetch(),
   },
   realtime: {
     params: { eventsPerSecond: 10 },
