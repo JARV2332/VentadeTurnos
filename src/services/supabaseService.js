@@ -773,6 +773,15 @@ export async function getMesasByOrg(organizacionId) {
   return data || [];
 }
 
+/** Upsert (POST) en lugar de PATCH: algunos proxies corporativos bloquean preflight PATCH a Supabase. */
+async function saveCargadorOrganizacion(row) {
+  return supabase
+    .from('cargadores_organizacion')
+    .upsert(row, { onConflict: 'id' })
+    .select()
+    .single();
+}
+
 export async function getCargadorById(cargadorId) {
   if (!cargadorId) return null;
   const { data } = await supabase
@@ -830,13 +839,11 @@ export async function updateDevoto(organizacionId, cargadorId, datos) {
     telefono_emergencia: datos.telefono_emergencia?.replace(/\D/g, '') || '',
   };
 
-  const { data, error } = await supabase
-    .from('cargadores_organizacion')
-    .update(campos)
-    .eq('id', cargadorId)
-    .eq('organizacion_id', organizacionId)
-    .select()
-    .single();
+  const { data, error } = await saveCargadorOrganizacion({
+    id: cargadorId,
+    organizacion_id: organizacionId,
+    ...campos,
+  });
 
   if (error) return err(error);
   return { data };
@@ -1161,12 +1168,11 @@ async function upsertDevotoVenta(orgId, cargadorData) {
     return { cargador: data };
   }
 
-  const { data, error } = await supabase
-    .from('cargadores_organizacion')
-    .update(campos)
-    .eq('id', devoto.id)
-    .select()
-    .single();
+  const { data, error } = await saveCargadorOrganizacion({
+    id: devoto.id,
+    organizacion_id: orgId,
+    ...campos,
+  });
   if (error) return err(error);
   return { cargador: data };
 }
@@ -2401,12 +2407,11 @@ async function upsertCargadorParcialImport(organizacionId, datos) {
   }
 
   if (cargador) {
-    const { data, error } = await supabase
-      .from('cargadores_organizacion')
-      .update(campos)
-      .eq('id', cargador.id)
-      .select()
-      .single();
+    const { data, error } = await saveCargadorOrganizacion({
+      id: cargador.id,
+      organizacion_id: organizacionId,
+      ...campos,
+    });
     if (error) return cargador;
     return data;
   }

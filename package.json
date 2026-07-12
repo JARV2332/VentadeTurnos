@@ -46,6 +46,7 @@
     "db:build:migration-sql": "node scripts/build-migration-sql.mjs",
     "db:realtime:enable": "node scripts/enable-realtime.mjs",
     "db:auth:urls": "node scripts/configure-auth-urls.mjs",
+    "vercel:setup-env": "node scripts/setup-vercel-env.mjs",
     "supabase:start": "npx supabase start",
     "supabase:stop": "npx supabase stop",
     "supabase:status": "npx supabase status",
