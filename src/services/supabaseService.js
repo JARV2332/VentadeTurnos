@@ -752,7 +752,7 @@ export async function getBrazosApartadosByOrg(organizacionId) {
   );
 }
 
-/** Solo ventas confirmadas, paginado (Impresión / finanzas). */
+/** Solo ventas confirmadas, paginado (finanzas / reenvío masivo). */
 export async function getBrazosVendidosByOrg(organizacionId) {
   if (!organizacionId) return [];
   return fetchPaginatedRows((from, to) =>
@@ -764,6 +764,139 @@ export async function getBrazosVendidosByOrg(organizacionId) {
       .order('updated_at', { ascending: false })
       .range(from, to)
   );
+}
+
+export const IMPRESION_RECIBOS_RECIENTES = 20;
+
+/** Impresión: últimas N ventas (compras), sin cargar todo el historial. */
+export async function getUltimosRecibosImpresion(
+  organizacionId,
+  limit = IMPRESION_RECIBOS_RECIENTES
+) {
+  if (!organizacionId) return { brazos: [], compras: [], cargadores: [] };
+
+  let qCompras = supabase
+    .from('compras')
+    .select(COMPRA_LIST_FIELDS)
+    .eq('organizacion_id', organizacionId)
+    .order('pago_confirmado_en', { ascending: false, nullsFirst: false })
+    .limit(limit);
+
+  const { data: comprasRaw, error: cErr } = await qCompras;
+  if (cErr) {
+    if (cErr.code === '42P01') return { brazos: [], compras: [], cargadores: [] };
+    throw cErr;
+  }
+
+  const compras = (comprasRaw || []).filter((c) => c.estado !== 'anulada');
+  const compraIds = compras.map((c) => c.id);
+
+  let brazos = [];
+  if (compraIds.length) {
+    const { data, error } = await supabase
+      .from('brazos')
+      .select(BRAZO_VENDIDO_FIELDS)
+      .eq('organizacion_id', organizacionId)
+      .eq('estado', 'vendido')
+      .in('compra_id', compraIds);
+    if (error) throw error;
+    brazos = data || [];
+  }
+
+  const { data: sueltos } = await supabase
+    .from('brazos')
+    .select(BRAZO_VENDIDO_FIELDS)
+    .eq('organizacion_id', organizacionId)
+    .eq('estado', 'vendido')
+    .is('compra_id', null)
+    .order('pago_confirmado_en', { ascending: false })
+    .limit(5);
+
+  if (sueltos?.length) {
+    const ids = new Set(brazos.map((b) => b.id));
+    sueltos.forEach((b) => {
+      if (!ids.has(b.id)) brazos.push(b);
+    });
+  }
+
+  const cargadorIds = [...new Set(brazos.map((b) => b.cargador_id).filter(Boolean))];
+  const cargadores = cargadorIds.length
+    ? await getCargadoresByIds(cargadorIds, organizacionId)
+    : [];
+
+  return { brazos, compras, cargadores };
+}
+
+async function buscarCargadoresParaImpresion(organizacionId, query) {
+  const cui = normalizarCui(query);
+  if (isValidCui(cui)) {
+    const c = await buscarCargadorPorCui(organizacionId, cui);
+    return c ? [c] : [];
+  }
+
+  const digits = String(query || '').replace(/\D/g, '');
+  if (digits.length >= 8) {
+    const local = digits.slice(-8);
+    const c = await buscarCargadorPorWhatsapp(organizacionId, `502${local}`);
+    return c ? [c] : [];
+  }
+
+  const termino = String(query || '')
+    .trim()
+    .replace(/[%_,]/g, ' ')
+    .slice(0, 80);
+  if (termino.length < 2) return [];
+
+  const { data, error } = await supabase
+    .from('cargadores_organizacion')
+    .select(CARGADOR_LIST_FIELDS)
+    .eq('organizacion_id', organizacionId)
+    .ilike('nombre_completo', `%${termino}%`)
+    .limit(15);
+  if (error) throw error;
+
+  return filtrarCargadoresPorBusqueda(data || [], query).slice(0, 10);
+}
+
+/** Impresión: búsqueda puntual por nombre, CUI o WhatsApp (no carga todo el catálogo). */
+export async function buscarRecibosImpresion(organizacionId, query) {
+  const q = String(query || '').trim();
+  if (!queryValidaBusquedaDevoto(q)) {
+    return {
+      error: 'Ingrese nombre (2+ letras), CUI (13 dígitos) o WhatsApp (8+ dígitos).',
+    };
+  }
+
+  const cargadores = await buscarCargadoresParaImpresion(organizacionId, q);
+  if (!cargadores.length) {
+    return {
+      brazos: [],
+      compras: [],
+      cargadores: [],
+      mensaje: 'No se encontraron ventas para esa búsqueda.',
+    };
+  }
+
+  const cargadorIds = cargadores.map((c) => c.id);
+  const { data: brazos, error } = await supabase
+    .from('brazos')
+    .select(BRAZO_VENDIDO_FIELDS)
+    .eq('organizacion_id', organizacionId)
+    .eq('estado', 'vendido')
+    .in('cargador_id', cargadorIds)
+    .order('pago_confirmado_en', { ascending: false });
+  if (error) throw error;
+
+  const listaBrazos = brazos || [];
+  const compraIds = [...new Set(listaBrazos.map((b) => b.compra_id).filter(Boolean))];
+  const compras = compraIds.length ? await getComprasByIds(compraIds, organizacionId) : [];
+
+  return {
+    brazos: listaBrazos,
+    compras,
+    cargadores,
+    mensaje: listaBrazos.length ? null : 'El devoto(a) existe pero no tiene ventas confirmadas.',
+  };
 }
 
 export async function getTurnosAgrupados(cortejoId, organizacionId) {

@@ -36,6 +36,18 @@ export const getBrazosVendidosByOrg = (organizacionId) =>
     ? sb.getBrazosVendidosByOrg(organizacionId)
     : Promise.resolve(mock.getBrazosVendidosByOrg(organizacionId));
 
+export const getUltimosRecibosImpresion = (organizacionId, limit) =>
+  isSupabaseBackend()
+    ? sb.getUltimosRecibosImpresion(organizacionId, limit)
+    : Promise.resolve(mock.getUltimosRecibosImpresionMock(organizacionId, limit));
+
+export const buscarRecibosImpresion = (organizacionId, query) =>
+  isSupabaseBackend()
+    ? sb.buscarRecibosImpresion(organizacionId, query)
+    : Promise.resolve(mock.buscarRecibosImpresionMock(organizacionId, query));
+
+export { IMPRESION_RECIBOS_RECIENTES } from './supabaseService';
+
 export const getTurnoById = (turnoId) =>
   isSupabaseBackend()
     ? sb.getTurnoById(turnoId)

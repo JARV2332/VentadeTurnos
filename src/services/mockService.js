@@ -55,6 +55,54 @@ export function getBrazosVendidosByOrg(organizacionId) {
   return store.brazos.filter((b) => b.organizacion_id === organizacionId && b.estado === 'vendido');
 }
 
+export function getUltimosRecibosImpresionMock(organizacionId, limit = 20) {
+  const compras = (store.compras || [])
+    .filter((c) => c.organizacion_id === organizacionId && c.estado !== 'anulada')
+    .sort(
+      (a, b) =>
+        new Date(b.pago_confirmado_en || b.created_at || 0) -
+        new Date(a.pago_confirmado_en || a.created_at || 0)
+    )
+    .slice(0, limit);
+  const compraIds = new Set(compras.map((c) => c.id));
+  const brazos = getBrazosVendidosByOrg(organizacionId).filter(
+    (b) => (b.compra_id && compraIds.has(b.compra_id)) || !b.compra_id
+  );
+  const cargadorIds = [...new Set(brazos.map((b) => b.cargador_id).filter(Boolean))];
+  return {
+    brazos,
+    compras,
+    cargadores: getCargadoresByIdsMock(cargadorIds, organizacionId),
+  };
+}
+
+export function buscarRecibosImpresionMock(organizacionId, query) {
+  const q = String(query || '').trim();
+  if (!queryValidaBusquedaDevoto(q)) {
+    return {
+      error: 'Ingrese nombre (2+ letras), CUI (13 dígitos) o WhatsApp (8+ dígitos).',
+    };
+  }
+  const cargadores = filtrarCargadoresPorBusqueda(getCargadoresByOrg(organizacionId), q);
+  if (!cargadores.length) {
+    return {
+      brazos: [],
+      compras: [],
+      cargadores: [],
+      mensaje: 'No se encontraron ventas para esa búsqueda.',
+    };
+  }
+  const ids = new Set(cargadores.map((c) => c.id));
+  const brazos = getBrazosVendidosByOrg(organizacionId).filter((b) => ids.has(b.cargador_id));
+  const compraIds = [...new Set(brazos.map((b) => b.compra_id).filter(Boolean))];
+  return {
+    brazos,
+    compras: getComprasByIdsMock(compraIds, organizacionId),
+    cargadores,
+    mensaje: brazos.length ? null : 'El devoto(a) existe pero no tiene ventas confirmadas.',
+  };
+}
+
 export function getCortejosByOrg(organizacionId, { incluirInactivas = false } = {}) {
   return store.cortejos.filter((c) => {
     if (c.organizacion_id !== organizacionId) return false;

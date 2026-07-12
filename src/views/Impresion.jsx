@@ -5,14 +5,13 @@ import BoletaContraseñaTurno from '../components/BoletaContraseñaTurno';
 import StatusBadge from '../components/StatusBadge';
 import { useAuth } from '../context/AuthContext';
 import {
-  getBrazosVendidosByOrg,
-  getComprasByOrg,
+  getUltimosRecibosImpresion,
+  buscarRecibosImpresion,
   getCortejosByOrg,
-  getCargadoresByIds,
-  getComprasByIds,
   getTurnosByIds,
   buscarBoletaPorCodigo,
   updateDevoto,
+  IMPRESION_RECIBOS_RECIENTES,
 } from '../services/dataService';
 import EditDevotoModal from '../components/EditDevotoModal';
 import ReenvioMasivoModal from '../components/ReenvioMasivoModal';
@@ -39,30 +38,6 @@ function agruparRecibos(vendidos, comprasPorId) {
   return [...map.values()];
 }
 
-function filtrarRecibos(recibos, cargadoresPorId, busqueda) {
-  const q = normalizarBusqueda(busqueda);
-  const qCodigo = normalizarBusqueda(extraerCodigoBoleta(busqueda));
-  if (!q && !qCodigo) return recibos;
-  return recibos.filter((r) => {
-    const cargador = cargadoresPorId[r.brazos[0]?.cargador_id];
-    const nombre = normalizarBusqueda(cargador?.nombre_completo);
-    const cui = normalizarBusqueda(cargador?.cui_o_identificacion);
-    const codigoRecibo = normalizarBusqueda(
-      codigoReciboDisplay(r.compra, r.brazos)
-    );
-    const codigos = r.brazos.map((b) => normalizarBusqueda(b.codigo_boleta_qr)).join(' ');
-    const consulta = q || qCodigo;
-    return (
-      nombre.includes(consulta) ||
-      cui.includes(consulta) ||
-      codigoRecibo.includes(consulta) ||
-      (qCodigo && codigoRecibo.includes(qCodigo)) ||
-      codigos.includes(consulta) ||
-      (qCodigo && codigos.includes(qCodigo))
-    );
-  });
-}
-
 function reciboDesdeBusqueda(res) {
   if (!res?.brazos?.length) return null;
   return {
@@ -81,19 +56,23 @@ function etiquetaRecibo(recibo, cargadoresPorId) {
   return `${nombre} — ${n} turno(s) · ${codigo}`;
 }
 
-function normalizarBusqueda(texto) {
-  return String(texto || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
+function aplicarPaqueteRecibos({ brazos, compras, cargadores }) {
+  const comprasMap = Object.fromEntries((compras || []).map((c) => [c.id, c]));
+  const cargadoresMap = Object.fromEntries((cargadores || []).map((c) => [c.id, c]));
+  return {
+    recibos: agruparRecibos(brazos || [], comprasMap),
+    cargadoresPorId: cargadoresMap,
+  };
 }
 
 export default function Impresion() {
   const { organizacion, organizacionId, hasPermiso } = useAuth();
-  const [recibos, setRecibos] = useState([]);
+  const [recibosRecientes, setRecibosRecientes] = useState([]);
+  const [recibosBusqueda, setRecibosBusqueda] = useState(null);
   const [cargadoresPorId, setCargadoresPorId] = useState({});
-  const [busqueda, setBusqueda] = useState('');
+  const [busquedaDevoto, setBusquedaDevoto] = useState('');
+  const [busquedaCodigo, setBusquedaCodigo] = useState('');
+  const [msgBusqueda, setMsgBusqueda] = useState('');
   const [selectedId, setSelectedId] = useState(null);
   const [detalle, setDetalle] = useState({
     cargador: null,
@@ -101,10 +80,12 @@ export default function Impresion() {
     items: [],
     compra: null,
   });
+  const [cargandoRecientes, setCargandoRecientes] = useState(true);
+  const [buscandoDevoto, setBuscandoDevoto] = useState(false);
+  const [buscandoCodigo, setBuscandoCodigo] = useState(false);
   const [enviandoCorreo, setEnviandoCorreo] = useState(false);
   const [msgReenvio, setMsgReenvio] = useState(null);
   const [reciboPorCodigo, setReciboPorCodigo] = useState(null);
-  const [buscandoCodigo, setBuscandoCodigo] = useState(false);
   const [devotoEditando, setDevotoEditando] = useState(null);
   const [guardandoDevoto, setGuardandoDevoto] = useState(false);
   const [errorDevoto, setErrorDevoto] = useState('');
@@ -112,39 +93,60 @@ export default function Impresion() {
   const [reenvioMasivoAbierto, setReenvioMasivoAbierto] = useState(false);
   const cortejosCacheRef = useRef(null);
 
-  const refresh = useCallback(async () => {
-    const brazos = await getBrazosVendidosByOrg(organizacionId);
-    const vendidos = Array.isArray(brazos) ? brazos : [];
-    const compraIds = [...new Set(vendidos.map((b) => b.compra_id).filter(Boolean))];
-    const cargadorIds = [...new Set(vendidos.map((b) => b.cargador_id).filter(Boolean))];
-
-    const [cargadores, compras] = await Promise.all([
-      getCargadoresByIds(cargadorIds, organizacionId),
-      compraIds.length ? getComprasByIds(compraIds, organizacionId) : Promise.resolve([]),
-    ]);
-
-    const map = {};
-    (Array.isArray(cargadores) ? cargadores : []).forEach((c) => {
-      map[c.id] = c;
-    });
-    const comprasMap = {};
-    (Array.isArray(compras) ? compras : []).forEach((c) => {
-      comprasMap[c.id] = c;
-    });
-    setRecibos(agruparRecibos(vendidos, comprasMap));
-    setCargadoresPorId(map);
+  const cargarRecientes = useCallback(async () => {
+    if (!organizacionId) return;
+    setCargandoRecientes(true);
+    try {
+      const pack = await getUltimosRecibosImpresion(organizacionId);
+      const { recibos, cargadoresPorId: map } = aplicarPaqueteRecibos(pack);
+      setRecibosRecientes(recibos);
+      setCargadoresPorId(map);
+      setRecibosBusqueda(null);
+      setMsgBusqueda('');
+      setReciboPorCodigo(null);
+      setBusquedaCodigo('');
+    } finally {
+      setCargandoRecientes(false);
+    }
   }, [organizacionId]);
 
   useEffect(() => {
     cortejosCacheRef.current = null;
-  }, [organizacionId]);
+    cargarRecientes();
+  }, [organizacionId, cargarRecientes]);
+
+  const handleBuscarDevoto = async (e) => {
+    e?.preventDefault();
+    const q = busquedaDevoto.trim();
+    if (!q) {
+      setRecibosBusqueda(null);
+      setMsgBusqueda('');
+      setReciboPorCodigo(null);
+      return;
+    }
+    setBuscandoDevoto(true);
+    setMsgBusqueda('');
+    setReciboPorCodigo(null);
+    setBusquedaCodigo('');
+    try {
+      const res = await buscarRecibosImpresion(organizacionId, q);
+      if (res.error) {
+        setMsgBusqueda(res.error);
+        setRecibosBusqueda([]);
+        return;
+      }
+      const { recibos, cargadoresPorId: map } = aplicarPaqueteRecibos(res);
+      setRecibosBusqueda(recibos);
+      setCargadoresPorId((prev) => ({ ...prev, ...map }));
+      setMsgBusqueda(res.mensaje || (recibos.length ? '' : 'Sin resultados.'));
+      if (recibos.length) setSelectedId(recibos[0].id);
+    } finally {
+      setBuscandoDevoto(false);
+    }
+  };
 
   useEffect(() => {
-    refresh();
-  }, [organizacionId, refresh]);
-
-  useEffect(() => {
-    const codigo = extraerCodigoBoleta(busqueda);
+    const codigo = extraerCodigoBoleta(busquedaCodigo);
     if (!/^V[RT]-[A-Z0-9]+$/i.test(codigo)) {
       setReciboPorCodigo(null);
       return undefined;
@@ -152,51 +154,54 @@ export default function Impresion() {
 
     let cancelado = false;
     setBuscandoCodigo(true);
+    setRecibosBusqueda(null);
+    setMsgBusqueda('');
     (async () => {
       const res = await buscarBoletaPorCodigo(organizacionId, codigo);
       if (cancelado) return;
       setBuscandoCodigo(false);
       if (res.error) {
         setReciboPorCodigo(null);
+        setMsgBusqueda(res.error);
         return;
       }
       const recibo = reciboDesdeBusqueda(res);
       setReciboPorCodigo(recibo);
+      if (res.cargador) {
+        setCargadoresPorId((prev) => ({ ...prev, [res.cargador.id]: res.cargador }));
+      }
       if (recibo) setSelectedId(recibo.id);
     })();
 
     return () => {
       cancelado = true;
     };
-  }, [busqueda, organizacionId]);
+  }, [busquedaCodigo, organizacionId]);
 
   const recibosLista = useMemo(() => {
-    if (!reciboPorCodigo) return recibos;
-    if (recibos.some((r) => r.id === reciboPorCodigo.id)) return recibos;
-    return [reciboPorCodigo, ...recibos];
-  }, [recibos, reciboPorCodigo]);
-
-  const recibosFiltrados = useMemo(
-    () => filtrarRecibos(recibosLista, cargadoresPorId, busqueda),
-    [recibosLista, cargadoresPorId, busqueda]
-  );
-
-  const hayFiltroActivo = Boolean(busqueda.trim());
+    if (reciboPorCodigo) {
+      const base = recibosBusqueda ?? recibosRecientes;
+      if (base.some((r) => r.id === reciboPorCodigo.id)) return base;
+      return [reciboPorCodigo, ...base];
+    }
+    if (recibosBusqueda !== null) return recibosBusqueda;
+    return recibosRecientes;
+  }, [recibosRecientes, recibosBusqueda, reciboPorCodigo]);
 
   const reciboSel = useMemo(
-    () => recibosFiltrados.find((r) => r.id === selectedId) || null,
-    [recibosFiltrados, selectedId]
+    () => recibosLista.find((r) => r.id === selectedId) || null,
+    [recibosLista, selectedId]
   );
 
   useEffect(() => {
-    if (!recibosFiltrados.length) {
+    if (!recibosLista.length) {
       setSelectedId(null);
       return;
     }
     setSelectedId((prev) =>
-      prev && recibosFiltrados.some((r) => r.id === prev) ? prev : recibosFiltrados[0].id
+      prev && recibosLista.some((r) => r.id === prev) ? prev : recibosLista[0].id
     );
-  }, [recibosFiltrados]);
+  }, [recibosLista]);
 
   useEffect(() => {
     setMsgReenvio(null);
@@ -314,16 +319,15 @@ export default function Impresion() {
     }
   };
 
-  if (!recibos.length) {
-    return (
-      <Layout title="Impresión de boletas" subtitle="Boleta con QR para validación y entrega">
-        <p className="text-muted">No hay ventas confirmadas para imprimir.</p>
-      </Layout>
-    );
-  }
+  const tituloLista =
+    reciboPorCodigo !== null
+      ? 'Boleta por código'
+      : recibosBusqueda !== null
+        ? 'Resultados de búsqueda'
+        : `Últimas ${IMPRESION_RECIBOS_RECIENTES} ventas`;
 
   return (
-    <Layout title="Impresión de boletas" subtitle="Busque por devoto(a), imprima o reenvíe boleta">
+    <Layout title="Impresión de boletas" subtitle="Últimas ventas o búsqueda puntual por devoto(a)">
       {okDevoto && <div className="alert alert--success no-print">{okDevoto}</div>}
       {organizacion?.subdominio_slug && (
         <div className="info-box no-print mis-turnos-enlace-admin">
@@ -334,42 +338,91 @@ export default function Impresion() {
           <code>{typeof window !== 'undefined' ? `${window.location.origin}/mis-turnos/${organizacion.subdominio_slug}` : `/mis-turnos/${organizacion.subdominio_slug}`}</code>
         </div>
       )}
-      <div className="impresion-controls no-print">
-        <label className="impresion-controls__busqueda">
-          Buscar {TERMINO_DEVOTO.toLowerCase()}
-          <input
-            type="search"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Nombre, CUI o código VR- / VT-…"
-            autoComplete="off"
-          />
-          <small className="field-hint">
-            {buscandoCodigo
-              ? 'Buscando por código…'
-              : `${recibosFiltrados.length} de ${recibosLista.length} recibo(s)`}
-          </small>
-        </label>
 
-        {recibosFiltrados.length > 0 ? (
-          <label>
-            Resultado
-            <select
-              value={selectedId || ''}
-              onChange={(e) => setSelectedId(e.target.value)}
+      <div className="impresion-controls no-print">
+        <section className="impresion-controls__bloque">
+          <h3 className="impresion-controls__titulo">{tituloLista}</h3>
+          {cargandoRecientes ? (
+            <p className="text-muted">Cargando ventas recientes…</p>
+          ) : recibosLista.length > 0 ? (
+            <label>
+              Recibo
+              <select
+                value={selectedId || ''}
+                onChange={(e) => setSelectedId(e.target.value)}
+              >
+                {recibosLista.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {etiquetaRecibo(r, cargadoresPorId)}
+                  </option>
+                ))}
+              </select>
+              <small className="field-hint">
+                {recibosBusqueda === null && !reciboPorCodigo
+                  ? `Mostrando las ${recibosLista.length} ventas más recientes.`
+                  : `${recibosLista.length} recibo(s) encontrado(s).`}
+              </small>
+            </label>
+          ) : (
+            <p className="text-muted">No hay ventas recientes para mostrar.</p>
+          )}
+          {recibosBusqueda !== null && (
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => {
+                setBusquedaDevoto('');
+                setRecibosBusqueda(null);
+                setMsgBusqueda('');
+                cargarRecientes();
+              }}
             >
-              {recibosFiltrados.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {etiquetaRecibo(r, cargadoresPorId)}
-                </option>
-              ))}
-            </select>
+              Volver a últimas ventas
+            </button>
+          )}
+        </section>
+
+        <section className="impresion-controls__bloque">
+          <h3 className="impresion-controls__titulo">Buscar otra boleta</h3>
+          <form onSubmit={handleBuscarDevoto} className="impresion-controls__busqueda-form">
+            <label className="impresion-controls__busqueda">
+              {TERMINO_DEVOTO}(a) — nombre, CUI o WhatsApp
+              <input
+                type="search"
+                value={busquedaDevoto}
+                onChange={(e) => setBusquedaDevoto(e.target.value)}
+                placeholder="Ej. García, 1234567890123 o 55551234"
+                autoComplete="off"
+              />
+            </label>
+            <button
+              type="submit"
+              className="btn btn--primary"
+              disabled={buscandoDevoto || !busquedaDevoto.trim()}
+            >
+              {buscandoDevoto ? 'Buscando…' : 'Buscar'}
+            </button>
+          </form>
+          <label className="impresion-controls__busqueda">
+            Código de boleta (VR- / VT-)
+            <input
+              type="search"
+              value={busquedaCodigo}
+              onChange={(e) => {
+                setBusquedaCodigo(e.target.value);
+                setBusquedaDevoto('');
+              }}
+              placeholder="VR-XXXXXXXX o VT-XXXXXXXX"
+              autoComplete="off"
+            />
+            <small className="field-hint">
+              {buscandoCodigo ? 'Buscando por código…' : 'Búsqueda directa por código de recibo.'}
+            </small>
           </label>
-        ) : (
-          <p className="impresion-controls__sin-resultados text-muted">
-            No hay coincidencias. Limpie la búsqueda o pruebe otro nombre.
-          </p>
-        )}
+          {msgBusqueda && (
+            <p className="impresion-controls__sin-resultados text-muted">{msgBusqueda}</p>
+          )}
+        </section>
 
         <div className="impresion-controls__acciones">
           <button
@@ -486,7 +539,11 @@ export default function Impresion() {
           </p>
         </div>
       ) : (
-        <p className="text-muted no-print">Ajuste la búsqueda para ver una boleta.</p>
+        !cargandoRecientes && (
+          <p className="text-muted no-print">
+            Use la búsqueda por {TERMINO_DEVOTO.toLowerCase()}(a) o código VR-/VT- para encontrar una boleta.
+          </p>
+        )
       )}
 
       <p className="impresion-print-tip no-print">
@@ -507,11 +564,11 @@ export default function Impresion() {
         abierto={reenvioMasivoAbierto}
         onCerrar={() => setReenvioMasivoAbierto(false)}
         recibosTodos={recibosLista}
-        recibosFiltrados={recibosFiltrados}
+        recibosFiltrados={recibosLista}
         cargadoresPorId={cargadoresPorId}
         organizacionId={organizacionId}
         organizacion={organizacion}
-        hayFiltroActivo={hayFiltroActivo}
+        hayFiltroActivo={recibosBusqueda !== null || Boolean(reciboPorCodigo)}
       />
     </Layout>
   );
