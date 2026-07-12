@@ -86,6 +86,11 @@ export const getCargadoresByOrg = (organizacionId) =>
     ? sb.getCargadoresByOrg(organizacionId)
     : Promise.resolve(mock.getCargadoresByOrg(organizacionId));
 
+export const getCargadoresByIds = (cargadorIds, organizacionId) =>
+  isSupabaseBackend()
+    ? sb.getCargadoresByIds(cargadorIds, organizacionId)
+    : Promise.resolve(mock.getCargadoresByIdsMock(cargadorIds, organizacionId));
+
 export const updateDevoto = (organizacionId, cargadorId, datos) =>
   isSupabaseBackend()
     ? sb.updateDevoto(organizacionId, cargadorId, datos)
@@ -144,6 +149,11 @@ export const getComprasByOrg = (organizacionId) =>
   isSupabaseBackend()
     ? sb.getComprasByOrg(organizacionId)
     : Promise.resolve(mock.getComprasByOrgMock(organizacionId));
+
+export const getComprasByIds = (compraIds, organizacionId) =>
+  isSupabaseBackend()
+    ? sb.getComprasByIds(compraIds, organizacionId)
+    : Promise.resolve(mock.getComprasByIdsMock(compraIds, organizacionId));
 
 export const buscarBoletaPorCodigo = (organizacionId, codigo) =>
   isSupabaseBackend()

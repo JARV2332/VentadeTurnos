@@ -230,20 +230,25 @@ export default function Taquilla() {
   const refresh = useCallback(async () => {
     if (!cortejoId) return;
     try {
-      if (organizacionId) {
-        const ahora = Date.now();
-        if (ahora - ultimaLiberacionRef.current >= LIBERAR_RESERVAS_CADA_MS) {
-          ultimaLiberacionRef.current = ahora;
-          await liberarReservasTaquillaExpiradas(organizacionId);
-        }
-      }
-      // Brazos del cortejo activo: getTurnosAgrupados. Colgadas org-wide: count liviano.
-      let lista = await getTurnosAgrupados(cortejoId, organizacionId);
-      if (!Array.isArray(lista)) lista = [];
-      setTurnosTodos(lista);
-      if (organizacionId) {
-        setReservasColgadas(await contarReservasTaquillaColgadasOrg(organizacionId));
-      }
+      const ahora = Date.now();
+      const liberar =
+        organizacionId && ahora - ultimaLiberacionRef.current >= LIBERAR_RESERVAS_CADA_MS
+          ? (() => {
+              ultimaLiberacionRef.current = ahora;
+              return liberarReservasTaquillaExpiradas(organizacionId).catch((e) =>
+                console.warn('liberarReservasTaquillaExpiradas:', e)
+              );
+            })()
+          : null;
+
+      const [lista, colgadas] = await Promise.all([
+        getTurnosAgrupados(cortejoId, organizacionId),
+        organizacionId ? contarReservasTaquillaColgadasOrg(organizacionId) : Promise.resolve(0),
+        liberar,
+      ]);
+
+      setTurnosTodos(Array.isArray(lista) ? lista : []);
+      if (organizacionId) setReservasColgadas(colgadas);
     } catch (err) {
       console.error('Error al actualizar turnos en taquilla:', err);
     }
@@ -290,13 +295,14 @@ export default function Taquilla() {
 
   useEffect(() => {
     refreshCortejos();
+  }, [organizacionId, refreshCortejos]);
+
+  useEffect(() => {
+    if (!cortejoId) return undefined;
     refresh();
-    const unsub = subscribeData(organizacionId, () => {
-      refreshCortejos();
-      refresh();
-    });
+    const unsub = subscribeData(organizacionId, refresh);
     return unsub;
-  }, [organizacionId, refreshCortejos, refresh]);
+  }, [organizacionId, cortejoId, refresh]);
 
   useEffect(() => {
     const cortejoParam = searchParams.get('cortejo');

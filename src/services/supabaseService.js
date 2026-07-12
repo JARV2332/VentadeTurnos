@@ -74,6 +74,9 @@ const BRAZO_METRICS_FIELDS =
 const BRAZO_VENDIDO_FIELDS =
   'id, turno_id, numero_turno, numero_brazo, lado, estado, precio_pagado, codigo_boleta_qr, compra_id, cargador_id, mesa_id, vendedor_id, operador_nombre, metodo_pago, comprobante_url, estado_entrega, pago_confirmado_en, updated_at, created_at';
 
+const CARGADOR_LIST_FIELDS =
+  'id, organizacion_id, nombre_completo, whatsapp, correo, cui_o_identificacion, telefono_emergencia';
+
 const BRAZO_DEVOTO_FIELDS =
   'id, turno_id, numero_turno, numero_brazo, lado, estado, reserva_apartado, apartado_notas, asignado_nombre, cargador_id, precio_pagado, codigo_boleta_qr, compra_id, estado_entrega';
 
@@ -187,8 +190,8 @@ async function rollbackCortejoCompleto(cortejoId) {
 }
 
 /** Trae todos los brazos de un cortejo (Supabase limita ~1000 filas por consulta). */
-export async function getBrazosByCortejo(cortejoId, organizacionId) {
-  const turnos = await getTurnosByCortejo(cortejoId);
+export async function getBrazosByCortejo(cortejoId, organizacionId, turnosPrecargados) {
+  const turnos = turnosPrecargados ?? (await getTurnosByCortejo(cortejoId));
   const turnoIds = turnos.map((t) => t.id);
   if (!turnoIds.length) return [];
 
@@ -754,8 +757,11 @@ export async function getBrazosVendidosByOrg(organizacionId) {
 
 export async function getTurnosAgrupados(cortejoId, organizacionId) {
   const turnos = await getTurnosByCortejo(cortejoId);
-  const brazos = await getBrazosByCortejo(cortejoId, organizacionId);
-  const cargadores = await getCargadoresByOrg(organizacionId);
+  const brazos = await getBrazosByCortejo(cortejoId, organizacionId, turnos);
+  const cargadorIds = [...new Set(brazos.map((b) => b.cargador_id).filter(Boolean))];
+  const cargadores = cargadorIds.length
+    ? await getCargadoresByIds(cargadorIds, organizacionId)
+    : [];
   const cargadoresPorId = Object.fromEntries(cargadores.map((c) => [c.id, c]));
   const brazosEnriquecidos = brazos.map((b) => ({
     ...b,
@@ -795,10 +801,31 @@ export async function getCargadorById(cargadorId) {
 export async function getCargadoresByOrg(organizacionId) {
   const { data, error } = await supabase
     .from('cargadores_organizacion')
-    .select('*')
+    .select(CARGADOR_LIST_FIELDS)
     .eq('organizacion_id', organizacionId);
   if (error) throw error;
   return data || [];
+}
+
+/** Solo los devotos referenciados (evita cargar miles de filas en taquilla/impresión). */
+export async function getCargadoresByIds(cargadorIds, organizacionId) {
+  const ids = [...new Set((cargadorIds || []).filter(Boolean))];
+  if (!ids.length) return [];
+
+  const CHUNK = 100;
+  const all = [];
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const slice = ids.slice(i, i + CHUNK);
+    let q = supabase
+      .from('cargadores_organizacion')
+      .select(CARGADOR_LIST_FIELDS)
+      .in('id', slice);
+    if (organizacionId) q = q.eq('organizacion_id', organizacionId);
+    const { data, error } = await q;
+    if (error) throw error;
+    if (data?.length) all.push(...data);
+  }
+  return all;
 }
 
 export async function updateDevoto(organizacionId, cargadorId, datos) {
@@ -1061,6 +1088,16 @@ export async function reservarBrazo(brazoId, mesaId, vendedorId) {
 /** Libera en BD reservas de taquilla cuyos 5 minutos ya vencieron (no toca apartados formales). */
 export async function liberarReservasTaquillaExpiradas(organizacionId) {
   if (!organizacionId) return { liberados: 0 };
+
+  const { data, error } = await supabase.rpc('liberar_reservas_taquilla_expiradas', {
+    p_organizacion_id: organizacionId,
+  });
+  if (!error) return { liberados: typeof data === 'number' ? data : 0 };
+  if (isMissingRpc(error)) return liberarReservasTaquillaExpiradasPatch(organizacionId);
+  return err(error);
+}
+
+async function liberarReservasTaquillaExpiradasPatch(organizacionId) {
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from('brazos')
@@ -1215,6 +1252,27 @@ export async function getComprasByOrg(organizacionId) {
   return data || [];
 }
 
+/** Compras por IDs (impresión: solo recibos con venta activa). */
+export async function getComprasByIds(compraIds, organizacionId) {
+  const ids = [...new Set((compraIds || []).filter(Boolean))];
+  if (!ids.length) return [];
+
+  const CHUNK = 100;
+  const all = [];
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const slice = ids.slice(i, i + CHUNK);
+    let q = supabase.from('compras').select(COMPRA_LIST_FIELDS).in('id', slice);
+    if (organizacionId) q = q.eq('organizacion_id', organizacionId);
+    const { data, error } = await q;
+    if (error) {
+      if (error.code === '42P01') return [];
+      throw error;
+    }
+    if (data?.length) all.push(...data);
+  }
+  return all;
+}
+
 export async function confirmarVentaCompra(brazoIds, cargadorData, precios, pagoData = {}) {
   const orgId = cargadorData.organizacion_id;
   const upsert = await upsertDevotoVenta(orgId, cargadorData);
@@ -1364,7 +1422,8 @@ export async function buscarBoletaPorCodigo(organizacionId, codigo) {
     }
 
     const brazo = brazos[0];
-    const { data: turno } = await supabase.from('turnos').select('*').eq('id', brazo.turno_id).single();
+    const turnosMap = await getTurnosByIds(brazos.map((b) => b.turno_id));
+    const turno = turnosMap[brazo.turno_id] || null;
     const { data: cortejo } = turno?.cortejo_id
       ? await supabase.from('cortejos').select('*').eq('id', turno.cortejo_id).single()
       : { data: null };
@@ -1372,12 +1431,10 @@ export async function buscarBoletaPorCodigo(organizacionId, codigo) {
       return { error: 'La procesión de esta boleta está inactiva.' };
     }
     const cargador = brazo.cargador_id ? await getCargadorById(brazo.cargador_id) : null;
-    const items = await Promise.all(
-      brazos.map(async (b) => ({
-        brazo: b,
-        turno: b.turno_id === turno?.id ? turno : await getTurnoById(b.turno_id),
-      }))
-    );
+    const items = brazos.map((b) => ({
+      brazo: b,
+      turno: turnosMap[b.turno_id] || null,
+    }));
 
     return { brazo, brazos, compra, turno, cortejo, cargador, items };
   }
@@ -1410,7 +1467,8 @@ export async function buscarBoletaPorCodigo(organizacionId, codigo) {
     if (brazosCompra?.length) brazos = brazosCompra;
   }
 
-  const { data: turno } = await supabase.from('turnos').select('*').eq('id', brazo.turno_id).single();
+  const turnosMap = await getTurnosByIds(brazos.map((b) => b.turno_id));
+  const turno = turnosMap[brazo.turno_id] || null;
   const { data: cortejo } = turno?.cortejo_id
     ? await supabase.from('cortejos').select('*').eq('id', turno.cortejo_id).single()
     : { data: null };
@@ -1418,12 +1476,10 @@ export async function buscarBoletaPorCodigo(organizacionId, codigo) {
     return { error: 'La procesión de esta boleta está inactiva.' };
   }
   const cargador = brazo.cargador_id ? await getCargadorById(brazo.cargador_id) : null;
-  const items = await Promise.all(
-    brazos.map(async (b) => ({
-      brazo: b,
-      turno: b.turno_id === turno?.id ? turno : await getTurnoById(b.turno_id),
-    }))
-  );
+  const items = brazos.map((b) => ({
+    brazo: b,
+    turno: turnosMap[b.turno_id] || null,
+  }));
 
   return { brazo, brazos, compra, turno, cortejo, cargador, items };
 }

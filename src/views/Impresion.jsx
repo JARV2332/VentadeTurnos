@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import BoletaContraseñaTurno from '../components/BoletaContraseñaTurno';
@@ -8,8 +8,9 @@ import {
   getBrazosVendidosByOrg,
   getComprasByOrg,
   getCortejosByOrg,
-  getCargadoresByOrg,
-  getTurnoById,
+  getCargadoresByIds,
+  getComprasByIds,
+  getTurnosByIds,
   buscarBoletaPorCodigo,
   updateDevoto,
 } from '../services/dataService';
@@ -109,14 +110,19 @@ export default function Impresion() {
   const [errorDevoto, setErrorDevoto] = useState('');
   const [okDevoto, setOkDevoto] = useState('');
   const [reenvioMasivoAbierto, setReenvioMasivoAbierto] = useState(false);
+  const cortejosCacheRef = useRef(null);
 
   const refresh = useCallback(async () => {
-    const [brazos, cargadores, compras] = await Promise.all([
-      getBrazosVendidosByOrg(organizacionId),
-      getCargadoresByOrg(organizacionId),
-      getComprasByOrg(organizacionId),
-    ]);
+    const brazos = await getBrazosVendidosByOrg(organizacionId);
     const vendidos = Array.isArray(brazos) ? brazos : [];
+    const compraIds = [...new Set(vendidos.map((b) => b.compra_id).filter(Boolean))];
+    const cargadorIds = [...new Set(vendidos.map((b) => b.cargador_id).filter(Boolean))];
+
+    const [cargadores, compras] = await Promise.all([
+      getCargadoresByIds(cargadorIds, organizacionId),
+      compraIds.length ? getComprasByIds(compraIds, organizacionId) : Promise.resolve([]),
+    ]);
+
     const map = {};
     (Array.isArray(cargadores) ? cargadores : []).forEach((c) => {
       map[c.id] = c;
@@ -127,6 +133,10 @@ export default function Impresion() {
     });
     setRecibos(agruparRecibos(vendidos, comprasMap));
     setCargadoresPorId(map);
+  }, [organizacionId]);
+
+  useEffect(() => {
+    cortejosCacheRef.current = null;
   }, [organizacionId]);
 
   useEffect(() => {
@@ -196,13 +206,20 @@ export default function Impresion() {
         return;
       }
       const cargador = cargadoresPorId[reciboSel.brazos[0]?.cargador_id] || null;
-      const cortejos = await getCortejosByOrg(organizacionId);
-      const items = await Promise.all(
-        reciboSel.brazos.map(async (b) => ({
-          brazo: b,
-          turno: await getTurnoById(b.turno_id),
-        }))
-      );
+      const turnoIds = reciboSel.brazos.map((b) => b.turno_id);
+      const [turnosMap, cortejos] = await Promise.all([
+        getTurnosByIds(turnoIds),
+        cortejosCacheRef.current
+          ? Promise.resolve(cortejosCacheRef.current)
+          : getCortejosByOrg(organizacionId).then((c) => {
+              cortejosCacheRef.current = c;
+              return c;
+            }),
+      ]);
+      const items = reciboSel.brazos.map((b) => ({
+        brazo: b,
+        turno: turnosMap[b.turno_id] || null,
+      }));
       const cortejo =
         cortejos.find((c) => c.id === items[0]?.turno?.cortejo_id) || null;
       setDetalle({

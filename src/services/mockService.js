@@ -385,6 +385,13 @@ export function getCargadoresByOrg(organizacionId) {
   return store.cargadores.filter((c) => c.organizacion_id === organizacionId);
 }
 
+export function getCargadoresByIdsMock(cargadorIds, organizacionId) {
+  const ids = new Set((cargadorIds || []).filter(Boolean));
+  return store.cargadores.filter(
+    (c) => ids.has(c.id) && (!organizacionId || c.organizacion_id === organizacionId)
+  );
+}
+
 export function updateDevotoMock(organizacionId, cargadorId, datos) {
   if (!cargadorId) return { error: 'Devoto no válido.' };
 
@@ -1087,6 +1094,13 @@ export function confirmarVentaCompraMock(
 
 export function getComprasByOrgMock(organizacionId) {
   return (store.compras || []).filter((c) => c.organizacion_id === organizacionId);
+}
+
+export function getComprasByIdsMock(compraIds, organizacionId) {
+  const ids = new Set((compraIds || []).filter(Boolean));
+  return (store.compras || []).filter(
+    (c) => ids.has(c.id) && (!organizacionId || c.organizacion_id === organizacionId)
+  );
 }
 
 /** Genera procesión: turno 1 salida, último entrada, extraordinarios en posiciones elegidas */

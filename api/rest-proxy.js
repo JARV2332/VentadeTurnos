@@ -5,13 +5,40 @@ import { getSupabaseConfig } from './verifyCaller.js';
 import { verifyAuth } from './verifyAuth.js';
 
 const ALLOWED_METHODS = new Set(['PATCH', 'DELETE']);
+const AUTH_CACHE_MS = 60_000;
+const authCache = new Map();
+
+async function verifyAuthCached(req) {
+  const authHeader = req.headers.authorization || '';
+  if (!authHeader.startsWith('Bearer ')) {
+    return { status: 401, error: 'No autorizado' };
+  }
+
+  const token = authHeader.slice(7);
+  const cached = authCache.get(token);
+  if (cached && cached.expires > Date.now()) {
+    return cached.result;
+  }
+
+  const result = await verifyAuth(req);
+  if (!result.status) {
+    authCache.set(token, { result, expires: Date.now() + AUTH_CACHE_MS });
+    if (authCache.size > 200) {
+      const now = Date.now();
+      for (const [key, entry] of authCache) {
+        if (entry.expires <= now) authCache.delete(key);
+      }
+    }
+  }
+  return result;
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const auth = await verifyAuth(req);
+  const auth = await verifyAuthCached(req);
   if (auth.status) {
     return res.status(auth.status).json({ error: auth.error });
   }

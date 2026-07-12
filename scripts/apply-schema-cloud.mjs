@@ -38,6 +38,7 @@ const SQL_FILES = [
   '018_anular_venta.sql',
   '019_horario_turno.sql',
   '020_devoto_whatsapp_no_unique.sql',
+  '021_perf_taquilla_impresion.sql',
 ];
 
 if (!DATABASE_URL || DATABASE_URL.includes('[YOUR-PASSWORD]')) {
