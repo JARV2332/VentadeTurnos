@@ -189,32 +189,43 @@ async function rollbackCortejoCompleto(cortejoId) {
   await supabase.from('cortejos').delete().eq('id', cortejoId);
 }
 
-/** Trae todos los brazos de un cortejo (Supabase limita ~1000 filas por consulta). */
+/** Trae todos los brazos de un cortejo (JOIN RPC o lotes por turno; sin OFFSET lento). */
 export async function getBrazosByCortejo(cortejoId, organizacionId, turnosPrecargados) {
+  if (!cortejoId || !organizacionId) return [];
+
   const turnos = turnosPrecargados ?? (await getTurnosByCortejo(cortejoId));
   const turnoIds = turnos.map((t) => t.id);
   if (!turnoIds.length) return [];
 
-  const PAGE = 500;
-  const all = [];
-  let from = 0;
-
-  while (true) {
-    const { data, error } = await supabase
-      .from('brazos')
-      .select(BRAZO_LIST_FIELDS)
-      .eq('organizacion_id', organizacionId)
-      .in('turno_id', turnoIds)
-      .order('turno_id')
-      .order('numero_brazo')
-      .range(from, from + PAGE - 1);
-    if (error) throw error;
-    if (!data?.length) break;
-    all.push(...data);
-    if (data.length < PAGE) break;
-    from += PAGE;
+  const { data: rpcData, error: rpcError } = await supabase.rpc('get_brazos_cortejo', {
+    p_cortejo_id: cortejoId,
+    p_organizacion_id: organizacionId,
+  });
+  if (!rpcError && Array.isArray(rpcData) && rpcData.length > 0 && rpcData.length < 1000) {
+    return rpcData;
+  }
+  if (rpcError && !isMissingRpc(rpcError)) {
+    console.warn('get_brazos_cortejo RPC:', rpcError.message);
   }
 
+  const TURNO_BATCH = 10;
+  const tareas = [];
+  for (let i = 0; i < turnoIds.length; i += TURNO_BATCH) {
+    const batch = turnoIds.slice(i, i + TURNO_BATCH);
+    tareas.push(
+      supabase
+        .from('brazos')
+        .select(BRAZO_LIST_FIELDS)
+        .eq('organizacion_id', organizacionId)
+        .in('turno_id', batch)
+    );
+  }
+  const resultados = await Promise.all(tareas);
+  const all = [];
+  for (const { data, error } of resultados) {
+    if (error) throw error;
+    if (data?.length) all.push(...data);
+  }
   return all;
 }
 
@@ -706,7 +717,7 @@ export async function agregarTurnoProcesion(organizacionId, cortejoId, datos) {
 export async function getTurnosByCortejo(cortejoId) {
   const { data, error } = await supabase
     .from('turnos')
-    .select('*')
+    .select(TURNO_LIST_FIELDS)
     .eq('cortejo_id', cortejoId)
     .order('numero_turno');
   if (error) throw error;

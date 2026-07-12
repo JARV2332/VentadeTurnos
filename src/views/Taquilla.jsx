@@ -80,7 +80,12 @@ export default function Taquilla() {
   );
   const ventaPanelRef = useRef(null);
   const ultimaLiberacionRef = useRef(0);
+  const refreshInFlightRef = useRef(false);
+  const refreshQueuedRef = useRef(false);
+  const ultimoConteoColgadasRef = useRef(0);
   const LIBERAR_RESERVAS_CADA_MS = 3 * 60 * 1000;
+  const CONTEO_COLGADAS_CADA_MS = 60 * 1000;
+  const REALTIME_DEBOUNCE_MS = 900;
 
   const ventaAbierta = carrito.length > 0;
   const cobroAbierto = ventaAbierta && pasoVenta >= 1;
@@ -229,6 +234,11 @@ export default function Taquilla() {
 
   const refresh = useCallback(async () => {
     if (!cortejoId) return;
+    if (refreshInFlightRef.current) {
+      refreshQueuedRef.current = true;
+      return;
+    }
+    refreshInFlightRef.current = true;
     try {
       const ahora = Date.now();
       const liberar =
@@ -241,16 +251,27 @@ export default function Taquilla() {
             })()
           : null;
 
+      const needConteo = ahora - ultimoConteoColgadasRef.current >= CONTEO_COLGADAS_CADA_MS;
+      if (needConteo) ultimoConteoColgadasRef.current = ahora;
+
       const [lista, colgadas] = await Promise.all([
         getTurnosAgrupados(cortejoId, organizacionId),
-        organizacionId ? contarReservasTaquillaColgadasOrg(organizacionId) : Promise.resolve(0),
+        needConteo && organizacionId
+          ? contarReservasTaquillaColgadasOrg(organizacionId)
+          : Promise.resolve(null),
         liberar,
       ]);
 
       setTurnosTodos(Array.isArray(lista) ? lista : []);
-      if (organizacionId) setReservasColgadas(colgadas);
+      if (colgadas != null) setReservasColgadas(colgadas);
     } catch (err) {
       console.error('Error al actualizar turnos en taquilla:', err);
+    } finally {
+      refreshInFlightRef.current = false;
+      if (refreshQueuedRef.current) {
+        refreshQueuedRef.current = false;
+        refresh();
+      }
     }
   }, [cortejoId, organizacionId]);
 
@@ -300,7 +321,7 @@ export default function Taquilla() {
   useEffect(() => {
     if (!cortejoId) return undefined;
     refresh();
-    const unsub = subscribeData(organizacionId, refresh);
+    const unsub = subscribeData(organizacionId, refresh, REALTIME_DEBOUNCE_MS);
     return unsub;
   }, [organizacionId, cortejoId, refresh]);
 

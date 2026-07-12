@@ -39,6 +39,7 @@ const SQL_FILES = [
   '019_horario_turno.sql',
   '020_devoto_whatsapp_no_unique.sql',
   '021_perf_taquilla_impresion.sql',
+  '022_brazos_cortejo_rpc.sql',
 ];
 
 if (!DATABASE_URL || DATABASE_URL.includes('[YOUR-PASSWORD]')) {
