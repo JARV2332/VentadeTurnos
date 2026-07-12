@@ -68,6 +68,11 @@ const BRAZOS_PAGE = 500;
 const BRAZO_LIST_FIELDS =
   'id, organizacion_id, turno_id, numero_turno, numero_brazo, lado, estado, reserva_apartado, apartado_notas, asignado_nombre, cargador_id, bloqueado_hasta, mesa_id, vendedor_id, precio_pagado, codigo_boleta_qr, compra_id, metodo_pago, comprobante_url, estado_entrega, operador_nombre, pago_confirmado_en, updated_at, created_at';
 
+const BRAZO_TAQUILLA_FIELDS =
+  'id, turno_id, numero_turno, numero_brazo, lado, estado, reserva_apartado, apartado_notas, asignado_nombre, cargador_id, bloqueado_hasta, mesa_id, vendedor_id, precio_pagado';
+
+const BRAZOS_RPC_PAGE = 1000;
+
 const BRAZO_METRICS_FIELDS =
   'id, turno_id, estado, reserva_apartado, estado_entrega, precio_pagado, updated_at, created_at, bloqueado_hasta';
 
@@ -189,33 +194,62 @@ async function rollbackCortejoCompleto(cortejoId) {
   await supabase.from('cortejos').delete().eq('id', cortejoId);
 }
 
-/** Trae todos los brazos de un cortejo (JOIN RPC o lotes por turno; sin OFFSET lento). */
-export async function getBrazosByCortejo(cortejoId, organizacionId, turnosPrecargados) {
+async function fetchBrazosCortejoRpc(cortejoId, organizacionId) {
+  const all = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .rpc('get_brazos_cortejo', {
+        p_cortejo_id: cortejoId,
+        p_organizacion_id: organizacionId,
+      })
+      .range(from, from + BRAZOS_RPC_PAGE - 1);
+    if (error) return { error, data: null };
+    const page = data || [];
+    all.push(...page);
+    if (page.length < BRAZOS_RPC_PAGE) break;
+    from += BRAZOS_RPC_PAGE;
+  }
+  return { error: null, data: all };
+}
+
+function mapBrazosTaquillaRpc(brazos) {
+  return (brazos || []).map(({ cargador_nombre, lado_ord, ...b }) => ({
+    ...b,
+    cargador: b.cargador_id
+      ? {
+          id: b.cargador_id,
+          nombre_completo: cargador_nombre || b.asignado_nombre || '',
+        }
+      : null,
+  }));
+}
+
+/** Trae todos los brazos de un cortejo (JOIN RPC paginado o lotes por turno). */
+export async function getBrazosByCortejo(cortejoId, organizacionId, turnosPrecargados, opts = {}) {
   if (!cortejoId || !organizacionId) return [];
 
+  const selectFields = opts.campos || BRAZO_LIST_FIELDS;
   const turnos = turnosPrecargados ?? (await getTurnosByCortejo(cortejoId));
   const turnoIds = turnos.map((t) => t.id);
   if (!turnoIds.length) return [];
 
-  const { data: rpcData, error: rpcError } = await supabase.rpc('get_brazos_cortejo', {
-    p_cortejo_id: cortejoId,
-    p_organizacion_id: organizacionId,
-  });
-  if (!rpcError && Array.isArray(rpcData) && rpcData.length > 0 && rpcData.length < 1000) {
-    return rpcData;
+  const rpc = await fetchBrazosCortejoRpc(cortejoId, organizacionId);
+  if (!rpc.error && Array.isArray(rpc.data)) {
+    return rpc.data;
   }
-  if (rpcError && !isMissingRpc(rpcError)) {
-    console.warn('get_brazos_cortejo RPC:', rpcError.message);
+  if (rpc.error && !isMissingRpc(rpc.error)) {
+    console.warn('get_brazos_cortejo RPC:', rpc.error.message);
   }
 
-  const TURNO_BATCH = 10;
+  const TURNO_BATCH = 20;
   const tareas = [];
   for (let i = 0; i < turnoIds.length; i += TURNO_BATCH) {
     const batch = turnoIds.slice(i, i + TURNO_BATCH);
     tareas.push(
       supabase
         .from('brazos')
-        .select(BRAZO_LIST_FIELDS)
+        .select(selectFields)
         .eq('organizacion_id', organizacionId)
         .in('turno_id', batch)
     );
@@ -899,6 +933,55 @@ export async function buscarRecibosImpresion(organizacionId, query) {
   };
 }
 
+function enriquecerBrazosConCargadores(brazos, cargadoresPorId) {
+  return brazos.map((b) => ({
+    ...b,
+    cargador: b.cargador || cargadoresPorId[b.cargador_id] || null,
+  }));
+}
+
+async function getTurnosAgrupadosTaquillaFallback(cortejoId, organizacionId) {
+  const turnos = await getTurnosByCortejo(cortejoId);
+  const brazos = await getBrazosByCortejo(cortejoId, organizacionId, turnos, {
+    campos: BRAZO_TAQUILLA_FIELDS,
+  });
+  const cargadorIds = [
+    ...new Set(
+      brazos
+        .filter((b) => b.estado !== 'disponible' || b.reserva_apartado)
+        .map((b) => b.cargador_id)
+        .filter(Boolean)
+    ),
+  ];
+  const cargadores = cargadorIds.length
+    ? await getCargadoresByIds(cargadorIds, organizacionId)
+    : [];
+  const cargadoresPorId = Object.fromEntries(cargadores.map((c) => [c.id, c]));
+  return agruparTurnosConBrazos(turnos, enriquecerBrazosConCargadores(brazos, cargadoresPorId));
+}
+
+/** Taquilla: 1 RPC (turnos + brazos ligeros + nombre devoto) o fallback optimizado. */
+export async function getTurnosAgrupadosTaquilla(cortejoId, organizacionId) {
+  if (!cortejoId || !organizacionId) return [];
+
+  const { data, error } = await supabase.rpc('get_taquilla_cortejo', {
+    p_cortejo_id: cortejoId,
+    p_organizacion_id: organizacionId,
+  });
+
+  if (!error && data && typeof data === 'object') {
+    const turnos = data.turnos || [];
+    const brazos = mapBrazosTaquillaRpc(data.brazos);
+    return agruparTurnosConBrazos(turnos, brazos);
+  }
+
+  if (error && !isMissingRpc(error)) {
+    console.warn('get_taquilla_cortejo RPC:', error.message);
+  }
+
+  return getTurnosAgrupadosTaquillaFallback(cortejoId, organizacionId);
+}
+
 export async function getTurnosAgrupados(cortejoId, organizacionId) {
   const turnos = await getTurnosByCortejo(cortejoId);
   const brazos = await getBrazosByCortejo(cortejoId, organizacionId, turnos);
@@ -907,11 +990,7 @@ export async function getTurnosAgrupados(cortejoId, organizacionId) {
     ? await getCargadoresByIds(cargadorIds, organizacionId)
     : [];
   const cargadoresPorId = Object.fromEntries(cargadores.map((c) => [c.id, c]));
-  const brazosEnriquecidos = brazos.map((b) => ({
-    ...b,
-    cargador: cargadoresPorId[b.cargador_id] || null,
-  }));
-  return agruparTurnosConBrazos(turnos, brazosEnriquecidos);
+  return agruparTurnosConBrazos(turnos, enriquecerBrazosConCargadores(brazos, cargadoresPorId));
 }
 
 export async function getMesasByOrg(organizacionId) {

@@ -57,20 +57,26 @@ export function crearBrazosParaTurno({
 export function agruparTurnosConBrazos(turnos, brazos) {
   const listaTurnos = Array.isArray(turnos) ? turnos : [];
   const listaBrazos = Array.isArray(brazos) ? brazos : [];
+  const porTurno = new Map();
+  for (const b of listaBrazos) {
+    const key = b.turno_id;
+    if (!porTurno.has(key)) porTurno.set(key, []);
+    porTurno.get(key).push(b);
+  }
   return listaTurnos
     .slice()
     .sort((a, b) => a.numero_turno - b.numero_turno)
     .map((turno) => {
-      const delTurno = listaBrazos.filter((b) => b.turno_id === turno.id);
-      return {
-        ...turno,
-        izquierda: delTurno
-          .filter((b) => b.lado === 'Izquierda')
-          .sort((a, b) => a.numero_brazo - b.numero_brazo),
-        derecha: delTurno
-          .filter((b) => b.lado === 'Derecha')
-          .sort((a, b) => a.numero_brazo - b.numero_brazo),
-      };
+      const delTurno = porTurno.get(turno.id) || [];
+      const izquierda = [];
+      const derecha = [];
+      for (const b of delTurno) {
+        if (b.lado === 'Izquierda') izquierda.push(b);
+        else derecha.push(b);
+      }
+      izquierda.sort((a, b) => a.numero_brazo - b.numero_brazo);
+      derecha.sort((a, b) => a.numero_brazo - b.numero_brazo);
+      return { ...turno, izquierda, derecha };
     });
 }
 

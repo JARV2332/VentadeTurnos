@@ -68,6 +68,11 @@ export const getTurnosAgrupados = (cortejoId, organizacionId) =>
     ? sb.getTurnosAgrupados(cortejoId, organizacionId)
     : Promise.resolve(mock.getTurnosAgrupados(cortejoId, organizacionId));
 
+export const getTurnosAgrupadosTaquilla = (cortejoId, organizacionId) =>
+  isSupabaseBackend()
+    ? sb.getTurnosAgrupadosTaquilla(cortejoId, organizacionId)
+    : Promise.resolve(mock.getTurnosAgrupados(cortejoId, organizacionId));
+
 export const getTurnosByCortejo = (cortejoId) =>
   isSupabaseBackend()
     ? sb.getTurnosByCortejo(cortejoId)

@@ -6,7 +6,7 @@ import { TurnoCartulina } from '../components/TurnoCartulina';
 import { useAuth } from '../context/AuthContext';
 import {
   getCortejosByOrg,
-  getTurnosAgrupados,
+  getTurnosAgrupadosTaquilla,
   getMesasByOrg,
   contarReservasTaquillaColgadasOrg,
   subscribeData,
@@ -16,6 +16,7 @@ import {
   buscarCargadorPorCui,
   getCargadorById,
 } from '../services/dataService';
+import { leerCacheTaquilla, guardarCacheTaquilla } from '../utils/taquillaCacheUtils';
 import { enviarBoletaPorCorreo } from '../services/emailService';
 import {
   METODOS_PAGO,
@@ -53,6 +54,7 @@ export default function Taquilla() {
   const [filtroTipo, setFiltroTipo] = useState('all');
   const [turnoFoco, setTurnoFoco] = useState(() => searchParams.get('turno') || '');
   const [turnosTodos, setTurnosTodos] = useState([]);
+  const [cargandoTurnos, setCargandoTurnos] = useState(true);
   const [busquedaApartado, setBusquedaApartado] = useState('');
   const [extraApartadosCui, setExtraApartadosCui] = useState([]);
   const [carrito, setCarrito] = useState([]);
@@ -218,9 +220,11 @@ export default function Taquilla() {
 
   const refreshCortejos = useCallback(async () => {
     if (!organizacionId) return;
-    const lista = await getCortejosByOrg(organizacionId);
+    const [lista, mesas] = await Promise.all([
+      getCortejosByOrg(organizacionId),
+      getMesasByOrg(organizacionId),
+    ]);
     setCortejos(Array.isArray(lista) ? lista : []);
-    const mesas = await getMesasByOrg(organizacionId);
     setMesaActiva(mesas.find((m) => m.estado === 'activa') || mesas[0] || null);
     const ultimo = sessionStorage.getItem('vtd_ultimo_cortejo');
     if (ultimo && lista.some((c) => c.id === ultimo)) {
@@ -233,40 +237,47 @@ export default function Taquilla() {
   }, [organizacionId]);
 
   const refresh = useCallback(async () => {
-    if (!cortejoId) return;
+    if (!cortejoId || !organizacionId) return;
     if (refreshInFlightRef.current) {
       refreshQueuedRef.current = true;
       return;
     }
     refreshInFlightRef.current = true;
+
+    const cached = leerCacheTaquilla(organizacionId, cortejoId);
+    if (cached) {
+      setTurnosTodos(cached);
+      setCargandoTurnos(false);
+    } else {
+      setCargandoTurnos(true);
+    }
+
     try {
       const ahora = Date.now();
-      const liberar =
-        organizacionId && ahora - ultimaLiberacionRef.current >= LIBERAR_RESERVAS_CADA_MS
-          ? (() => {
-              ultimaLiberacionRef.current = ahora;
-              return liberarReservasTaquillaExpiradas(organizacionId).catch((e) =>
-                console.warn('liberarReservasTaquillaExpiradas:', e)
-              );
-            })()
-          : null;
+      if (ahora - ultimaLiberacionRef.current >= LIBERAR_RESERVAS_CADA_MS) {
+        ultimaLiberacionRef.current = ahora;
+        liberarReservasTaquillaExpiradas(organizacionId).catch((e) =>
+          console.warn('liberarReservasTaquillaExpiradas:', e)
+        );
+      }
 
       const needConteo = ahora - ultimoConteoColgadasRef.current >= CONTEO_COLGADAS_CADA_MS;
       if (needConteo) ultimoConteoColgadasRef.current = ahora;
 
-      const [lista, colgadas] = await Promise.all([
-        getTurnosAgrupados(cortejoId, organizacionId),
-        needConteo && organizacionId
-          ? contarReservasTaquillaColgadasOrg(organizacionId)
-          : Promise.resolve(null),
-        liberar,
-      ]);
+      const lista = await getTurnosAgrupadosTaquilla(cortejoId, organizacionId);
+      const turnos = Array.isArray(lista) ? lista : [];
+      setTurnosTodos(turnos);
+      guardarCacheTaquilla(organizacionId, cortejoId, turnos);
 
-      setTurnosTodos(Array.isArray(lista) ? lista : []);
-      if (colgadas != null) setReservasColgadas(colgadas);
+      if (needConteo) {
+        contarReservasTaquillaColgadasOrg(organizacionId)
+          .then((colgadas) => setReservasColgadas(colgadas))
+          .catch((e) => console.warn('contarReservasTaquillaColgadasOrg:', e));
+      }
     } catch (err) {
       console.error('Error al actualizar turnos en taquilla:', err);
     } finally {
+      setCargandoTurnos(false);
       refreshInFlightRef.current = false;
       if (refreshQueuedRef.current) {
         refreshQueuedRef.current = false;
@@ -729,7 +740,9 @@ export default function Taquilla() {
 
       <div className="taquilla-layout">
         <div className="turnos-lista">
-          {turnos.length === 0 ? (
+          {cargandoTurnos && turnosTodos.length === 0 ? (
+            <p className="text-muted">Cargando turnos…</p>
+          ) : turnos.length === 0 ? (
             <p className="text-muted">
               {busquedaApartado.trim().length >= 2
                 ? 'Ningún turno visible coincide con la búsqueda.'
