@@ -172,6 +172,11 @@ export const getComprasByOrg = (organizacionId) =>
     ? sb.getComprasByOrg(organizacionId)
     : Promise.resolve(mock.getComprasByOrgMock(organizacionId));
 
+export const getComprobanteVentaBrazo = (organizacionId, brazoId) =>
+  isSupabaseBackend()
+    ? sb.getComprobanteVentaBrazo(organizacionId, brazoId)
+    : Promise.resolve(null);
+
 export const getComprasByIds = (compraIds, organizacionId) =>
   isSupabaseBackend()
     ? sb.getComprasByIds(compraIds, organizacionId)

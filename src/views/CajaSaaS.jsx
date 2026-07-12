@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Layout from '../components/Layout';
 import Loader from '../components/Loader';
 import CajaReportePanel from '../components/CajaReportePanel';
@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   getFinanzasByOrg,
   getComprasByOrg,
+  getComprobanteVentaBrazo,
   subscribeData,
   buscarBoletaPorCodigo,
   anularVentaPorCodigo,
@@ -42,6 +43,7 @@ export default function CajaSaaS() {
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [comprobanteVer, setComprobanteVer] = useState(null);
+  const [cargandoComprobanteId, setCargandoComprobanteId] = useState(null);
   const [anularAbierto, setAnularAbierto] = useState(false);
   const [codigoAnular, setCodigoAnular] = useState('');
   const [previewAnular, setPreviewAnular] = useState(null);
@@ -57,8 +59,16 @@ export default function CajaSaaS() {
   const [devotoEditando, setDevotoEditando] = useState(null);
   const [guardandoDevoto, setGuardandoDevoto] = useState(false);
   const [errorDevoto, setErrorDevoto] = useState('');
+  const refreshInFlightRef = useRef(false);
+  const refreshQueuedRef = useRef(false);
+  const FINANZAS_REALTIME_DEBOUNCE_MS = 1500;
 
   const refreshFinanzas = useCallback(async () => {
+    if (refreshInFlightRef.current) {
+      refreshQueuedRef.current = true;
+      return;
+    }
+    refreshInFlightRef.current = true;
     try {
       const [data, comprasData] = await Promise.all([
         getFinanzasByOrg(organizacionId),
@@ -81,20 +91,28 @@ export default function CajaSaaS() {
       });
     } catch (err) {
       console.error('Error al cargar finanzas:', err);
-      setFinanzas({
-        ventas: [],
-        recaudado: 0,
-        presupuestoTotal: 0,
-        porMesa: [],
-        porVendedor: {},
-        porMetodo: { efectivo: 0, transferencia: 0, tarjeta: 0 },
-      });
+      setFinanzas((prev) =>
+        prev || {
+          ventas: [],
+          recaudado: 0,
+          presupuestoTotal: 0,
+          porMesa: [],
+          porVendedor: {},
+          porMetodo: { efectivo: 0, transferencia: 0, tarjeta: 0 },
+        }
+      );
+    } finally {
+      refreshInFlightRef.current = false;
+      if (refreshQueuedRef.current) {
+        refreshQueuedRef.current = false;
+        refreshFinanzas();
+      }
     }
   }, [organizacionId]);
 
   useEffect(() => {
     refreshFinanzas();
-    return subscribeData(organizacionId, refreshFinanzas);
+    return subscribeData(organizacionId, refreshFinanzas, FINANZAS_REALTIME_DEBOUNCE_MS);
   }, [organizacionId, refreshFinanzas]);
 
   const ventasFiltradas = useMemo(() => {
@@ -319,6 +337,24 @@ export default function CajaSaaS() {
     const hoy = fechaHoyKey();
     setFechaDesde(hoy);
     setFechaHasta(hoy);
+  };
+
+  const verComprobante = async (venta) => {
+    if (venta.comprobante_url) {
+      setComprobanteVer(venta);
+      return;
+    }
+    setCargandoComprobanteId(venta.id);
+    try {
+      const row = await getComprobanteVentaBrazo(organizacionId, venta.id);
+      if (row?.comprobante_url) {
+        setComprobanteVer({ ...venta, comprobante_url: row.comprobante_url });
+      }
+    } catch (err) {
+      console.error('Error al cargar comprobante:', err);
+    } finally {
+      setCargandoComprobanteId(null);
+    }
   };
 
   return (
@@ -698,13 +734,14 @@ export default function CajaSaaS() {
                   <td data-label="Operador">{v.operador_nombre || '—'}</td>
                   <td data-label="Pago">{labelMetodoPago(v.metodo_pago)}</td>
                   <td data-label="Comprobante">
-                    {v.comprobante_url ? (
+                    {v.comprobante_url || v.tiene_comprobante ? (
                       <button
                         type="button"
                         className="btn btn--ghost btn--sm"
-                        onClick={() => setComprobanteVer(v)}
+                        disabled={cargandoComprobanteId === v.id}
+                        onClick={() => verComprobante(v)}
                       >
-                        Ver foto
+                        {cargandoComprobanteId === v.id ? 'Cargando…' : 'Ver foto'}
                       </button>
                     ) : (
                       <span className="text-muted">—</span>

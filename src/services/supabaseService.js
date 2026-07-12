@@ -79,6 +79,9 @@ const BRAZO_METRICS_FIELDS =
 const BRAZO_VENDIDO_FIELDS =
   'id, turno_id, numero_turno, numero_brazo, lado, estado, precio_pagado, codigo_boleta_qr, compra_id, cargador_id, mesa_id, vendedor_id, operador_nombre, metodo_pago, comprobante_url, estado_entrega, pago_confirmado_en, updated_at, created_at';
 
+const BRAZO_VENDIDO_LIST_FIELDS =
+  'id, turno_id, numero_turno, numero_brazo, lado, estado, precio_pagado, codigo_boleta_qr, compra_id, cargador_id, mesa_id, vendedor_id, operador_nombre, metodo_pago, estado_entrega, pago_confirmado_en, updated_at, created_at';
+
 const CARGADOR_LIST_FIELDS =
   'id, organizacion_id, nombre_completo, whatsapp, correo, cui_o_identificacion, telefono_emergencia';
 
@@ -799,18 +802,41 @@ export async function getBrazosApartadosByOrg(organizacionId) {
   );
 }
 
-/** Solo ventas confirmadas, paginado (finanzas / reenvío masivo). */
+/** Solo ventas confirmadas (RPC JSON o paginado REST de respaldo). */
 export async function getBrazosVendidosByOrg(organizacionId) {
   if (!organizacionId) return [];
+
+  const { data, error } = await supabase.rpc('get_brazos_vendidos_org_json', {
+    p_organizacion_id: organizacionId,
+  });
+  if (!error && data) {
+    return Array.isArray(data) ? data : [];
+  }
+  if (error && !isMissingRpc(error)) {
+    console.warn('get_brazos_vendidos_org_json RPC:', error.message);
+  }
+
   return fetchPaginatedRows((from, to) =>
     supabase
       .from('brazos')
-      .select(BRAZO_VENDIDO_FIELDS)
+      .select(BRAZO_VENDIDO_LIST_FIELDS)
       .eq('organizacion_id', organizacionId)
       .eq('estado', 'vendido')
-      .order('updated_at', { ascending: false })
+      .order('pago_confirmado_en', { ascending: false, nullsFirst: false })
       .range(from, to)
   );
+}
+
+export async function getComprobanteVentaBrazo(organizacionId, brazoId) {
+  if (!organizacionId || !brazoId) return null;
+  const { data, error } = await supabase
+    .from('brazos')
+    .select('id, comprobante_url, metodo_pago, codigo_boleta_qr')
+    .eq('id', brazoId)
+    .eq('organizacion_id', organizacionId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
 }
 
 export const IMPRESION_RECIBOS_RECIENTES = 20;
@@ -1479,17 +1505,36 @@ export async function confirmarVenta(brazoId, cargadorData, precioPagado, pagoDa
 const COMPRA_LIST_FIELDS =
   'id, organizacion_id, codigo_recibo, total_pagado, cargador_id, vendedor_id, operador_nombre, metodo_pago, comprobante_url, estado, pago_confirmado_en, created_at';
 
+const COMPRA_LIST_LITE_FIELDS =
+  'id, organizacion_id, codigo_recibo, total_pagado, cargador_id, vendedor_id, operador_nombre, metodo_pago, estado, pago_confirmado_en, created_at';
+
 export async function getComprasByOrg(organizacionId) {
-  const { data, error } = await supabase
+  const { data, error } = await supabase.rpc('get_compras_org_json', {
+    p_organizacion_id: organizacionId,
+  });
+  if (!error && data) {
+    const rows = Array.isArray(data) ? data : [];
+    rows.sort((a, b) => {
+      const ta = new Date(a.pago_confirmado_en || a.created_at || 0).getTime();
+      const tb = new Date(b.pago_confirmado_en || b.created_at || 0).getTime();
+      return tb - ta;
+    });
+    return rows;
+  }
+  if (error && !isMissingRpc(error)) {
+    console.warn('get_compras_org_json RPC:', error.message);
+  }
+
+  const { data: rows, error: restErr } = await supabase
     .from('compras')
-    .select(COMPRA_LIST_FIELDS)
+    .select(COMPRA_LIST_LITE_FIELDS)
     .eq('organizacion_id', organizacionId)
     .order('pago_confirmado_en', { ascending: false });
-  if (error) {
-    if (error.code === '42P01') return [];
-    throw error;
+  if (restErr) {
+    if (restErr.code === '42P01') return [];
+    throw restErr;
   }
-  return data || [];
+  return rows || [];
 }
 
 /** Compras por IDs (impresión: solo recibos con venta activa). */
@@ -1920,14 +1965,22 @@ export async function marcarEntregado(brazoId) {
 }
 
 export async function getFinanzasByOrg(organizacionId) {
-  const [brazos, { data: compras }, usuarios, cortejosRaw] = await Promise.all([
+  const [brazosRaw, usuarios, cortejosRaw, { data: turnos }] = await Promise.all([
     getBrazosVendidosByOrg(organizacionId),
-    supabase.from('compras').select('id, vendedor_id, operador_nombre').eq('organizacion_id', organizacionId),
     getUsuariosByOrg(organizacionId),
     getCortejosByOrg(organizacionId, { incluirInactivas: true }),
+    supabase
+      .from('turnos')
+      .select('id, precio, cortejo_id, numero_turno, tipo_turno, etiqueta, hora_estimada')
+      .eq('organizacion_id', organizacionId),
   ]);
 
-  const comprasMap = Object.fromEntries((compras || []).map((c) => [c.id, c]));
+  const { data: comprasLite } = await supabase
+    .from('compras')
+    .select('id, vendedor_id, operador_nombre')
+    .eq('organizacion_id', organizacionId);
+
+  const comprasMap = Object.fromEntries((comprasLite || []).map((c) => [c.id, c]));
   const mapaUsuarios = {};
   for (const u of usuarios || []) {
     const nombre = u.nombre?.trim() || u.email?.trim() || '';
@@ -1937,35 +1990,20 @@ export async function getFinanzasByOrg(organizacionId) {
   }
 
   const cortejosMap = Object.fromEntries((cortejosRaw || []).map((c) => [c.id, c]));
-
-  const { data: turnos } = await supabase
-    .from('turnos')
-    .select('id, precio, cortejo_id, numero_turno, tipo_turno, etiqueta, hora_estimada')
-    .eq('organizacion_id', organizacionId);
-
   const turnosMap = Object.fromEntries((turnos || []).map((t) => [t.id, t]));
 
-  const presupuestoTotal = (turnos || []).reduce((s, t) => {
-    const delTurno = (brazos || []).filter((b) => b.turno_id === t.id);
-    return s + Number(t.precio) * (delTurno.length || 0);
-  }, 0);
-
-  const recaudado = (brazos || []).reduce((s, b) => s + Number(b.precio_pagado || 0), 0);
-
-  const ventas = (brazos || []).map((b) => {
+  let ventas = (brazosRaw || []).map((b) => {
     const compra = b.compra_id ? comprasMap[b.compra_id] : null;
     const turno = turnosMap[b.turno_id];
-    const operador_nombre =
-      b.operador_nombre?.trim() ||
-      compra?.operador_nombre?.trim() ||
-      mapaUsuarios[b.vendedor_id] ||
-      mapaUsuarios[compra?.vendedor_id] ||
-      '';
     return {
       ...b,
       vendedor_id: b.vendedor_id || compra?.vendedor_id || null,
-      mesa_id: b.mesa_id,
-      operador_nombre,
+      operador_nombre:
+        b.operador_nombre?.trim() ||
+        compra?.operador_nombre?.trim() ||
+        mapaUsuarios[b.vendedor_id] ||
+        mapaUsuarios[compra?.vendedor_id] ||
+        '',
       tipo_turno: turno?.tipo_turno || null,
       turno_etiqueta: turno?.etiqueta || turno?.tipo_turno || '',
       numero_turno: b.numero_turno ?? turno?.numero_turno,
@@ -1974,6 +2012,21 @@ export async function getFinanzasByOrg(organizacionId) {
       cortejo_nombre: cortejosMap[turno?.cortejo_id]?.nombre_evento || null,
     };
   });
+
+  ventas.sort((a, b) => {
+    const ta = new Date(a.pago_confirmado_en || a.updated_at || 0).getTime();
+    const tb = new Date(b.pago_confirmado_en || b.updated_at || 0).getTime();
+    return tb - ta;
+  });
+
+  const brazos = ventas;
+
+  const presupuestoTotal = (turnos || []).reduce((s, t) => {
+    const delTurno = brazos.filter((b) => b.turno_id === t.id);
+    return s + Number(t.precio) * (delTurno.length || 0);
+  }, 0);
+
+  const recaudado = brazos.reduce((s, b) => s + Number(b.precio_pagado || 0), 0);
 
   const mesas = await getMesasByOrg(organizacionId);
   const porMesa = (mesas || []).map((mesa) => {
