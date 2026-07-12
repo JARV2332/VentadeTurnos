@@ -268,6 +268,7 @@ export default function Taquilla() {
       const turnos = Array.isArray(lista) ? lista : [];
       setTurnosTodos(turnos);
       guardarCacheTaquilla(organizacionId, cortejoId, turnos);
+      setError('');
 
       if (needConteo) {
         contarReservasTaquillaColgadasOrg(organizacionId)
@@ -276,6 +277,9 @@ export default function Taquilla() {
       }
     } catch (err) {
       console.error('Error al actualizar turnos en taquilla:', err);
+      if (leerCacheTaquilla(organizacionId, cortejoId)) {
+        setError('No se pudo actualizar. Mostrando la última carga guardada.');
+      }
     } finally {
       setCargandoTurnos(false);
       refreshInFlightRef.current = false;

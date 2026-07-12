@@ -194,23 +194,54 @@ async function rollbackCortejoCompleto(cortejoId) {
   await supabase.from('cortejos').delete().eq('id', cortejoId);
 }
 
+function isStatementTimeout(error) {
+  if (!error) return false;
+  return error.code === '57014' || /statement timeout/i.test(error.message || '');
+}
+
 async function fetchBrazosCortejoRpc(cortejoId, organizacionId) {
-  const all = [];
-  let from = 0;
-  while (true) {
-    const { data, error } = await supabase
-      .rpc('get_brazos_cortejo', {
-        p_cortejo_id: cortejoId,
-        p_organizacion_id: organizacionId,
-      })
-      .range(from, from + BRAZOS_RPC_PAGE - 1);
-    if (error) return { error, data: null };
-    const page = data || [];
-    all.push(...page);
-    if (page.length < BRAZOS_RPC_PAGE) break;
-    from += BRAZOS_RPC_PAGE;
+  const { data: jsonData, error: jsonError } = await supabase.rpc('get_brazos_cortejo_json', {
+    p_cortejo_id: cortejoId,
+    p_organizacion_id: organizacionId,
+  });
+  if (!jsonError && jsonData) {
+    const rows = Array.isArray(jsonData) ? jsonData : [];
+    return { error: null, data: rows };
   }
-  return { error: null, data: all };
+  if (jsonError && !isMissingRpc(jsonError)) {
+    console.warn('get_brazos_cortejo_json RPC:', jsonError.message);
+  }
+
+  const { data, error } = await supabase.rpc('get_brazos_cortejo', {
+    p_cortejo_id: cortejoId,
+    p_organizacion_id: organizacionId,
+  });
+  if (error) return { error, data: null };
+  const rows = data || [];
+  if (rows.length >= BRAZOS_RPC_PAGE) {
+    console.warn(
+      'get_brazos_cortejo truncado a',
+      BRAZOS_RPC_PAGE,
+      'filas; aplique supabase/024_taquilla_rpc_definer.sql'
+    );
+  }
+  return { error: null, data: rows };
+}
+
+async function fetchBrazosByTurnoIdsRest(organizacionId, turnoIds, selectFields) {
+  const TURNO_BATCH = 4;
+  const all = [];
+  for (let i = 0; i < turnoIds.length; i += TURNO_BATCH) {
+    const batch = turnoIds.slice(i, i + TURNO_BATCH);
+    const { data, error } = await supabase
+      .from('brazos')
+      .select(selectFields)
+      .eq('organizacion_id', organizacionId)
+      .in('turno_id', batch);
+    if (error) throw error;
+    if (data?.length) all.push(...data);
+  }
+  return all;
 }
 
 function mapBrazosTaquillaRpc(brazos) {
@@ -242,25 +273,7 @@ export async function getBrazosByCortejo(cortejoId, organizacionId, turnosPrecar
     console.warn('get_brazos_cortejo RPC:', rpc.error.message);
   }
 
-  const TURNO_BATCH = 20;
-  const tareas = [];
-  for (let i = 0; i < turnoIds.length; i += TURNO_BATCH) {
-    const batch = turnoIds.slice(i, i + TURNO_BATCH);
-    tareas.push(
-      supabase
-        .from('brazos')
-        .select(selectFields)
-        .eq('organizacion_id', organizacionId)
-        .in('turno_id', batch)
-    );
-  }
-  const resultados = await Promise.all(tareas);
-  const all = [];
-  for (const { data, error } of resultados) {
-    if (error) throw error;
-    if (data?.length) all.push(...data);
-  }
-  return all;
+  return fetchBrazosByTurnoIdsRest(organizacionId, turnoIds, selectFields);
 }
 
 function generarCodigoBoletaCliente() {
@@ -975,8 +988,12 @@ export async function getTurnosAgrupadosTaquilla(cortejoId, organizacionId) {
     return agruparTurnosConBrazos(turnos, brazos);
   }
 
-  if (error && !isMissingRpc(error)) {
-    console.warn('get_taquilla_cortejo RPC:', error.message);
+  if (error) {
+    if (isStatementTimeout(error)) {
+      console.warn('get_taquilla_cortejo timeout; usando fallback por lotes.');
+    } else if (!isMissingRpc(error)) {
+      console.warn('get_taquilla_cortejo RPC:', error.message);
+    }
   }
 
   return getTurnosAgrupadosTaquillaFallback(cortejoId, organizacionId);
