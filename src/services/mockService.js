@@ -103,6 +103,21 @@ export function buscarRecibosImpresionMock(organizacionId, query) {
   };
 }
 
+export function getReciboImpresionPorCompraIdMock(organizacionId, compraId) {
+  const compras = getComprasByIdsMock([compraId], organizacionId);
+  const compra = compras[0];
+  if (!compra) return { error: 'Recibo no encontrado.' };
+  if (compra.estado === 'anulada') return { error: 'Esta boleta fue anulada.' };
+  const brazos = getBrazosVendidosByOrg(organizacionId).filter((b) => b.compra_id === compraId);
+  if (!brazos.length) return { error: 'No hay turnos vendidos en este recibo.' };
+  const cargadorIds = [...new Set(brazos.map((b) => b.cargador_id).filter(Boolean))];
+  return {
+    brazos,
+    compras: [compra],
+    cargadores: getCargadoresByIdsMock(cargadorIds, organizacionId),
+  };
+}
+
 export function getCortejosByOrg(organizacionId, { incluirInactivas = false } = {}) {
   return store.cortejos.filter((c) => {
     if (c.organizacion_id !== organizacionId) return false;

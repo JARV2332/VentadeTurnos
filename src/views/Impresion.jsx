@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import BoletaContraseñaTurno from '../components/BoletaContraseñaTurno';
 import StatusBadge from '../components/StatusBadge';
@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   getUltimosRecibosImpresion,
   buscarRecibosImpresion,
+  getReciboImpresionPorCompraId,
   getCortejosByOrg,
   getTurnosByIds,
   buscarBoletaPorCodigo,
@@ -67,12 +68,14 @@ function aplicarPaqueteRecibos({ brazos, compras, cargadores }) {
 
 export default function Impresion() {
   const { organizacion, organizacionId, hasPermiso } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [recibosRecientes, setRecibosRecientes] = useState([]);
   const [recibosBusqueda, setRecibosBusqueda] = useState(null);
   const [cargadoresPorId, setCargadoresPorId] = useState({});
   const [busquedaDevoto, setBusquedaDevoto] = useState('');
   const [busquedaCodigo, setBusquedaCodigo] = useState('');
   const [msgBusqueda, setMsgBusqueda] = useState('');
+  const [soloReciboVenta, setSoloReciboVenta] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [detalle, setDetalle] = useState({
     cargador: null,
@@ -105,15 +108,58 @@ export default function Impresion() {
       setMsgBusqueda('');
       setReciboPorCodigo(null);
       setBusquedaCodigo('');
+      setSoloReciboVenta(false);
     } finally {
       setCargandoRecientes(false);
     }
   }, [organizacionId]);
 
+  const cargarReciboDirecto = useCallback(
+    async ({ compraId, codigo }) => {
+      if (!organizacionId) return;
+      setCargandoRecientes(true);
+      setMsgBusqueda('');
+      setRecibosBusqueda(null);
+      setReciboPorCodigo(null);
+      setSoloReciboVenta(true);
+      try {
+        if (compraId) {
+          const res = await getReciboImpresionPorCompraId(organizacionId, compraId);
+          if (res.error) {
+            setMsgBusqueda(res.error);
+            setRecibosRecientes([]);
+            return;
+          }
+          const { recibos, cargadoresPorId: map } = aplicarPaqueteRecibos(res);
+          setRecibosRecientes(recibos);
+          setCargadoresPorId(map);
+          if (recibos.length) setSelectedId(recibos[0].id);
+          return;
+        }
+        if (codigo) {
+          setBusquedaCodigo(codigo);
+        }
+      } finally {
+        setCargandoRecientes(false);
+      }
+    },
+    [organizacionId]
+  );
+
   useEffect(() => {
     cortejosCacheRef.current = null;
-    cargarRecientes();
-  }, [organizacionId, cargarRecientes]);
+    const compraId = searchParams.get('compra')?.trim() || '';
+    const codigoParam = searchParams.get('codigo')?.trim() || '';
+    if (compraId || codigoParam) {
+      cargarReciboDirecto({ compraId, codigo: codigoParam });
+    } else {
+      cargarRecientes();
+    }
+  }, [organizacionId, searchParams, cargarRecientes, cargarReciboDirecto]);
+
+  const verUltimasVentas = () => {
+    setSearchParams({});
+  };
 
   const handleBuscarDevoto = async (e) => {
     e?.preventDefault();
@@ -148,14 +194,16 @@ export default function Impresion() {
   useEffect(() => {
     const codigo = extraerCodigoBoleta(busquedaCodigo);
     if (!/^V[RT]-[A-Z0-9]+$/i.test(codigo)) {
-      setReciboPorCodigo(null);
+      if (!soloReciboVenta || recibosRecientes.length) {
+        setReciboPorCodigo(null);
+      }
       return undefined;
     }
 
     let cancelado = false;
     setBuscandoCodigo(true);
     setRecibosBusqueda(null);
-    setMsgBusqueda('');
+    if (!soloReciboVenta) setMsgBusqueda('');
     (async () => {
       const res = await buscarBoletaPorCodigo(organizacionId, codigo);
       if (cancelado) return;
@@ -170,13 +218,18 @@ export default function Impresion() {
       if (res.cargador) {
         setCargadoresPorId((prev) => ({ ...prev, [res.cargador.id]: res.cargador }));
       }
-      if (recibo) setSelectedId(recibo.id);
+      if (recibo) {
+        setSelectedId(recibo.id);
+        if (soloReciboVenta) {
+          setRecibosRecientes([recibo]);
+        }
+      }
     })();
 
     return () => {
       cancelado = true;
     };
-  }, [busquedaCodigo, organizacionId]);
+  }, [busquedaCodigo, organizacionId, soloReciboVenta, recibosRecientes.length]);
 
   const recibosLista = useMemo(() => {
     if (reciboPorCodigo) {
@@ -319,8 +372,9 @@ export default function Impresion() {
     }
   };
 
-  const tituloLista =
-    reciboPorCodigo !== null
+  const tituloLista = soloReciboVenta
+    ? 'Boleta de esta venta'
+    : reciboPorCodigo !== null
       ? 'Boleta por código'
       : recibosBusqueda !== null
         ? 'Resultados de búsqueda'
@@ -358,15 +412,28 @@ export default function Impresion() {
                 ))}
               </select>
               <small className="field-hint">
-                {recibosBusqueda === null && !reciboPorCodigo
-                  ? `Mostrando las ${recibosLista.length} ventas más recientes.`
-                  : `${recibosLista.length} recibo(s) encontrado(s).`}
+                {soloReciboVenta
+                  ? 'Listo para imprimir. Use el botón Imprimir boleta abajo.'
+                  : recibosBusqueda === null && !reciboPorCodigo
+                    ? `Mostrando las ${recibosLista.length} ventas más recientes.`
+                    : `${recibosLista.length} recibo(s) encontrado(s).`}
               </small>
             </label>
           ) : (
-            <p className="text-muted">No hay ventas recientes para mostrar.</p>
+            <p className="text-muted">
+              {soloReciboVenta ? 'No se pudo cargar la boleta.' : 'No hay ventas recientes para mostrar.'}
+            </p>
           )}
-          {recibosBusqueda !== null && (
+          {(recibosBusqueda !== null || soloReciboVenta) && (
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={verUltimasVentas}
+            >
+              Ver últimas {IMPRESION_RECIBOS_RECIENTES} ventas
+            </button>
+          )}
+          {recibosBusqueda !== null && !soloReciboVenta && (
             <button
               type="button"
               className="btn btn--ghost btn--sm"

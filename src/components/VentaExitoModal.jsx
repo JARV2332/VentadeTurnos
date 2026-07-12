@@ -7,6 +7,16 @@ import { construirLineasRecibo, codigoReciboDisplay } from '../utils/compraUtils
 import { formatPrecio } from '../utils/boletaUtils';
 import { TERMINO_DEVOTO_A } from '../constants/terminologia';
 
+function urlImpresionVenta(venta, brazos) {
+  const codigo = codigoReciboDisplay(venta?.compra, brazos) || venta?.codigo;
+  const compraId = venta?.compra?.id;
+  const params = new URLSearchParams();
+  if (compraId) params.set('compra', compraId);
+  if (codigo) params.set('codigo', codigo);
+  const q = params.toString();
+  return q ? `/impresion?${q}` : '/impresion';
+}
+
 /**
  * Modal de venta completada (portal en body para no quedar detrás del panel móvil).
  */
@@ -19,6 +29,7 @@ export default function VentaExitoModal({ venta, organizacion, onCerrar }) {
   const { lineas, totalFmt } = construirLineasRecibo(items);
   const brazos = items.map((i) => i.brazo).filter(Boolean);
   const codigo = codigoReciboDisplay(venta?.compra, brazos) || venta?.codigo;
+  const linkImpresion = urlImpresionVenta(venta, brazos);
 
   let enlaceWhatsapp = null;
   if (venta) {
@@ -141,7 +152,7 @@ export default function VentaExitoModal({ venta, organizacion, onCerrar }) {
           </p>
         )}
         <div className="venta-exito-card__links">
-          <Link to="/impresion" className="btn btn--ghost btn--sm" onClick={onCerrar}>
+          <Link to={linkImpresion} className="btn btn--ghost btn--sm" onClick={onCerrar}>
             Imprimir boleta
           </Link>
           <Link to="/entrega" className="btn btn--ghost btn--sm" onClick={onCerrar}>

@@ -46,6 +46,11 @@ export const buscarRecibosImpresion = (organizacionId, query) =>
     ? sb.buscarRecibosImpresion(organizacionId, query)
     : Promise.resolve(mock.buscarRecibosImpresionMock(organizacionId, query));
 
+export const getReciboImpresionPorCompraId = (organizacionId, compraId) =>
+  isSupabaseBackend()
+    ? sb.getReciboImpresionPorCompraId(organizacionId, compraId)
+    : Promise.resolve(mock.getReciboImpresionPorCompraIdMock(organizacionId, compraId));
+
 export { IMPRESION_RECIBOS_RECIENTES } from './supabaseService';
 
 export const getTurnoById = (turnoId) =>

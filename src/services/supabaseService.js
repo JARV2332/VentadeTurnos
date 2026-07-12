@@ -1417,6 +1417,33 @@ export async function getComprasByIds(compraIds, organizacionId) {
   return all;
 }
 
+/** Impresión: un recibo por ID de compra (p. ej. tras venta en taquilla). */
+export async function getReciboImpresionPorCompraId(organizacionId, compraId) {
+  if (!organizacionId || !compraId) return { error: 'Recibo no válido.' };
+
+  const compras = await getComprasByIds([compraId], organizacionId);
+  const compra = compras[0];
+  if (!compra) return { error: 'Recibo no encontrado.' };
+  if (compra.estado === 'anulada') return { error: 'Esta boleta fue anulada.' };
+
+  const { data: brazos, error } = await supabase
+    .from('brazos')
+    .select(BRAZO_VENDIDO_FIELDS)
+    .eq('organizacion_id', organizacionId)
+    .eq('compra_id', compraId)
+    .eq('estado', 'vendido')
+    .order('numero_turno', { ascending: true });
+  if (error) throw error;
+  if (!brazos?.length) return { error: 'No hay turnos vendidos en este recibo.' };
+
+  const cargadorIds = [...new Set(brazos.map((b) => b.cargador_id).filter(Boolean))];
+  const cargadores = cargadorIds.length
+    ? await getCargadoresByIds(cargadorIds, organizacionId)
+    : [];
+
+  return { brazos, compras: [compra], cargadores };
+}
+
 export async function confirmarVentaCompra(brazoIds, cargadorData, precios, pagoData = {}) {
   const orgId = cargadorData.organizacion_id;
   const upsert = await upsertDevotoVenta(orgId, cargadorData);
