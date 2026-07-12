@@ -3075,6 +3075,139 @@ html {
 }
 
 /* ── Impresión ── */
+/* Impresión: panel lateral + boleta visible sin scroll excesivo */
+.app-content--impresion {
+  padding: 0.75rem 1.25rem 1rem;
+}
+
+@media (max-width: 960px) {
+  .impresion-page {
+    grid-template-columns: 1fr;
+  }
+
+  .impresion-page__side {
+    position: static;
+  }
+}
+
+.impresion-page {
+  display: grid;
+  grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.impresion-page__side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  position: sticky;
+  top: 0.65rem;
+}
+
+.impresion-page__main {
+  min-width: 0;
+}
+
+.impresion-page__vacio {
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.88rem;
+}
+
+.impresion-enlace-publico {
+  font-size: 0.78rem;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--primary-light);
+  color: var(--text);
+}
+
+.impresion-enlace-publico summary {
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+}
+
+.impresion-enlace-publico summary::-webkit-details-marker {
+  display: none;
+}
+
+.impresion-enlace-publico code {
+  display: block;
+  margin-top: 0.45rem;
+  font-size: 0.72rem;
+  word-break: break-all;
+}
+
+.impresion-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+}
+
+.impresion-toolbar__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.impresion-toolbar__titulo {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.impresion-toolbar__campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.impresion-toolbar__campo input[type='search'],
+.impresion-toolbar__campo select {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.84rem;
+}
+
+.impresion-toolbar__busqueda {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.35rem;
+  align-items: end;
+}
+
+.impresion-toolbar__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.impresion-toolbar__hint--warn {
+  color: var(--warning, #b45309);
+}
+
+.impresion-toolbar__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding-top: 0.15rem;
+}
+
 .impresion-controls {
   display: flex;
   flex-direction: column;
@@ -3190,11 +3323,31 @@ html {
   color: var(--danger);
 }
 
+.impresion-reenvio--compact {
+  margin-bottom: 0;
+  padding: 0.55rem 0.65rem;
+  box-shadow: none;
+}
+
+.impresion-reenvio--compact .impresion-reenvio__info {
+  margin-bottom: 0.35rem;
+  font-size: 0.82rem;
+}
+
+.impresion-reenvio--compact .impresion-reenvio__botones {
+  gap: 0.35rem;
+}
+
+.impresion-reenvio--compact .impresion-reenvio__msg {
+  margin-top: 0.45rem;
+  font-size: 0.78rem;
+}
+
 .impresion-boleta {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
+  gap: 0.5rem;
 }
 
 .reenvio-masivo-modal__campo {
@@ -3365,11 +3518,10 @@ html {
 }
 
 .impresion-print-tip {
-  margin-top: 1.25rem;
-  font-size: 0.82rem;
+  margin: 0;
+  font-size: 0.72rem;
   color: var(--text-muted);
-  max-width: 42rem;
-  line-height: 1.5;
+  line-height: 1.35;
 }
 
 /* Contraseña de turno (impresión formal — media carta horizontal) */
@@ -5171,6 +5323,7 @@ html {
   .navbar,
   .mobile-nav,
   .impresion-controls,
+  .impresion-page__side,
   .impresion-reenvio,
   .impresion-hint,
   .impresion-print-tip,
@@ -5285,7 +5438,8 @@ html {
   }
 
   .app-content,
-  .app-content--taquilla {
+  .app-content--taquilla,
+  .app-content--impresion {
     padding: 0 !important;
     margin: 0 !important;
     overflow: visible !important;
@@ -7150,6 +7304,22 @@ body.taquilla-cobro-activo {
   }
 
   /* Impresión / devotos / import */
+  .impresion-page {
+    grid-template-columns: 1fr;
+  }
+
+  .impresion-page__side {
+    position: static;
+  }
+
+  .impresion-toolbar__busqueda {
+    grid-template-columns: 1fr;
+  }
+
+  .impresion-toolbar__acciones .btn {
+    flex: 1 1 calc(50% - 0.25rem);
+  }
+
   .impresion-controls {
     flex-direction: column;
     align-items: stretch;

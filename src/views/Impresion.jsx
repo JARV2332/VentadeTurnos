@@ -18,7 +18,6 @@ import EditDevotoModal from '../components/EditDevotoModal';
 import ReenvioMasivoModal from '../components/ReenvioMasivoModal';
 import { enviarBoletaPorCorreo } from '../services/emailService';
 import { construirEnlaceBoletaWhatsapp } from '../utils/whatsappUtils';
-import { localDigitsFromGtPhone } from '../utils/phoneGtUtils';
 import { codigoReciboDisplay } from '../utils/compraUtils';
 import { extraerCodigoBoleta } from '../utils/boletaUtils';
 import { TERMINO_DEVOTO } from '../constants/terminologia';
@@ -381,242 +380,229 @@ export default function Impresion() {
         : `Últimas ${IMPRESION_RECIBOS_RECIENTES} ventas`;
 
   return (
-    <Layout title="Impresión de boletas" subtitle="Últimas ventas o búsqueda puntual por devoto(a)">
+    <Layout
+      title="Impresión de boletas"
+      subtitle="Últimas ventas o búsqueda puntual por devoto(a)"
+      className="app-content--impresion"
+    >
       {okDevoto && <div className="alert alert--success no-print">{okDevoto}</div>}
-      {organizacion?.subdominio_slug && (
-        <div className="info-box no-print mis-turnos-enlace-admin">
-          <strong>Enlace público «Ver mis turnos»</strong>
-          <p className="text-muted">
-            Comparta este enlace en redes sociales para que los devotos descarguen sus boletas con su DPI:
-          </p>
-          <code>{typeof window !== 'undefined' ? `${window.location.origin}/mis-turnos/${organizacion.subdominio_slug}` : `/mis-turnos/${organizacion.subdominio_slug}`}</code>
-        </div>
-      )}
 
-      <div className="impresion-controls no-print">
-        <section className="impresion-controls__bloque">
-          <h3 className="impresion-controls__titulo">{tituloLista}</h3>
-          {cargandoRecientes ? (
-            <p className="text-muted">Cargando ventas recientes…</p>
-          ) : recibosLista.length > 0 ? (
-            <label>
-              Recibo
-              <select
-                value={selectedId || ''}
-                onChange={(e) => setSelectedId(e.target.value)}
+      <div className="impresion-page">
+        <aside className="impresion-page__side no-print">
+          {organizacion?.subdominio_slug && (
+            <details className="impresion-enlace-publico">
+              <summary>Enlace público «Ver mis turnos»</summary>
+              <code>
+                {typeof window !== 'undefined'
+                  ? `${window.location.origin}/mis-turnos/${organizacion.subdominio_slug}`
+                  : `/mis-turnos/${organizacion.subdominio_slug}`}
+              </code>
+            </details>
+          )}
+
+          <div className="impresion-toolbar">
+            <div className="impresion-toolbar__head">
+              <span className="impresion-toolbar__titulo">{tituloLista}</span>
+              {(recibosBusqueda !== null || soloReciboVenta) && (
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={verUltimasVentas}
+                >
+                  Últimas {IMPRESION_RECIBOS_RECIENTES}
+                </button>
+              )}
+              {recibosBusqueda !== null && !soloReciboVenta && (
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => {
+                    setBusquedaDevoto('');
+                    setRecibosBusqueda(null);
+                    setMsgBusqueda('');
+                    cargarRecientes();
+                  }}
+                >
+                  Volver
+                </button>
+              )}
+            </div>
+
+            {cargandoRecientes ? (
+              <p className="text-muted impresion-toolbar__hint">Cargando…</p>
+            ) : recibosLista.length > 0 ? (
+              <label className="impresion-toolbar__campo">
+                Recibo
+                <select value={selectedId || ''} onChange={(e) => setSelectedId(e.target.value)}>
+                  {recibosLista.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {etiquetaRecibo(r, cargadoresPorId)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <p className="text-muted impresion-toolbar__hint">
+                {soloReciboVenta ? 'No se pudo cargar la boleta.' : 'Sin ventas recientes.'}
+              </p>
+            )}
+
+            <form onSubmit={handleBuscarDevoto} className="impresion-toolbar__busqueda">
+              <label className="impresion-toolbar__campo">
+                {TERMINO_DEVOTO}(a)
+                <input
+                  type="search"
+                  value={busquedaDevoto}
+                  onChange={(e) => setBusquedaDevoto(e.target.value)}
+                  placeholder="Nombre, CUI o WhatsApp"
+                  autoComplete="off"
+                />
+              </label>
+              <button
+                type="submit"
+                className="btn btn--primary btn--sm"
+                disabled={buscandoDevoto || !busquedaDevoto.trim()}
               >
-                {recibosLista.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {etiquetaRecibo(r, cargadoresPorId)}
-                  </option>
-                ))}
-              </select>
-              <small className="field-hint">
-                {soloReciboVenta
-                  ? 'Listo para imprimir. Use el botón Imprimir boleta abajo.'
-                  : recibosBusqueda === null && !reciboPorCodigo
-                    ? `Mostrando las ${recibosLista.length} ventas más recientes.`
-                    : `${recibosLista.length} recibo(s) encontrado(s).`}
-              </small>
-            </label>
-          ) : (
-            <p className="text-muted">
-              {soloReciboVenta ? 'No se pudo cargar la boleta.' : 'No hay ventas recientes para mostrar.'}
-            </p>
-          )}
-          {(recibosBusqueda !== null || soloReciboVenta) && (
-            <button
-              type="button"
-              className="btn btn--ghost btn--sm"
-              onClick={verUltimasVentas}
-            >
-              Ver últimas {IMPRESION_RECIBOS_RECIENTES} ventas
-            </button>
-          )}
-          {recibosBusqueda !== null && !soloReciboVenta && (
-            <button
-              type="button"
-              className="btn btn--ghost btn--sm"
-              onClick={() => {
-                setBusquedaDevoto('');
-                setRecibosBusqueda(null);
-                setMsgBusqueda('');
-                cargarRecientes();
-              }}
-            >
-              Volver a últimas ventas
-            </button>
-          )}
-        </section>
+                {buscandoDevoto ? '…' : 'Buscar'}
+              </button>
+            </form>
 
-        <section className="impresion-controls__bloque">
-          <h3 className="impresion-controls__titulo">Buscar otra boleta</h3>
-          <form onSubmit={handleBuscarDevoto} className="impresion-controls__busqueda-form">
-            <label className="impresion-controls__busqueda">
-              {TERMINO_DEVOTO}(a) — nombre, CUI o WhatsApp
+            <label className="impresion-toolbar__campo">
+              Código VR- / VT-
               <input
                 type="search"
-                value={busquedaDevoto}
-                onChange={(e) => setBusquedaDevoto(e.target.value)}
-                placeholder="Ej. García, 1234567890123 o 55551234"
+                value={busquedaCodigo}
+                onChange={(e) => {
+                  setBusquedaCodigo(e.target.value);
+                  setBusquedaDevoto('');
+                }}
+                placeholder="VR-… o VT-…"
                 autoComplete="off"
               />
             </label>
-            <button
-              type="submit"
-              className="btn btn--primary"
-              disabled={buscandoDevoto || !busquedaDevoto.trim()}
-            >
-              {buscandoDevoto ? 'Buscando…' : 'Buscar'}
-            </button>
-          </form>
-          <label className="impresion-controls__busqueda">
-            Código de boleta (VR- / VT-)
-            <input
-              type="search"
-              value={busquedaCodigo}
-              onChange={(e) => {
-                setBusquedaCodigo(e.target.value);
-                setBusquedaDevoto('');
-              }}
-              placeholder="VR-XXXXXXXX o VT-XXXXXXXX"
-              autoComplete="off"
-            />
-            <small className="field-hint">
-              {buscandoCodigo ? 'Buscando por código…' : 'Búsqueda directa por código de recibo.'}
-            </small>
-          </label>
-          {msgBusqueda && (
-            <p className="impresion-controls__sin-resultados text-muted">{msgBusqueda}</p>
-          )}
-        </section>
 
-        <div className="impresion-controls__acciones">
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={handlePrint}
-            disabled={!reciboSel}
-          >
-            Imprimir boleta
-          </button>
-          {codigoBoletaPublica && (
-            <Link
-              to={`/boleta/${codigoBoletaPublica}`}
-              className="btn btn--ghost"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Ver boleta digital
-            </Link>
-          )}
-          {(hasPermiso('config_recibo') || hasPermiso('config_correo')) && (
-            <Link to="/config/recibo" className="btn btn--ghost">
-              Diseño del recibo
-            </Link>
-          )}
-          <button
-            type="button"
-            className="btn btn--ghost"
-            onClick={() => setReenvioMasivoAbierto(true)}
-            title="Reenviar boletas por correo con pausa entre envíos"
-          >
-            Reenvío masivo
-          </button>
-        </div>
-      </div>
+            {msgBusqueda && (
+              <p className="impresion-toolbar__hint impresion-toolbar__hint--warn">{msgBusqueda}</p>
+            )}
+            {buscandoCodigo && (
+              <p className="impresion-toolbar__hint">Buscando por código…</p>
+            )}
 
-      {reciboSel && (
-        <div className="impresion-reenvio no-print">
-          <div className="impresion-reenvio__info">
-            <strong>{cargador?.nombre_completo || 'Devoto(a)'}</strong>
-            {cargador?.correo && (
-              <span className="text-muted"> · {cargador.correo}</span>
-            )}
-            {cargador?.whatsapp && (
-              <span className="text-muted">
-                {' '}
-                · +502 {localDigitsFromGtPhone(cargador.whatsapp)}
-              </span>
-            )}
-          </div>
-          <div className="impresion-reenvio__botones">
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={abrirEditarDevoto}
-              disabled={!cargador}
-            >
-              Editar datos
-            </button>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              onClick={handleReenviarCorreo}
-              disabled={enviandoCorreo || !cargador?.correo?.trim()}
-              title={!cargador?.correo?.trim() ? 'Sin correo registrado' : undefined}
-            >
-              {enviandoCorreo ? 'Enviando…' : 'Reenviar correo'}
-            </button>
-            {enlaceWhatsapp ? (
-              <a
-                href={enlaceWhatsapp}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn--whatsapp"
+            <div className="impresion-toolbar__acciones">
+              <button
+                type="button"
+                className="btn btn--primary btn--sm"
+                onClick={handlePrint}
+                disabled={!reciboSel}
               >
-                Enviar WhatsApp
-              </a>
-            ) : (
-              <span className="text-muted impresion-reenvio__sin-wa">
-                Sin WhatsApp válido (+502)
-              </span>
-            )}
+                Imprimir
+              </button>
+              {codigoBoletaPublica && (
+                <Link
+                  to={`/boleta/${codigoBoletaPublica}`}
+                  className="btn btn--ghost btn--sm"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Ver digital
+                </Link>
+              )}
+              {(hasPermiso('config_recibo') || hasPermiso('config_correo')) && (
+                <Link to="/config/recibo" className="btn btn--ghost btn--sm">
+                  Diseño
+                </Link>
+              )}
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={() => setReenvioMasivoAbierto(true)}
+              >
+                Reenvío masivo
+              </button>
+            </div>
           </div>
-          {msgReenvio && (
-            <p
-              className={
-                msgReenvio.tipo === 'ok'
-                  ? 'impresion-reenvio__msg impresion-reenvio__msg--ok'
-                  : 'impresion-reenvio__msg impresion-reenvio__msg--error'
-              }
-            >
-              {msgReenvio.texto}
-            </p>
+
+          {reciboSel && (
+            <div className="impresion-reenvio impresion-reenvio--compact">
+              <div className="impresion-reenvio__info">
+                <strong>{cargador?.nombre_completo || 'Devoto(a)'}</strong>
+                {cargador?.correo && <span className="text-muted"> · {cargador.correo}</span>}
+              </div>
+              <div className="impresion-reenvio__botones">
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={abrirEditarDevoto}
+                  disabled={!cargador}
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={handleReenviarCorreo}
+                  disabled={enviandoCorreo || !cargador?.correo?.trim()}
+                >
+                  {enviandoCorreo ? '…' : 'Correo'}
+                </button>
+                {enlaceWhatsapp ? (
+                  <a
+                    href={enlaceWhatsapp}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn--whatsapp btn--sm"
+                  >
+                    WhatsApp
+                  </a>
+                ) : null}
+              </div>
+              {msgReenvio && (
+                <p
+                  className={
+                    msgReenvio.tipo === 'ok'
+                      ? 'impresion-reenvio__msg impresion-reenvio__msg--ok'
+                      : 'impresion-reenvio__msg impresion-reenvio__msg--error'
+                  }
+                >
+                  {msgReenvio.texto}
+                </p>
+              )}
+            </div>
           )}
-        </div>
-      )}
 
-      {reciboSel ? (
-        <div className="impresion-boleta print-area">
-          <BoletaContraseñaTurno
-            organizacion={organizacion}
-            brazo={reciboSel.brazos[0]}
-            turno={items[0]?.turno}
-            items={items}
-            compra={compra}
-            cortejo={cortejo}
-            cargador={cargador}
-          />
-          <p className="text-muted impresion-hint no-print">
-            {reciboSel.brazos.length} turno(s) ·{' '}
-            {reciboSel.brazos.map((b) => (
-              <StatusBadge key={b.id} status={b.estado_entrega} />
-            ))}
+          <p className="impresion-print-tip">
+            PDF: desactive encabezados, active gráficos de fondo.
           </p>
-        </div>
-      ) : (
-        !cargandoRecientes && (
-          <p className="text-muted no-print">
-            Use la búsqueda por {TERMINO_DEVOTO.toLowerCase()}(a) o código VR-/VT- para encontrar una boleta.
-          </p>
-        )
-      )}
+        </aside>
 
-      <p className="impresion-print-tip no-print">
-        Al imprimir o guardar PDF: desactive <strong>Encabezados y pies de página</strong>, active{' '}
-        <strong>Gráficos en segundo plano</strong> y elija <strong>Guardar como PDF</strong>.
-      </p>
+        <main className="impresion-page__main">
+          {reciboSel ? (
+            <div className="impresion-boleta print-area">
+              <BoletaContraseñaTurno
+                organizacion={organizacion}
+                brazo={reciboSel.brazos[0]}
+                turno={items[0]?.turno}
+                items={items}
+                compra={compra}
+                cortejo={cortejo}
+                cargador={cargador}
+              />
+              <p className="text-muted impresion-hint no-print">
+                {reciboSel.brazos.length} turno(s) ·{' '}
+                {reciboSel.brazos.map((b) => (
+                  <StatusBadge key={b.id} status={b.estado_entrega} />
+                ))}
+              </p>
+            </div>
+          ) : (
+            !cargandoRecientes && (
+              <p className="text-muted impresion-page__vacio no-print">
+                Seleccione un recibo o busque por {TERMINO_DEVOTO.toLowerCase()}(a) / código.
+              </p>
+            )
+          )}
+        </main>
+      </div>
 
       <EditDevotoModal
         abierto={Boolean(devotoEditando)}
