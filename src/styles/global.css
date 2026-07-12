@@ -2504,6 +2504,25 @@ html {
   gap: 0.5rem 0.75rem;
 }
 
+.caja-filters__busqueda input[type='search'] {
+  min-width: min(100%, 220px);
+}
+
+.caja-detalle__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.caja-detalle__vistas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
 .caja-cierre-hoy { margin-bottom: 1rem; }
 
 .metric-card--warn {

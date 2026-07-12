@@ -25,10 +25,13 @@ import {
   filtrarVentasCaja,
   formatQ,
   tiposTurnoDisponibles,
+  numerosTurnoDisponibles,
   labelTipoTurno,
   formatFechaReporte,
   fechaVentaKey,
   agruparVentasPorDia,
+  agruparVentasPorTurno,
+  descripcionTurnoVenta,
 } from '../utils/cajaReportUtils';
 import { fechaHoyKey } from '../utils/dashboardMetricsUtils';
 import { formatHoraVentaGt } from '../utils/turnoHorarioUtils';
@@ -40,6 +43,9 @@ export default function CajaSaaS() {
   const [filtroMesa, setFiltroMesa] = useState('all');
   const [filtroVendedor, setFiltroVendedor] = useState('all');
   const [filtroTipoTurno, setFiltroTipoTurno] = useState('all');
+  const [filtroNumeroTurno, setFiltroNumeroTurno] = useState('all');
+  const [filtroBusquedaTurno, setFiltroBusquedaTurno] = useState('');
+  const [vistaDetalle, setVistaDetalle] = useState('cronologico');
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [comprobanteVer, setComprobanteVer] = useState(null);
@@ -123,12 +129,33 @@ export default function CajaSaaS() {
       vendedorId: filtroVendedor,
       tipoTurno: filtroTipoTurno,
       mesaId: filtroMesa,
+      numeroTurno: filtroNumeroTurno,
+      busquedaTurno: filtroBusquedaTurno,
     });
-  }, [finanzas, fechaDesde, fechaHasta, filtroVendedor, filtroTipoTurno, filtroMesa]);
+  }, [
+    finanzas,
+    fechaDesde,
+    fechaHasta,
+    filtroVendedor,
+    filtroTipoTurno,
+    filtroMesa,
+    filtroNumeroTurno,
+    filtroBusquedaTurno,
+  ]);
 
   const tiposTurno = useMemo(
     () => tiposTurnoDisponibles(finanzas?.ventas),
     [finanzas?.ventas]
+  );
+
+  const numerosTurno = useMemo(
+    () => numerosTurnoDisponibles(finanzas?.ventas),
+    [finanzas?.ventas]
+  );
+
+  const ventasPorTurno = useMemo(
+    () => agruparVentasPorTurno(ventasFiltradas),
+    [ventasFiltradas]
   );
 
   const ventasPorDia = useMemo(
@@ -193,8 +220,19 @@ export default function CajaSaaS() {
       tipoTurno: filtroTipoTurno,
       mesaId: filtroMesa,
       mesaNombre: mesa,
+      numeroTurno: filtroNumeroTurno,
+      busquedaTurno: filtroBusquedaTurno,
     };
-  }, [fechaDesde, fechaHasta, filtroVendedor, filtroTipoTurno, filtroMesa, finanzas]);
+  }, [
+    fechaDesde,
+    fechaHasta,
+    filtroVendedor,
+    filtroTipoTurno,
+    filtroMesa,
+    filtroNumeroTurno,
+    filtroBusquedaTurno,
+    finanzas,
+  ]);
 
   const abrirAnular = (codigo = '') => {
     setErrorMsg('');
@@ -331,6 +369,8 @@ export default function CajaSaaS() {
     setFiltroMesa('all');
     setFiltroVendedor('all');
     setFiltroTipoTurno('all');
+    setFiltroNumeroTurno('all');
+    setFiltroBusquedaTurno('');
   };
 
   const filtrarHoy = () => {
@@ -426,6 +466,17 @@ export default function CajaSaaS() {
           </select>
         </label>
         <label>
+          N.º de turno
+          <select value={filtroNumeroTurno} onChange={(e) => setFiltroNumeroTurno(e.target.value)}>
+            <option value="all">Todos</option>
+            {numerosTurno.map((n) => (
+              <option key={n} value={n}>
+                Turno #{n}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
           Tipo de turno
           <select value={filtroTipoTurno} onChange={(e) => setFiltroTipoTurno(e.target.value)}>
             <option value="all">Todos</option>
@@ -435,6 +486,15 @@ export default function CajaSaaS() {
               </option>
             ))}
           </select>
+        </label>
+        <label className="caja-filters__busqueda">
+          Buscar turno o boleta
+          <input
+            type="search"
+            value={filtroBusquedaTurno}
+            onChange={(e) => setFiltroBusquedaTurno(e.target.value)}
+            placeholder="N.º, nombre, VR-…, operador…"
+          />
         </label>
         <label>
           Mesa
@@ -689,18 +749,38 @@ export default function CajaSaaS() {
       </div>
 
       <section className="panel">
-        <h3 className="panel__title">Detalle de ventas ({ventasFiltradas.length})</h3>
-        <p className="text-muted config-hint caja-detalle-hint">
-          Ordenado por fecha y hora de venta (día a día, de la más temprana a la más reciente).
-        </p>
+        <div className="caja-detalle__head">
+          <div>
+            <h3 className="panel__title">Detalle de ventas ({ventasFiltradas.length})</h3>
+            <p className="text-muted config-hint caja-detalle-hint">
+              Boletas vendidas en orden cronológico (primera venta del período → la más reciente).
+              Use los filtros de turno arriba para acotar por número, tipo o nombre.
+            </p>
+          </div>
+          <div className="caja-detalle__vistas">
+            <button
+              type="button"
+              className={`btn btn--sm ${vistaDetalle === 'cronologico' ? 'btn--primary' : 'btn--ghost'}`}
+              onClick={() => setVistaDetalle('cronologico')}
+            >
+              Por fecha
+            </button>
+            <button
+              type="button"
+              className={`btn btn--sm ${vistaDetalle === 'turno' ? 'btn--primary' : 'btn--ghost'}`}
+              onClick={() => setVistaDetalle('turno')}
+            >
+              Por turno
+            </button>
+          </div>
+        </div>
         <div className="table-wrap table-wrap--cards">
           <table className="data-table data-table--stack">
             <thead>
               <tr>
                 <th>Fecha</th>
                 <th>Hora</th>
-                <th>Turno</th>
-                <th>Tipo</th>
+                <th>Turno comprado</th>
                 <th>Boleta</th>
                 <th>Operador</th>
                 <th>Pago</th>
@@ -710,64 +790,137 @@ export default function CajaSaaS() {
               </tr>
             </thead>
             <tbody>
-              {ventasPorDia.map((grupo) => (
-                <React.Fragment key={grupo.fechaKey}>
-                  <tr className="caja-detalle__dia">
-                    <td colSpan={10}>
-                      <strong>{grupo.fechaLabel}</strong>
-                      <span className="text-muted">
-                        {' '}
-                        · {grupo.ventas.length} venta(s) ·{' '}
-                        {formatQ(grupo.ventas.reduce((s, v) => s + Number(v.precio_pagado || 0), 0))}
-                      </span>
-                    </td>
-                  </tr>
-                  {grupo.ventas.map((v) => (
-                <tr key={v.id}>
-                  <td data-label="Fecha">{formatFechaReporte(fechaVentaKey(v))}</td>
-                  <td data-label="Hora">{formatHoraVentaGt(v.pago_confirmado_en || v.updated_at) || '—'}</td>
-                  <td data-label="Turno">#{v.numero_turno}</td>
-                  <td data-label="Tipo">{labelTipoTurno(v.tipo_turno)}</td>
-                  <td data-label="Boleta">
-                    <code>{v.codigo_boleta_qr}</code>
-                  </td>
-                  <td data-label="Operador">{v.operador_nombre || '—'}</td>
-                  <td data-label="Pago">{labelMetodoPago(v.metodo_pago)}</td>
-                  <td data-label="Comprobante">
-                    {v.comprobante_url || v.tiene_comprobante ? (
-                      <button
-                        type="button"
-                        className="btn btn--ghost btn--sm"
-                        disabled={cargandoComprobanteId === v.id}
-                        onClick={() => verComprobante(v)}
-                      >
-                        {cargandoComprobanteId === v.id ? 'Cargando…' : 'Ver foto'}
-                      </button>
-                    ) : (
-                      <span className="text-muted">—</span>
-                    )}
-                  </td>
-                  <td data-label="Ofrenda">{formatQ(v.precio_pagado)}</td>
-                  <td data-label="Acciones">
-                    <button
-                      type="button"
-                      className="btn btn--ghost btn--sm"
-                      onClick={() => abrirEditarPago(v.codigo_boleta_qr)}
-                    >
-                      Editar pago
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn--ghost btn--sm btn--danger-text"
-                      onClick={() => abrirAnular(v.codigo_boleta_qr)}
-                    >
-                      Anular
-                    </button>
+              {ventasFiltradas.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="text-muted">
+                    No hay ventas con los filtros actuales.
                   </td>
                 </tr>
-                  ))}
-                </React.Fragment>
-              ))}
+              ) : vistaDetalle === 'turno' ? (
+                ventasPorTurno.map((grupo) => (
+                  <React.Fragment key={grupo.key}>
+                    <tr className="caja-detalle__dia">
+                      <td colSpan={9}>
+                        <strong>{grupo.label}</strong>
+                        <span className="text-muted">
+                          {' '}
+                          · {grupo.ventas.length} boleta(s) ·{' '}
+                          {formatQ(
+                            grupo.ventas.reduce((s, v) => s + Number(v.precio_pagado || 0), 0)
+                          )}
+                        </span>
+                      </td>
+                    </tr>
+                    {grupo.ventas.map((v) => (
+                      <tr key={v.id}>
+                        <td data-label="Fecha">{formatFechaReporte(fechaVentaKey(v))}</td>
+                        <td data-label="Hora">
+                          {formatHoraVentaGt(v.pago_confirmado_en || v.updated_at) || '—'}
+                        </td>
+                        <td data-label="Turno comprado">{descripcionTurnoVenta(v)}</td>
+                        <td data-label="Boleta">
+                          <code>{v.codigo_boleta_qr}</code>
+                        </td>
+                        <td data-label="Operador">{v.operador_nombre || '—'}</td>
+                        <td data-label="Pago">{labelMetodoPago(v.metodo_pago)}</td>
+                        <td data-label="Comprobante">
+                          {v.comprobante_url || v.tiene_comprobante ? (
+                            <button
+                              type="button"
+                              className="btn btn--ghost btn--sm"
+                              disabled={cargandoComprobanteId === v.id}
+                              onClick={() => verComprobante(v)}
+                            >
+                              {cargandoComprobanteId === v.id ? 'Cargando…' : 'Ver foto'}
+                            </button>
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
+                        </td>
+                        <td data-label="Ofrenda">{formatQ(v.precio_pagado)}</td>
+                        <td data-label="Acciones">
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            onClick={() => abrirEditarPago(v.codigo_boleta_qr)}
+                          >
+                            Editar pago
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm btn--danger-text"
+                            onClick={() => abrirAnular(v.codigo_boleta_qr)}
+                          >
+                            Anular
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ))
+              ) : (
+                ventasPorDia.map((grupo) => (
+                  <React.Fragment key={grupo.fechaKey}>
+                    <tr className="caja-detalle__dia">
+                      <td colSpan={9}>
+                        <strong>{grupo.fechaLabel}</strong>
+                        <span className="text-muted">
+                          {' '}
+                          · {grupo.ventas.length} venta(s) ·{' '}
+                          {formatQ(
+                            grupo.ventas.reduce((s, v) => s + Number(v.precio_pagado || 0), 0)
+                          )}
+                        </span>
+                      </td>
+                    </tr>
+                    {grupo.ventas.map((v) => (
+                      <tr key={v.id}>
+                        <td data-label="Fecha">{formatFechaReporte(fechaVentaKey(v))}</td>
+                        <td data-label="Hora">
+                          {formatHoraVentaGt(v.pago_confirmado_en || v.updated_at) || '—'}
+                        </td>
+                        <td data-label="Turno comprado">{descripcionTurnoVenta(v)}</td>
+                        <td data-label="Boleta">
+                          <code>{v.codigo_boleta_qr}</code>
+                        </td>
+                        <td data-label="Operador">{v.operador_nombre || '—'}</td>
+                        <td data-label="Pago">{labelMetodoPago(v.metodo_pago)}</td>
+                        <td data-label="Comprobante">
+                          {v.comprobante_url || v.tiene_comprobante ? (
+                            <button
+                              type="button"
+                              className="btn btn--ghost btn--sm"
+                              disabled={cargandoComprobanteId === v.id}
+                              onClick={() => verComprobante(v)}
+                            >
+                              {cargandoComprobanteId === v.id ? 'Cargando…' : 'Ver foto'}
+                            </button>
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
+                        </td>
+                        <td data-label="Ofrenda">{formatQ(v.precio_pagado)}</td>
+                        <td data-label="Acciones">
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            onClick={() => abrirEditarPago(v.codigo_boleta_qr)}
+                          >
+                            Editar pago
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm btn--danger-text"
+                            onClick={() => abrirAnular(v.codigo_boleta_qr)}
+                          >
+                            Anular
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ))
+              )}
             </tbody>
           </table>
         </div>

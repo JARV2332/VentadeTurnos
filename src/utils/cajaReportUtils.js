@@ -15,6 +15,50 @@ export function labelTipoTurno(tipo) {
   return TIPO_TURNO_LABELS[key] || tipo;
 }
 
+/** Etiqueta legible del turno vendido (#, tipo, nombre/etiqueta). */
+export function etiquetaTurnoVenta(venta) {
+  const n = venta?.numero_turno;
+  const tipo = venta?.tipo_turno ? labelTipoTurno(venta.tipo_turno) : '';
+  const etiq = venta?.turno_etiqueta?.trim();
+  const partes = [];
+  if (n != null && n !== '') partes.push(`#${n}`);
+  if (tipo && tipo !== 'Sin tipo') partes.push(tipo);
+  if (etiq && etiq !== tipo && etiq !== venta?.tipo_turno) partes.push(etiq);
+  return partes.join(' · ') || '—';
+}
+
+export function etiquetaBrazoVenta(venta) {
+  if (venta?.numero_brazo == null) return '';
+  const lado =
+    venta.lado === 'Izquierda' ? 'Izq.' : venta.lado === 'Derecha' ? 'Der.' : venta.lado || '';
+  return lado ? `Brazo ${venta.numero_brazo} ${lado}` : `Brazo ${venta.numero_brazo}`;
+}
+
+/** Turno + espacio físico (para detalle de caja). */
+export function descripcionTurnoVenta(venta) {
+  const turno = etiquetaTurnoVenta(venta);
+  const brazo = etiquetaBrazoVenta(venta);
+  return brazo && turno !== '—' ? `${turno} — ${brazo}` : turno;
+}
+
+function textoBusquedaTurnoVenta(venta) {
+  return [
+    venta?.numero_turno,
+    venta?.tipo_turno,
+    venta?.turno_etiqueta,
+    venta?.codigo_boleta_qr,
+    venta?.cortejo_nombre,
+    venta?.numero_brazo,
+    venta?.lado,
+    venta?.operador_nombre,
+    etiquetaTurnoVenta(venta),
+    descripcionTurnoVenta(venta),
+  ]
+    .filter((x) => x != null && String(x).trim() !== '')
+    .join(' ')
+    .toLowerCase();
+}
+
 export function fechaVentaKey(venta) {
   const raw = venta?.pago_confirmado_en || venta?.updated_at || venta?.created_at;
   if (!raw) return null;
@@ -95,7 +139,8 @@ export function agruparVentasPorDia(ventas) {
 
 export function filtrarVentasCaja(ventas, filtros = {}) {
   let lista = Array.isArray(ventas) ? [...ventas] : [];
-  const { fechaDesde, fechaHasta, vendedorId, tipoTurno, mesaId } = filtros;
+  const { fechaDesde, fechaHasta, vendedorId, tipoTurno, mesaId, numeroTurno, busquedaTurno } =
+    filtros;
 
   if (fechaDesde) {
     lista = lista.filter((v) => {
@@ -117,6 +162,13 @@ export function filtrarVentasCaja(ventas, filtros = {}) {
   }
   if (mesaId && mesaId !== 'all') {
     lista = lista.filter((v) => v.mesa_id === mesaId);
+  }
+  if (numeroTurno && numeroTurno !== 'all') {
+    lista = lista.filter((v) => String(v.numero_turno) === String(numeroTurno));
+  }
+  if (busquedaTurno?.trim()) {
+    const q = busquedaTurno.trim().toLowerCase();
+    lista = lista.filter((v) => textoBusquedaTurnoVenta(v).includes(q));
   }
 
   return ordenarVentasCaja(lista);
@@ -182,6 +234,37 @@ export function tiposTurnoDisponibles(ventas) {
   return [...set].sort();
 }
 
+export function numerosTurnoDisponibles(ventas) {
+  const set = new Set();
+  (ventas || []).forEach((v) => {
+    if (v.numero_turno != null && v.numero_turno !== '') set.add(String(v.numero_turno));
+  });
+  return [...set].sort((a, b) => Number(a) - Number(b));
+}
+
+/** Boletas agrupadas por turno; dentro de cada turno van en orden cronológico. */
+export function agruparVentasPorTurno(ventas) {
+  const ordenadas = ordenarVentasCaja(ventas);
+  const map = new Map();
+  ordenadas.forEach((v) => {
+    const key = `${v.numero_turno ?? '—'}|${v.tipo_turno || ''}|${v.turno_etiqueta || ''}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        numeroTurno: v.numero_turno,
+        tipoTurno: v.tipo_turno,
+        turnoEtiqueta: v.turno_etiqueta,
+        label: etiquetaTurnoVenta(v),
+        ventas: [],
+      });
+    }
+    map.get(key).ventas.push(v);
+  });
+  return [...map.values()].sort(
+    (a, b) => (Number(a.numeroTurno) || 0) - (Number(b.numeroTurno) || 0)
+  );
+}
+
 function filtrosTexto(filtros) {
   const partes = [];
   if (filtros.fechaDesde || filtros.fechaHasta) {
@@ -193,6 +276,12 @@ function filtrosTexto(filtros) {
   if (filtros.tipoTurno && filtros.tipoTurno !== 'all') {
     partes.push(`Tipo turno: ${labelTipoTurno(filtros.tipoTurno)}`);
   }
+  if (filtros.numeroTurno && filtros.numeroTurno !== 'all') {
+    partes.push(`Turno #${filtros.numeroTurno}`);
+  }
+  if (filtros.busquedaTurno?.trim()) {
+    partes.push(`Búsqueda: ${filtros.busquedaTurno.trim()}`);
+  }
   if (filtros.mesaNombre) partes.push(`Mesa: ${filtros.mesaNombre}`);
   return partes.length ? partes.join(' · ') : 'Todos los registros';
 }
@@ -201,8 +290,11 @@ function filasDetalleExcel(ventas) {
   return ordenarVentasCaja(ventas).map((v) => ({
     'Fecha venta': formatFechaReporte(fechaVentaKey(v)),
     'Hora venta': formatHoraVentaGt(v.pago_confirmado_en || v.updated_at),
-    Turno: v.numero_turno ?? '—',
+    Turno: descripcionTurnoVenta(v),
+    'N.º turno': v.numero_turno ?? '—',
     'Tipo turno': labelTipoTurno(v.tipo_turno),
+    'Nombre / etiqueta': v.turno_etiqueta || '—',
+    Brazo: etiquetaBrazoVenta(v) || '—',
     Boleta: v.codigo_boleta_qr || '—',
     Operador: v.operador_nombre || '—',
     Pago: labelMetodoPago(v.metodo_pago),
@@ -381,7 +473,7 @@ function buildReporteCajaHtml({ ventas, resumen, filtros = {}, orgNombre = '' })
   <div class="panel">
     <h2>Detalle (${ventasOrdenadas.length} registros)</h2>
     <table>
-      <thead><tr><th>Fecha</th><th>Hora</th><th>Turno</th><th>Tipo</th><th>Boleta</th><th>Operador</th><th>Pago</th><th>Ofrenda</th></tr></thead>
+      <thead><tr><th>Fecha</th><th>Hora</th><th>Turno comprado</th><th>Boleta</th><th>Operador</th><th>Pago</th><th>Ofrenda</th></tr></thead>
       <tbody>
         ${ventasOrdenadas
           .slice(0, 500)
@@ -389,8 +481,7 @@ function buildReporteCajaHtml({ ventas, resumen, filtros = {}, orgNombre = '' })
             (v) => `<tr>
           <td>${escapeHtml(formatFechaReporte(fechaVentaKey(v)))}</td>
           <td>${escapeHtml(formatHoraVentaGt(v.pago_confirmado_en || v.updated_at) || '—')}</td>
-          <td>#${escapeHtml(v.numero_turno ?? '—')}</td>
-          <td>${escapeHtml(labelTipoTurno(v.tipo_turno))}</td>
+          <td>${escapeHtml(descripcionTurnoVenta(v))}</td>
           <td>${escapeHtml(v.codigo_boleta_qr || '—')}</td>
           <td>${escapeHtml(v.operador_nombre || '—')}</td>
           <td>${escapeHtml(labelMetodoPago(v.metodo_pago))}</td>
