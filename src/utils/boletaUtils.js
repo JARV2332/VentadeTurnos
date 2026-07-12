@@ -13,6 +13,24 @@ export function extraerCodigoBoleta(texto) {
   return trimmed.toUpperCase();
 }
 
+/** Normaliza texto pegado en búsqueda (acepta VR-/VT- o solo el sufijo alfanumérico). */
+export function normalizarCodigoBusqueda(texto) {
+  const extraido = extraerCodigoBoleta(texto);
+  if (/^V[RT]-[A-Z0-9]+$/i.test(extraido)) return extraido.toUpperCase();
+  const alfanum = String(texto || '')
+    .trim()
+    .replace(/[^A-Z0-9]/gi, '')
+    .toUpperCase();
+  if (!alfanum) return '';
+  return `VR-${alfanum}`;
+}
+
+/** Variante VT- para reintento cuando VR- no encuentra la boleta. */
+export function alternativaCodigoVt(codigoVr) {
+  if (!/^VR-[A-Z0-9]+$/i.test(codigoVr || '')) return null;
+  return codigoVr.replace(/^VR-/i, 'VT-').toUpperCase();
+}
+
 export function formatPrecio(valor) {
   return new Intl.NumberFormat('es-GT', { style: 'currency', currency: 'GTQ' }).format(valor || 0);
 }

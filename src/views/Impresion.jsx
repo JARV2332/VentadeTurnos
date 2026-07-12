@@ -19,7 +19,7 @@ import ReenvioMasivoModal from '../components/ReenvioMasivoModal';
 import { enviarBoletaPorCorreo } from '../services/emailService';
 import { construirEnlaceBoletaWhatsapp } from '../utils/whatsappUtils';
 import { codigoReciboDisplay } from '../utils/compraUtils';
-import { extraerCodigoBoleta } from '../utils/boletaUtils';
+import { normalizarCodigoBusqueda, alternativaCodigoVt } from '../utils/boletaUtils';
 import { TERMINO_DEVOTO } from '../constants/terminologia';
 
 function agruparRecibos(vendidos, comprasPorId) {
@@ -95,6 +95,58 @@ export default function Impresion() {
   const [reenvioMasivoAbierto, setReenvioMasivoAbierto] = useState(false);
   const cortejosCacheRef = useRef(null);
 
+  const ejecutarBusquedaCodigo = useCallback(
+    async (textoRaw, { desdeVenta = false } = {}) => {
+      if (!organizacionId) return;
+      const texto = String(textoRaw || '').trim();
+      if (!texto) {
+        setMsgBusqueda('Ingrese un código de boleta.');
+        return;
+      }
+      const codigo = normalizarCodigoBusqueda(texto);
+      if (!codigo) {
+        setMsgBusqueda('Código inválido. Use VR-… o VT-…');
+        return;
+      }
+
+      setBusquedaCodigo(texto);
+      setBuscandoCodigo(true);
+      setRecibosBusqueda(null);
+      setBusquedaDevoto('');
+      if (!desdeVenta) {
+        setSoloReciboVenta(false);
+      }
+      if (!desdeVenta) setMsgBusqueda('');
+
+      try {
+        let res = await buscarBoletaPorCodigo(organizacionId, codigo);
+        const alternativa = alternativaCodigoVt(codigo);
+        if (res.error && alternativa) {
+          res = await buscarBoletaPorCodigo(organizacionId, alternativa);
+        }
+        if (res.error) {
+          setReciboPorCodigo(null);
+          setMsgBusqueda(res.error);
+          return;
+        }
+        const recibo = reciboDesdeBusqueda(res);
+        setReciboPorCodigo(recibo);
+        if (res.cargador) {
+          setCargadoresPorId((prev) => ({ ...prev, [res.cargador.id]: res.cargador }));
+        }
+        if (recibo) {
+          setSelectedId(recibo.id);
+          if (desdeVenta) {
+            setRecibosRecientes([recibo]);
+          }
+        }
+      } finally {
+        setBuscandoCodigo(false);
+      }
+    },
+    [organizacionId]
+  );
+
   const cargarRecientes = useCallback(async () => {
     if (!organizacionId) return;
     setCargandoRecientes(true);
@@ -137,12 +189,13 @@ export default function Impresion() {
         }
         if (codigo) {
           setBusquedaCodigo(codigo);
+          await ejecutarBusquedaCodigo(codigo, { desdeVenta: true });
         }
       } finally {
         setCargandoRecientes(false);
       }
     },
-    [organizacionId]
+    [organizacionId, ejecutarBusquedaCodigo]
   );
 
   useEffect(() => {
@@ -158,6 +211,11 @@ export default function Impresion() {
 
   const verUltimasVentas = () => {
     setSearchParams({});
+  };
+
+  const handleBuscarCodigo = async (e) => {
+    e?.preventDefault();
+    await ejecutarBusquedaCodigo(busquedaCodigo);
   };
 
   const handleBuscarDevoto = async (e) => {
@@ -189,46 +247,6 @@ export default function Impresion() {
       setBuscandoDevoto(false);
     }
   };
-
-  useEffect(() => {
-    const codigo = extraerCodigoBoleta(busquedaCodigo);
-    if (!/^V[RT]-[A-Z0-9]+$/i.test(codigo)) {
-      if (!soloReciboVenta || recibosRecientes.length) {
-        setReciboPorCodigo(null);
-      }
-      return undefined;
-    }
-
-    let cancelado = false;
-    setBuscandoCodigo(true);
-    setRecibosBusqueda(null);
-    if (!soloReciboVenta) setMsgBusqueda('');
-    (async () => {
-      const res = await buscarBoletaPorCodigo(organizacionId, codigo);
-      if (cancelado) return;
-      setBuscandoCodigo(false);
-      if (res.error) {
-        setReciboPorCodigo(null);
-        setMsgBusqueda(res.error);
-        return;
-      }
-      const recibo = reciboDesdeBusqueda(res);
-      setReciboPorCodigo(recibo);
-      if (res.cargador) {
-        setCargadoresPorId((prev) => ({ ...prev, [res.cargador.id]: res.cargador }));
-      }
-      if (recibo) {
-        setSelectedId(recibo.id);
-        if (soloReciboVenta) {
-          setRecibosRecientes([recibo]);
-        }
-      }
-    })();
-
-    return () => {
-      cancelado = true;
-    };
-  }, [busquedaCodigo, organizacionId, soloReciboVenta, recibosRecientes.length]);
 
   const recibosLista = useMemo(() => {
     if (reciboPorCodigo) {
@@ -494,19 +512,28 @@ export default function Impresion() {
                   </button>
                 </form>
 
-                <label className="impresion-toolbar__campo">
-                  Código VR- / VT-
-                  <input
-                    type="search"
-                    value={busquedaCodigo}
-                    onChange={(e) => {
-                      setBusquedaCodigo(e.target.value);
-                      setBusquedaDevoto('');
-                    }}
-                    placeholder="VR-… o VT-…"
-                    autoComplete="off"
-                  />
-                </label>
+                <form onSubmit={handleBuscarCodigo} className="impresion-toolbar__busqueda">
+                  <label className="impresion-toolbar__campo">
+                    Código VR- / VT-
+                    <input
+                      type="search"
+                      value={busquedaCodigo}
+                      onChange={(e) => {
+                        setBusquedaCodigo(e.target.value);
+                        setBusquedaDevoto('');
+                      }}
+                      placeholder="VR-…, VT-… o solo el código"
+                      autoComplete="off"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    className="btn btn--primary btn--sm"
+                    disabled={buscandoCodigo || !busquedaCodigo.trim()}
+                  >
+                    {buscandoCodigo ? '…' : 'Buscar'}
+                  </button>
+                </form>
               </>
             )}
 
