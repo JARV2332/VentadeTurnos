@@ -850,7 +850,7 @@ export async function getUltimosRecibosImpresion(
 
   let qCompras = supabase
     .from('compras')
-    .select(COMPRA_LIST_FIELDS)
+    .select(COMPRA_LIST_LITE_FIELDS)
     .eq('organizacion_id', organizacionId)
     .order('pago_confirmado_en', { ascending: false, nullsFirst: false })
     .limit(limit);
@@ -868,7 +868,7 @@ export async function getUltimosRecibosImpresion(
   if (compraIds.length) {
     const { data, error } = await supabase
       .from('brazos')
-      .select(BRAZO_VENDIDO_FIELDS)
+      .select(BRAZO_VENDIDO_LIST_FIELDS)
       .eq('organizacion_id', organizacionId)
       .eq('estado', 'vendido')
       .in('compra_id', compraIds);
@@ -878,7 +878,7 @@ export async function getUltimosRecibosImpresion(
 
   const { data: sueltos } = await supabase
     .from('brazos')
-    .select(BRAZO_VENDIDO_FIELDS)
+    .select(BRAZO_VENDIDO_LIST_FIELDS)
     .eq('organizacion_id', organizacionId)
     .eq('estado', 'vendido')
     .is('compra_id', null)
@@ -953,7 +953,7 @@ export async function buscarRecibosImpresion(organizacionId, query) {
   const cargadorIds = cargadores.map((c) => c.id);
   const { data: brazos, error } = await supabase
     .from('brazos')
-    .select(BRAZO_VENDIDO_FIELDS)
+    .select(BRAZO_VENDIDO_LIST_FIELDS)
     .eq('organizacion_id', organizacionId)
     .eq('estado', 'vendido')
     .in('cargador_id', cargadorIds)
@@ -1546,7 +1546,7 @@ export async function getComprasByIds(compraIds, organizacionId) {
   const all = [];
   for (let i = 0; i < ids.length; i += CHUNK) {
     const slice = ids.slice(i, i + CHUNK);
-    let q = supabase.from('compras').select(COMPRA_LIST_FIELDS).in('id', slice);
+    let q = supabase.from('compras').select(COMPRA_LIST_LITE_FIELDS).in('id', slice);
     if (organizacionId) q = q.eq('organizacion_id', organizacionId);
     const { data, error } = await q;
     if (error) {
@@ -1569,7 +1569,7 @@ export async function getReciboImpresionPorCompraId(organizacionId, compraId) {
 
   const { data: brazos, error } = await supabase
     .from('brazos')
-    .select(BRAZO_VENDIDO_FIELDS)
+    .select(BRAZO_VENDIDO_LIST_FIELDS)
     .eq('organizacion_id', organizacionId)
     .eq('compra_id', compraId)
     .eq('estado', 'vendido')
