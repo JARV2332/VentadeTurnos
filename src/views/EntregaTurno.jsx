@@ -8,10 +8,10 @@ import { useAuth } from '../context/AuthContext';
 import {
   buscarBoletaPorCodigo,
   marcarEntregado,
-  getBrazosVendidosByOrg,
+  getBrazosPendientesEntregaByOrg,
   getCortejosByOrg,
-  getCargadoresByOrg,
-  getComprasByOrg,
+  getCargadoresByIds,
+  getComprasByIds,
   getTurnosByIds,
   subscribeData,
 } from '../services/dataService';
@@ -46,18 +46,23 @@ export default function EntregaTurno() {
     if (!organizacionId) return;
     setCargandoPendientes(true);
     try {
-      const [cortejosData, vendidos, cargadores, compras] = await Promise.all([
+      const [cortejosData, pendientes] = await Promise.all([
         getCortejosByOrg(organizacionId, { incluirInactivas: true }),
-        getBrazosVendidosByOrg(organizacionId),
-        getCargadoresByOrg(organizacionId),
-        getComprasByOrg(organizacionId),
+        getBrazosPendientesEntregaByOrg(organizacionId),
       ]);
       setCortejos(cortejosData || []);
-      setBrazosVendidos(vendidos || []);
+      setBrazosVendidos(pendientes || []);
+
+      const compraIds = [...new Set((pendientes || []).map((b) => b.compra_id).filter(Boolean))];
+      const cargadorIds = [...new Set((pendientes || []).map((b) => b.cargador_id).filter(Boolean))];
+      const [compras, cargadores] = await Promise.all([
+        compraIds.length ? getComprasByIds(compraIds, organizacionId) : [],
+        cargadorIds.length ? getCargadoresByIds(cargadorIds, organizacionId) : [],
+      ]);
       setCargadoresPorId(Object.fromEntries((cargadores || []).map((c) => [c.id, c])));
       setComprasPorId(Object.fromEntries((compras || []).map((c) => [c.id, c])));
 
-      const turnoIds = [...new Set((vendidos || []).map((b) => b.turno_id).filter(Boolean))];
+      const turnoIds = [...new Set((pendientes || []).map((b) => b.turno_id).filter(Boolean))];
       const turnosMap = turnoIds.length ? await getTurnosByIds(turnoIds) : {};
       setTurnosPorId(turnosMap && typeof turnosMap === 'object' ? turnosMap : {});
 

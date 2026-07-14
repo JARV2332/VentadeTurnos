@@ -55,6 +55,12 @@ export function getBrazosVendidosByOrg(organizacionId) {
   return store.brazos.filter((b) => b.organizacion_id === organizacionId && b.estado === 'vendido');
 }
 
+export function getBrazosPendientesEntregaByOrg(organizacionId) {
+  return getBrazosVendidosByOrg(organizacionId).filter(
+    (b) => b.estado_entrega !== 'entregado'
+  );
+}
+
 export function getUltimosRecibosImpresionMock(organizacionId, limit = 20) {
   const compras = (store.compras || [])
     .filter((c) => c.organizacion_id === organizacionId && c.estado !== 'anulada')

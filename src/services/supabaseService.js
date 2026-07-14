@@ -827,6 +827,22 @@ export async function getBrazosVendidosByOrg(organizacionId) {
   );
 }
 
+/** Entrega: solo brazos vendidos pendientes de entregar (no todo el historial). */
+export async function getBrazosPendientesEntregaByOrg(organizacionId) {
+  if (!organizacionId) return [];
+  return fetchPaginatedRows((from, to) =>
+    supabase
+      .from('brazos')
+      .select(BRAZO_VENDIDO_LIST_FIELDS)
+      .eq('organizacion_id', organizacionId)
+      .eq('estado', 'vendido')
+      .eq('estado_entrega', 'pendiente')
+      .order('numero_turno', { ascending: true })
+      .order('numero_brazo', { ascending: true })
+      .range(from, to)
+  );
+}
+
 export async function getComprobanteVentaBrazo(organizacionId, brazoId) {
   if (!organizacionId || !brazoId) return null;
   const { data, error } = await supabase
