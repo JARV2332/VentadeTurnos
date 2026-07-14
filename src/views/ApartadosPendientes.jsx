@@ -8,7 +8,6 @@ import {
   getCortejosByOrg,
   getCargadoresByOrg,
   getTurnosByIds,
-  subscribeData,
 } from '../services/dataService';
 import {
   construirReporteApartadosPendientes,
@@ -59,7 +58,6 @@ export default function ApartadosPendientes() {
 
   useEffect(() => {
     cargar();
-    return subscribeData(organizacionId, cargar);
   }, [organizacionId, cargar]);
 
   const cortejosPorId = useMemo(

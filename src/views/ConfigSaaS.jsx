@@ -9,7 +9,6 @@ import {
   generarProcesion,
   getCortejosByOrg,
   getTurnosAgrupados,
-  subscribeData,
   desactivarProcesion,
   activarProcesion,
   eliminarProcesion,
@@ -152,7 +151,6 @@ export default function ConfigSaaS() {
 
   useEffect(() => {
     refreshLista();
-    return subscribeData(organizacionId, refreshLista);
   }, [organizacionId, refreshLista]);
 
   useEffect(() => {

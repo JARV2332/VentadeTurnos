@@ -8,7 +8,6 @@ import {
   getTurnosAgrupados,
   aplicarImportApartados,
   quitarApartados,
-  subscribeData,
 } from '../services/dataService';
 import ManualApartadoForm from '../components/ManualApartadoForm';
 import {
@@ -58,7 +57,6 @@ export default function ConfigImportReservas() {
 
   useEffect(() => {
     refresh();
-    return subscribeData(organizacionId, refresh);
   }, [refresh, organizacionId]);
 
   useEffect(() => {

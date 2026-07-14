@@ -7,7 +7,6 @@ import { useAuth } from '../context/AuthContext';
 import {
   getDashboardMetrics,
   getCortejosByOrg,
-  subscribeData,
 } from '../services/dataService';
 import HorarioTurnosPanel from '../components/HorarioTurnosPanel';
 import MisTurnosEnlaceAdmin from '../components/MisTurnosEnlaceAdmin';
@@ -23,7 +22,8 @@ export default function Dashboard() {
       setCortejos(await getCortejosByOrg(organizacionId));
     };
     refresh();
-    return subscribeData(organizacionId, refresh);
+    const timer = window.setInterval(refresh, 120_000);
+    return () => window.clearInterval(timer);
   }, [organizacionId]);
 
   const formatQ = (n) =>

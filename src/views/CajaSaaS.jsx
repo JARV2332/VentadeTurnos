@@ -67,7 +67,7 @@ export default function CajaSaaS() {
   const [errorDevoto, setErrorDevoto] = useState('');
   const refreshInFlightRef = useRef(false);
   const refreshQueuedRef = useRef(false);
-  const FINANZAS_REALTIME_DEBOUNCE_MS = 1500;
+  const FINANZAS_REALTIME_DEBOUNCE_MS = 2500;
 
   const refreshFinanzas = useCallback(async () => {
     if (refreshInFlightRef.current) {

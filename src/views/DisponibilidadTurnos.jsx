@@ -60,7 +60,7 @@ export default function DisponibilidadTurnos() {
 
   useEffect(() => {
     cargarTurnos();
-    return subscribeData(organizacionId, cargarTurnos);
+    return subscribeData(organizacionId, cargarTurnos, 2000);
   }, [organizacionId, cargarTurnos]);
 
   const cortejoSel = useMemo(

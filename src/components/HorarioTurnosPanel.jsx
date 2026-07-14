@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Loader from './Loader';
-import { getCortejosByOrg, getTurnosByCortejo, subscribeData } from '../services/dataService';
+import { getCortejosByOrg, getTurnosByCortejo } from '../services/dataService';
 import {
   formatFechaEvento,
   formatHoraDisplay,
@@ -24,7 +24,6 @@ export default function HorarioTurnosPanel({ organizacionId, incluirInactivas = 
 
   useEffect(() => {
     refreshCortejos();
-    return subscribeData(organizacionId, refreshCortejos);
   }, [organizacionId, incluirInactivas]);
 
   useEffect(() => {
