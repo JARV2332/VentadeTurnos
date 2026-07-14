@@ -1965,53 +1965,66 @@ export async function marcarEntregado(brazoId) {
 }
 
 export async function getFinanzasByOrg(organizacionId) {
-  const [brazosRaw, usuarios, cortejosRaw, { data: turnos }] = await Promise.all([
-    getBrazosVendidosByOrg(organizacionId),
-    getUsuariosByOrg(organizacionId),
-    getCortejosByOrg(organizacionId, { incluirInactivas: true }),
-    supabase
-      .from('turnos')
-      .select('id, precio, cortejo_id, numero_turno, tipo_turno, etiqueta, hora_estimada')
-      .eq('organizacion_id', organizacionId),
-  ]);
+  let ventas = null;
 
-  const { data: comprasLite } = await supabase
-    .from('compras')
-    .select('id, vendedor_id, operador_nombre')
-    .eq('organizacion_id', organizacionId);
-
-  const comprasMap = Object.fromEntries((comprasLite || []).map((c) => [c.id, c]));
-  const mapaUsuarios = {};
-  for (const u of usuarios || []) {
-    const nombre = u.nombre?.trim() || u.email?.trim() || '';
-    if (!nombre) continue;
-    if (u.auth_user_id) mapaUsuarios[u.auth_user_id] = nombre;
-    if (u.id) mapaUsuarios[u.id] = nombre;
+  const { data: rpcVentas, error: rpcErr } = await supabase.rpc('get_finanzas_ventas_json', {
+    p_organizacion_id: organizacionId,
+  });
+  if (!rpcErr && rpcVentas) {
+    ventas = Array.isArray(rpcVentas) ? rpcVentas : [];
+  } else if (rpcErr && !isMissingRpc(rpcErr)) {
+    console.warn('get_finanzas_ventas_json RPC:', rpcErr.message);
   }
 
-  const cortejosMap = Object.fromEntries((cortejosRaw || []).map((c) => [c.id, c]));
-  const turnosMap = Object.fromEntries((turnos || []).map((t) => [t.id, t]));
+  if (ventas === null) {
+    const [brazosRaw, usuarios, cortejosRaw, { data: turnos }] = await Promise.all([
+      getBrazosVendidosByOrg(organizacionId),
+      getUsuariosByOrg(organizacionId),
+      getCortejosByOrg(organizacionId, { incluirInactivas: true }),
+      supabase
+        .from('turnos')
+        .select('id, precio, cortejo_id, numero_turno, tipo_turno, etiqueta, hora_estimada')
+        .eq('organizacion_id', organizacionId),
+    ]);
 
-  let ventas = (brazosRaw || []).map((b) => {
-    const compra = b.compra_id ? comprasMap[b.compra_id] : null;
-    const turno = turnosMap[b.turno_id];
-    return {
-      ...b,
-      vendedor_id: b.vendedor_id || compra?.vendedor_id || null,
-      operador_nombre:
-        b.operador_nombre?.trim() ||
-        compra?.operador_nombre?.trim() ||
-        mapaUsuarios[b.vendedor_id] ||
-        mapaUsuarios[compra?.vendedor_id] ||
-        '',
-      tipo_turno: turno?.tipo_turno || null,
-      turno_etiqueta: turno?.etiqueta || turno?.tipo_turno || '',
-      numero_turno: b.numero_turno ?? turno?.numero_turno,
-      hora_estimada: turno?.hora_estimada || null,
-      fecha_evento: cortejosMap[turno?.cortejo_id]?.fecha || null,
-      cortejo_nombre: cortejosMap[turno?.cortejo_id]?.nombre_evento || null,
-    };
-  });
+    const { data: comprasLite } = await supabase
+      .from('compras')
+      .select('id, vendedor_id, operador_nombre')
+      .eq('organizacion_id', organizacionId);
+
+    const comprasMap = Object.fromEntries((comprasLite || []).map((c) => [c.id, c]));
+    const mapaUsuarios = {};
+    for (const u of usuarios || []) {
+      const nombre = u.nombre?.trim() || u.email?.trim() || '';
+      if (!nombre) continue;
+      if (u.auth_user_id) mapaUsuarios[u.auth_user_id] = nombre;
+      if (u.id) mapaUsuarios[u.id] = nombre;
+    }
+
+    const cortejosMap = Object.fromEntries((cortejosRaw || []).map((c) => [c.id, c]));
+    const turnosMap = Object.fromEntries((turnos || []).map((t) => [t.id, t]));
+
+    ventas = (brazosRaw || []).map((b) => {
+      const compra = b.compra_id ? comprasMap[b.compra_id] : null;
+      const turno = turnosMap[b.turno_id];
+      return {
+        ...b,
+        vendedor_id: b.vendedor_id || compra?.vendedor_id || null,
+        operador_nombre:
+          b.operador_nombre?.trim() ||
+          compra?.operador_nombre?.trim() ||
+          mapaUsuarios[b.vendedor_id] ||
+          mapaUsuarios[compra?.vendedor_id] ||
+          '',
+        tipo_turno: turno?.tipo_turno || null,
+        turno_etiqueta: turno?.etiqueta || turno?.tipo_turno || '',
+        numero_turno: b.numero_turno ?? turno?.numero_turno,
+        hora_estimada: turno?.hora_estimada || null,
+        fecha_evento: cortejosMap[turno?.cortejo_id]?.fecha || null,
+        cortejo_nombre: cortejosMap[turno?.cortejo_id]?.nombre_evento || null,
+      };
+    });
+  }
 
   ventas.sort((a, b) => {
     const ta = new Date(a.pago_confirmado_en || a.updated_at || 0).getTime();
@@ -2020,6 +2033,28 @@ export async function getFinanzasByOrg(organizacionId) {
   });
 
   const brazos = ventas;
+
+  const usuarios = await getUsuariosByOrg(organizacionId);
+  const mapaUsuarios = {};
+  for (const u of usuarios || []) {
+    const nombre = u.nombre?.trim() || u.email?.trim() || '';
+    if (!nombre) continue;
+    if (u.auth_user_id) mapaUsuarios[u.auth_user_id] = nombre;
+    if (u.id) mapaUsuarios[u.id] = nombre;
+  }
+
+  ventas = ventas.map((b) => ({
+    ...b,
+    operador_nombre:
+      b.operador_nombre?.trim() ||
+      mapaUsuarios[b.vendedor_id] ||
+      '',
+  }));
+
+  const { data: turnos } = await supabase
+    .from('turnos')
+    .select('id, precio, cortejo_id, numero_turno')
+    .eq('organizacion_id', organizacionId);
 
   const presupuestoTotal = (turnos || []).reduce((s, t) => {
     const delTurno = brazos.filter((b) => b.turno_id === t.id);
