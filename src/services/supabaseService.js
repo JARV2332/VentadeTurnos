@@ -74,7 +74,7 @@ const BRAZO_TAQUILLA_FIELDS =
 const BRAZOS_RPC_PAGE = 1000;
 
 const BRAZO_METRICS_FIELDS =
-  'id, turno_id, estado, reserva_apartado, estado_entrega, precio_pagado, updated_at, created_at, bloqueado_hasta';
+  'id, turno_id, estado, reserva_apartado, estado_entrega, precio_pagado, pago_confirmado_en, updated_at, created_at, bloqueado_hasta';
 
 const BRAZO_VENDIDO_FIELDS =
   'id, turno_id, numero_turno, numero_brazo, lado, estado, precio_pagado, codigo_boleta_qr, compra_id, cargador_id, mesa_id, vendedor_id, operador_nombre, metodo_pago, comprobante_url, estado_entrega, pago_confirmado_en, updated_at, created_at';
@@ -2104,8 +2104,7 @@ export async function getFinanzasByOrg(organizacionId) {
 }
 
 export async function getDashboardMetrics(organizacionId) {
-  const [fin, cortejos, brazos, turnosRes, reservasTaquillaColgadas] = await Promise.all([
-    getFinanzasByOrg(organizacionId),
+  const [cortejos, brazos, turnosRes, reservasTaquillaColgadas] = await Promise.all([
     getCortejosByOrg(organizacionId, { incluirInactivas: true }),
     organizacionId
       ? fetchPaginatedRows((from, to) =>
@@ -2127,7 +2126,6 @@ export async function getDashboardMetrics(organizacionId) {
 
   return {
     ...enriquecerDashboardMetrics({
-      fin,
       brazos,
       cortejos,
       turnos: turnosRes.data || [],

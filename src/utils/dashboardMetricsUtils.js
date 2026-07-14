@@ -26,10 +26,9 @@ export function enriquecerDashboardMetrics({
 }) {
   const turnosPorId = Object.fromEntries((turnos || []).map((t) => [t.id, t]));
   const totalBrazos = (brazos || []).length;
+  const vendidosList = (brazos || []).filter((b) => b.estado === 'vendido');
   const vendidos =
-    fin.brazosVendidos ??
-    fin.vendidos ??
-    (brazos || []).filter((b) => b.estado === 'vendido').length;
+    fin.brazosVendidos ?? fin.vendidos ?? vendidosList.length;
   const disponibles = (brazos || []).filter((b) => b.estado === 'disponible').length;
   const reservados = (brazos || []).filter((b) => b.estado === 'reservado').length;
   const pendientesEntrega = (brazos || []).filter(
@@ -40,10 +39,24 @@ export function enriquecerDashboardMetrics({
   ).length;
   const reservasTaquillaColgadas = contarReservasTaquillaColgadas(brazos);
 
+  const recaudado =
+    fin.recaudado ??
+    vendidosList.reduce((s, b) => s + Number(b.precio_pagado || 0), 0);
+
+  const presupuestoTotal =
+    fin.presupuestoTotal ??
+    (turnos || []).reduce((s, t) => {
+      const delTurno = (brazos || []).filter((b) => b.turno_id === t.id);
+      return s + Number(t.precio) * delTurno.length;
+    }, 0);
+
   const hoyKey = fechaHoyKey();
-  const ventasHoyList = (fin.ventas || []).filter((v) => fechaVentaKeyLocal(v) === hoyKey);
-  const ventasHoy = ventasHoyList.length;
-  const montoHoy = ventasHoyList.reduce((s, v) => s + Number(v.precio_pagado || 0), 0);
+  const ventasHoyFromFin = (fin.ventas || []).filter((v) => fechaVentaKeyLocal(v) === hoyKey);
+  const ventasHoyFromBrazos = vendidosList.filter((b) => fechaVentaKeyLocal(b) === hoyKey);
+  const ventasHoy = fin.ventas?.length ? ventasHoyFromFin.length : ventasHoyFromBrazos.length;
+  const montoHoy = fin.ventas?.length
+    ? ventasHoyFromFin.reduce((s, v) => s + Number(v.precio_pagado || 0), 0)
+    : ventasHoyFromBrazos.reduce((s, b) => s + Number(b.precio_pagado || 0), 0);
 
   const cortejosActivos = (cortejos || []).filter((c) => c.estado === 'activa');
   const porProcesion = cortejosActivos.map((cortejo) => {
@@ -69,6 +82,8 @@ export function enriquecerDashboardMetrics({
 
   return {
     ...fin,
+    recaudado,
+    presupuestoTotal,
     vendidos,
     totalBrazos,
     disponibles,
