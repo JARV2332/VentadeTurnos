@@ -3,10 +3,10 @@
  * Acepta un brazo (brazoId) o varios del mismo recibo (brazoIds).
  */
 import { createClient } from '@supabase/supabase-js';
-import { verifyOrgMember } from './verifyOrgMember.js';
-import { getSupabaseConfig } from './verifyCaller.js';
-import { buildEntregaEmailContent } from './emailEntregaContent.js';
-import { createTransporter, obtenerCredencialesSmtp } from './emailSmtp.js';
+import { verifyOrgMember } from './_lib/verifyOrgMember.js';
+import { getSupabaseConfig } from './_lib/verifyCaller.js';
+import { buildEntregaEmailContent } from './_lib/emailEntregaContent.js';
+import { createTransporter, obtenerCredencialesSmtp } from './_lib/emailSmtp.js';
 
 const TYPO_DOMINIOS = [
   { pattern: /@gmaii\./i, sugerencia: 'gmail.com' },

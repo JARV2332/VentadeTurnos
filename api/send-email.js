@@ -1,11 +1,10 @@
 /**
  * Envío de boletas por Gmail SMTP — credenciales por organización o fallback en Vercel.
  */
-import nodemailer from 'nodemailer';
-import { verifyOrgMember } from './verifyOrgMember.js';
-import { buildBoletaEmailContent } from './emailBoletaContent.js';
-import { buildEntregaEmailContent } from './emailEntregaContent.js';
-import { createTransporter, obtenerCredencialesSmtp } from './emailSmtp.js';
+import { verifyOrgMember } from './_lib/verifyOrgMember.js';
+import { buildBoletaEmailContent } from './_lib/emailBoletaContent.js';
+import { buildEntregaEmailContent } from './_lib/emailEntregaContent.js';
+import { createTransporter, obtenerCredencialesSmtp } from './_lib/emailSmtp.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

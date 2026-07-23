@@ -3,7 +3,7 @@
  * VT-… = brazo individual · VR-… = recibo multi-turno
  */
 import { createClient } from '@supabase/supabase-js';
-import { getSupabaseConfig } from './verifyCaller.js';
+import { getSupabaseConfig } from './_lib/verifyCaller.js';
 
 const BRAZO_FIELDS =
   'id, numero_turno, numero_brazo, lado, precio_pagado, codigo_boleta_qr, estado, estado_entrega, turno_id, cargador_id, organizacion_id, compra_id, operador_nombre, vendedor_id';

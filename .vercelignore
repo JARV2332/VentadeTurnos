@@ -1,0 +1,4 @@
+api/migrate-schema-once.js
+scripts/
+backups/
+.cursor/

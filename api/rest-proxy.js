@@ -1,8 +1,8 @@
 /**
  * Reenvía PATCH/DELETE de Supabase REST desde el servidor (sin CORS del navegador).
  */
-import { getSupabaseConfig } from './verifyCaller.js';
-import { verifyAuth } from './verifyAuth.js';
+import { getSupabaseConfig } from './_lib/verifyCaller.js';
+import { verifyAuth } from './_lib/verifyAuth.js';
 
 const ALLOWED_METHODS = new Set(['PATCH', 'DELETE']);
 const AUTH_CACHE_MS = 60_000;

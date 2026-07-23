@@ -1,7 +1,7 @@
 /**
  * Crea usuario en Auth + usuarios_app (requiere SUPABASE_SERVICE_ROLE_KEY en Vercel).
  */
-import { verifyCaller } from './verifyCaller.js';
+import { verifyCaller } from './_lib/verifyCaller.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
