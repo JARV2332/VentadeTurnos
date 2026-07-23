@@ -274,15 +274,17 @@ export default function EntregaTurno() {
 
               {esMulti ? (
                 <div className="entrega-recibo-multi">
-                  <BoletaContraseñaTurno
-                    organizacion={organizacion}
-                    cortejo={resultado.cortejo}
-                    turno={items[0]?.turno}
-                    brazo={items[0]?.brazo}
-                    items={items}
-                    compra={resultado.compra}
-                    cargador={resultado.cargador}
-                  />
+                  <div className="entrega-recibo-multi__viewport">
+                    <BoletaContraseñaTurno
+                      organizacion={organizacion}
+                      cortejo={resultado.cortejo}
+                      turno={items[0]?.turno}
+                      brazo={items[0]?.brazo}
+                      items={items}
+                      compra={resultado.compra}
+                      cargador={resultado.cargador}
+                    />
+                  </div>
                   <p className="entrega-recibo-multi__estados">
                     {items.length} turno(s) ·{' '}
                     {items.map((item) => (
