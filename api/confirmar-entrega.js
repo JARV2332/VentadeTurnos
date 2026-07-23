@@ -7,8 +7,18 @@ import { verifyOrgMember } from './_lib/verifyOrgMember.js';
 import { getSupabaseConfig } from './_lib/verifyCaller.js';
 import {
   encolarCorreoEntrega,
-  programarCorreoEntregaEnBackground,
+  procesarCorreoEntregaJob,
+  procesarCorreosEntregaPendientes,
 } from './_lib/correoEntregaJob.js';
+
+async function obtenerWaitUntil() {
+  try {
+    const mod = await import('@vercel/functions');
+    return typeof mod.waitUntil === 'function' ? mod.waitUntil : null;
+  } catch {
+    return null;
+  }
+}
 
 async function marcarBrazosEntregados(userClient, ids, esTercero, receptor) {
   const resultados = await Promise.all(
@@ -75,6 +85,20 @@ export default async function handler(req, res) {
 
     const { admin } = member;
 
+    const waitUntilFn = await obtenerWaitUntil();
+    if (waitUntilFn) {
+      waitUntilFn(
+        procesarCorreosEntregaPendientes(admin, organizacionId, 5).catch((err) =>
+          console.error('[confirmar-entrega] cola pendiente:', err?.message || err)
+        )
+      );
+    } else {
+      await Promise.race([
+        procesarCorreosEntregaPendientes(admin, organizacionId, 3),
+        new Promise((resolve) => setTimeout(resolve, 4000)),
+      ]).catch((err) => console.error('[confirmar-entrega] cola pendiente:', err?.message || err));
+    }
+
     const { url, anonKey } = getSupabaseConfig();
     if (!url || !anonKey) {
       return res.status(500).json({ error: 'Supabase no configurado en el servidor.' });
@@ -106,24 +130,35 @@ export default async function handler(req, res) {
           receptor,
         });
 
-        programarCorreoEntregaEnBackground(null, admin, organizacionId, {
+        const job = {
           colaId,
           brazosEntregados,
           esTercero,
           receptor,
-        });
-
-        correo = {
-          encolado: true,
-          ok: true,
-          mensaje: 'Correo de confirmación en cola — se enviará en breve.',
         };
+
+        const result = await procesarCorreoEntregaJob(admin, organizacionId, job);
+
+        if (result.ok) {
+          correo = {
+            ok: true,
+            destinatario: result.destinatario,
+            asunto: result.asunto,
+            advertencia: result.advertencia,
+          };
+        } else if (result.omitido) {
+          correo = { ok: false, omitido: true, motivo: result.motivo };
+        } else {
+          correo = {
+            ok: false,
+            error: result.error || 'No se pudo enviar el correo de confirmación.',
+          };
+        }
       } catch (err) {
-        console.error('[confirmar-entrega] cola correo:', err?.message || err);
+        console.error('[confirmar-entrega] correo:', err?.message || err);
         correo = {
-          encolado: false,
           ok: false,
-          error: err?.message || 'No se pudo encolar el correo de confirmación.',
+          error: err?.message || 'No se pudo enviar el correo de confirmación.',
         };
       }
     }
