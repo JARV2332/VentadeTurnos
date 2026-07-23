@@ -4857,6 +4857,12 @@ html {
   min-width: 0;
 }
 
+.entrega-layout--solo {
+  grid-template-columns: 1fr;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
 .panel--compact {
   padding: 1rem 1.1rem;
 }
