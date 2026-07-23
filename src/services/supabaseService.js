@@ -2021,6 +2021,43 @@ export async function marcarEntregado(brazoId, opts = {}) {
   return { data };
 }
 
+/** Revierte entrega errónea de uno o varios brazos (recibo multi-turno). */
+export async function revertirEntregaBrazos(brazoIds) {
+  const ids = [...new Set((brazoIds || []).filter(Boolean))];
+  if (!ids.length) {
+    return { error: 'No hay turnos entregados para revertir.' };
+  }
+
+  const { data, error } = await supabase.rpc('revertir_entrega_brazos', { p_brazo_ids: ids });
+
+  if (error) {
+    if (isMissingRpc(error)) {
+      const revertidos = [];
+      for (const id of ids) {
+        const res = await revertirEntregaBrazo(id);
+        if (res.error) {
+          if (revertidos.length) {
+            return {
+              error: `${res.error} (${revertidos.length} de ${ids.length} ya revertidos)`,
+              brazos: revertidos,
+            };
+          }
+          return res;
+        }
+        revertidos.push(res.data);
+      }
+      return { data: revertidos.length === 1 ? revertidos[0] : revertidos, brazos: revertidos };
+    }
+    return err(error);
+  }
+
+  const brazos = data || [];
+  return {
+    data: brazos.length === 1 ? brazos[0] : brazos,
+    brazos,
+  };
+}
+
 /** Revierte entrega errónea → pendiente de entrega. */
 export async function revertirEntregaBrazo(brazoId) {
   const { data, error } = await supabase.rpc('revertir_entrega_brazo', { p_brazo_id: brazoId });

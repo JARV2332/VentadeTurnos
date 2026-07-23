@@ -924,6 +924,32 @@ export function revertirEntregaBrazoMock(brazoId, organizacionId) {
   return { data: actualizado };
 }
 
+/** Revierte entrega errónea de varios brazos del mismo recibo. */
+export function revertirEntregaBrazosMock(brazoIds, organizacionId) {
+  const ids = [...new Set((brazoIds || []).filter(Boolean))];
+  if (!ids.length) return { error: 'No hay turnos entregados para revertir.' };
+
+  const revertidos = [];
+  for (const id of ids) {
+    const res = revertirEntregaBrazoMock(id, organizacionId);
+    if (res.error) {
+      if (revertidos.length) {
+        return {
+          error: `${res.error} (${revertidos.length} de ${ids.length} ya revertidos)`,
+          brazos: revertidos,
+        };
+      }
+      return res;
+    }
+    revertidos.push(res.data);
+  }
+
+  return {
+    data: revertidos.length === 1 ? revertidos[0] : revertidos,
+    brazos: revertidos,
+  };
+}
+
 export function buscarCargadorPorCui(organizacionId, cui) {
   const limpio = String(cui || '').replace(/\D/g, '');
   if (!limpio) return null;

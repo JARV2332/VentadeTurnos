@@ -14,6 +14,11 @@ export function itemsDesdeResultado(resultado) {
   return [];
 }
 
+/** Brazos ya marcados como entregados. */
+export function brazosEntregadosEnItems(items) {
+  return (items || []).filter((i) => i.brazo?.estado_entrega === 'entregado');
+}
+
 /** Brazos vendidos aún pendientes de entrega física. */
 export function brazosPendientesEntrega(items) {
   return (items || []).filter(

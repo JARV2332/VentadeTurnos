@@ -212,6 +212,11 @@ export const revertirEntregaBrazo = (brazoId, organizacionId) =>
     ? sb.revertirEntregaBrazo(brazoId)
     : Promise.resolve(mock.revertirEntregaBrazoMock(brazoId, organizacionId));
 
+export const revertirEntregaBrazos = (brazoIds, organizacionId) =>
+  isSupabaseBackend()
+    ? sb.revertirEntregaBrazos(brazoIds)
+    : Promise.resolve(mock.revertirEntregaBrazosMock(brazoIds, organizacionId));
+
 export const getFinanzasByOrg = (organizacionId) =>
   isSupabaseBackend()
     ? sb.getFinanzasByOrg(organizacionId)

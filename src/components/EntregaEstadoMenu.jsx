@@ -6,6 +6,9 @@ import StatusBadge from './StatusBadge';
  */
 export default function EntregaEstadoMenu({
   brazo,
+  cantidadARevertir = 1,
+  totalRecibo = 1,
+  esReciboMulti = false,
   onRevertirPendiente,
   loading,
   disabled,
@@ -13,6 +16,15 @@ export default function EntregaEstadoMenu({
   const entregado = brazo?.estado_entrega === 'entregado';
   const [valor, setValor] = useState(entregado ? 'entregado' : 'pendiente');
   const [confirmar, setConfirmar] = useState(false);
+
+  const n = Math.max(1, cantidadARevertir || 1);
+  const esVarios = esReciboMulti && n > 1;
+  const confirmarTexto = esVarios
+    ? `¿Marcar los ${n} turnos entregados de este recibo (${totalRecibo} en total) como pendientes de entrega?`
+    : '¿Marcar este turno como pendiente de entrega?';
+  const botonTexto = esVarios
+    ? `Sí, volver ${n} turnos a pendiente`
+    : 'Sí, volver a pendiente';
 
   useEffect(() => {
     setValor(brazo?.estado_entrega === 'entregado' ? 'entregado' : 'pendiente');
@@ -64,8 +76,7 @@ export default function EntregaEstadoMenu({
       {confirmar && (
         <div className="entrega-estado-menu__confirm">
           <p>
-            ¿Marcar este turno como <strong>pendiente de entrega</strong>? Use esto solo si la
-            entrega fue registrada por error.
+            {confirmarTexto} Use esto solo si la entrega fue registrada por error.
           </p>
           <div className="entrega-estado-menu__confirm-actions">
             <button
@@ -82,7 +93,7 @@ export default function EntregaEstadoMenu({
               onClick={onRevertirPendiente}
               disabled={loading || disabled}
             >
-              {loading ? 'Guardando…' : 'Sí, volver a pendiente'}
+              {loading ? 'Guardando…' : botonTexto}
             </button>
           </div>
         </div>
