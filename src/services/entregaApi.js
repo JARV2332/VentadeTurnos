@@ -10,12 +10,18 @@ const CONFIRMAR_ENTREGA_URL =
 export async function confirmarEntregaServidor({
   organizacionId,
   brazoId,
+  brazoIds,
   entregado_a_tercero,
   entregado_receptor_nombre,
   enviarCorreo,
 }) {
   if (!CONFIRMAR_ENTREGA_URL) {
     return { error: 'API de entrega no configurada (solo disponible en producción).' };
+  }
+
+  const ids = Array.isArray(brazoIds) && brazoIds.length ? brazoIds : brazoId ? [brazoId] : [];
+  if (!ids.length) {
+    return { error: 'No hay turnos pendientes de entrega.' };
   }
 
   const {
@@ -27,7 +33,8 @@ export async function confirmarEntregaServidor({
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000);
+    const timeoutMs = ids.length > 1 ? 45000 : 20000;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     const res = await fetch(CONFIRMAR_ENTREGA_URL, {
       method: 'POST',
@@ -38,7 +45,8 @@ export async function confirmarEntregaServidor({
       signal: controller.signal,
       body: JSON.stringify({
         organizacionId,
-        brazoId,
+        brazoId: ids.length === 1 ? ids[0] : undefined,
+        brazoIds: ids.length > 1 ? ids : undefined,
         entregado_a_tercero,
         entregado_receptor_nombre,
         enviarCorreo: Boolean(enviarCorreo),
@@ -50,7 +58,11 @@ export async function confirmarEntregaServidor({
     if (!res.ok) {
       return { error: json.error || 'No se pudo confirmar la entrega.' };
     }
-    return { data: json.data, correo: json.correo || null };
+    return {
+      data: json.data,
+      brazos: json.brazos || (json.data ? [json.data] : []),
+      correo: json.correo || null,
+    };
   } catch (err) {
     if (err?.name === 'AbortError') {
       return { error: 'La operación tardó demasiado. Verifique si la entrega quedó registrada.' };

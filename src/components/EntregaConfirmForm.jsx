@@ -15,6 +15,7 @@ export default function EntregaConfirmForm({
   onSubmit,
   loading,
   disabled,
+  cantidadTurnos = 1,
 }) {
   const tieneCorreo = Boolean(cargador?.correo?.trim());
   const avisoTypo = tieneCorreo ? advertirTypoCorreo(cargador.correo) : null;
@@ -85,7 +86,11 @@ export default function EntregaConfirmForm({
         className="btn btn--primary btn--block entrega-form__submit"
         disabled={disabled || loading || (esTercero && !receptorNombre.trim())}
       >
-        {loading ? 'Confirmando…' : 'Confirmar entrega del turno'}
+        {loading
+          ? 'Confirmando…'
+          : cantidadTurnos > 1
+            ? `Confirmar entrega de ${cantidadTurnos} turnos`
+            : 'Confirmar entrega del turno'}
       </button>
     </form>
   );

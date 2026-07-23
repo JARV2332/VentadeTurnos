@@ -4985,6 +4985,26 @@ html {
   cursor: not-allowed;
 }
 
+.entrega-recibo-multi {
+  margin-bottom: 1rem;
+}
+
+.entrega-recibo-multi .boleta-contraseña {
+  transform: scale(0.92);
+  transform-origin: top center;
+  max-width: 100%;
+}
+
+.entrega-recibo-multi__estados {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
 .entrega-form__warn {
   margin: 0.35rem 0 0;
   padding: 0.55rem 0.75rem;

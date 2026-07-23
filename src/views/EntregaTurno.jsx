@@ -1,6 +1,7 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import Layout from '../components/Layout';
 import BoletaCard from '../components/BoletaCard';
+import BoletaContraseñaTurno from '../components/BoletaContraseñaTurno';
 import QrScanner from '../components/QrScanner';
 import StatusBadge from '../components/StatusBadge';
 import EntregaConfirmForm, { textoEstadoEntrega } from '../components/EntregaConfirmForm';
@@ -13,6 +14,12 @@ import {
 import { confirmarEntregaServidor } from '../services/entregaApi';
 import { enviarCorreoEntregaConfirmada } from '../services/emailService';
 import { extraerCodigoBoleta } from '../utils/boletaUtils';
+import {
+  itemsDesdeResultado,
+  brazosPendientesEntrega,
+  resumenEntregaItems,
+} from '../utils/entregaItemsUtils';
+import { codigoReciboDisplay } from '../utils/compraUtils';
 
 export default function EntregaTurno() {
   const { organizacionId, organizacion, user } = useAuth();
@@ -23,17 +30,26 @@ export default function EntregaTurno() {
   const [okMsg, setOkMsg] = useState('');
   const [avisoCorreoMsg, setAvisoCorreoMsg] = useState('');
   const [scannerOn, setScannerOn] = useState(true);
-  const [entregandoId, setEntregandoId] = useState(null);
+  const [entregando, setEntregando] = useState(false);
 
   const [esTercero, setEsTercero] = useState(false);
   const [receptorNombre, setReceptorNombre] = useState('');
   const [enviarCorreo, setEnviarCorreo] = useState(true);
 
+  const items = useMemo(() => itemsDesdeResultado(resultado), [resultado]);
+  const resumen = useMemo(() => resumenEntregaItems(items), [items]);
+  const pendientes = useMemo(() => brazosPendientesEntrega(items), [items]);
+  const esMulti = items.length > 1;
+  const codigoRecibo = useMemo(
+    () => (resultado ? codigoReciboDisplay(resultado.compra, items.map((i) => i.brazo)) : ''),
+    [resultado, items]
+  );
+
   useEffect(() => {
     setEsTercero(false);
     setReceptorNombre('');
     setEnviarCorreo(Boolean(resultado?.cargador?.correo?.trim()));
-  }, [resultado?.brazo?.id, resultado?.cargador?.correo]);
+  }, [resultado?.brazo?.id, resultado?.cargador?.correo, resultado?.compra?.id]);
 
   const scrollAValidacion = () => {
     requestAnimationFrame(() => {
@@ -68,9 +84,22 @@ export default function EntregaTurno() {
     setScannerOn(false);
   }, [buscar]);
 
+  const actualizarResultadoConBrazos = (brazosActualizados) => {
+    const map = Object.fromEntries(brazosActualizados.map((b) => [b.id, b]));
+    const itemsNuevos = items.map((item) => ({
+      ...item,
+      brazo: map[item.brazo.id] || item.brazo,
+    }));
+    setResultado({
+      ...resultado,
+      items: itemsNuevos,
+      brazos: itemsNuevos.map((i) => i.brazo),
+      brazo: itemsNuevos[0]?.brazo || resultado.brazo,
+    });
+  };
+
   const handleEntregar = async () => {
-    const brazoId = resultado?.brazo?.id;
-    if (!brazoId) return;
+    if (!pendientes.length) return;
     if (esTercero && !receptorNombre.trim()) {
       setError('Indique el nombre de quien recibe el turno (tercero).');
       return;
@@ -79,58 +108,67 @@ export default function EntregaTurno() {
     setError('');
     setOkMsg('');
     setAvisoCorreoMsg('');
-    setEntregandoId(brazoId);
+    setEntregando(true);
 
+    const brazoIds = pendientes.map((i) => i.brazo.id);
     const opts = {
       entregado_a_tercero: esTercero,
       entregado_receptor_nombre: esTercero ? receptorNombre.trim() : null,
     };
-
     const quiereCorreo = enviarCorreo && Boolean(resultado?.cargador?.correo?.trim());
 
     const resApi = await confirmarEntregaServidor({
       organizacionId,
-      brazoId,
+      brazoIds,
       entregado_a_tercero: esTercero,
       entregado_receptor_nombre: opts.entregado_receptor_nombre,
       enviarCorreo: quiereCorreo,
     });
 
-    let brazoActualizado;
+    let brazosActualizados = [];
     let correoResult = null;
 
     if (resApi.error && resApi.error.includes('API de entrega no configurada')) {
-      const res = await marcarEntregado(brazoId, organizacionId, user?.authUserId || user?.id, opts);
-      if (res.error) {
-        setEntregandoId(null);
-        setError(res.error);
-        return;
+      for (const id of brazoIds) {
+        const res = await marcarEntregado(id, organizacionId, user?.authUserId || user?.id, opts);
+        if (res.error) {
+          setEntregando(false);
+          setError(
+            brazosActualizados.length
+              ? `${res.error} (${brazosActualizados.length} de ${brazoIds.length} ya entregados)`
+              : res.error
+          );
+          if (brazosActualizados.length) actualizarResultadoConBrazos(brazosActualizados);
+          return;
+        }
+        brazosActualizados.push(res.data);
       }
-      brazoActualizado = res.data;
-      if (quiereCorreo) {
+      if (quiereCorreo && brazosActualizados[0]) {
         let cargador = resultado?.cargador;
-        if (!cargador?.correo?.trim() && brazoActualizado?.cargador_id) {
-          cargador = (await getCargadorById(brazoActualizado.cargador_id)) || cargador;
+        const b0 = brazosActualizados[0];
+        if (!cargador?.correo?.trim() && b0?.cargador_id) {
+          cargador = (await getCargadorById(b0.cargador_id)) || cargador;
         }
         correoResult = await enviarCorreoEntregaConfirmada({
           organizacionId,
           organizacion,
           cargador,
-          brazo: brazoActualizado,
-          turno: resultado?.turno,
+          brazo: b0,
+          turno: pendientes[0]?.turno || resultado?.turno,
           cortejo: resultado?.cortejo,
           entregado_a_tercero: esTercero,
           entregado_receptor_nombre: opts.entregado_receptor_nombre,
-          entregado_en: brazoActualizado?.entregado_en,
+          entregado_en: b0?.entregado_en,
           forzarEnvio: true,
         });
       }
     } else if (resApi.error) {
-      setEntregandoId(null);
+      setEntregando(false);
+      if (resApi.brazos?.length) actualizarResultadoConBrazos(resApi.brazos);
       setError(resApi.error);
       return;
     } else {
-      brazoActualizado = resApi.data;
+      brazosActualizados = resApi.brazos || [];
       correoResult = resApi.correo;
     }
 
@@ -150,30 +188,27 @@ export default function EntregaTurno() {
       setAvisoCorreoMsg('No se envió correo: el devoto(a) no tiene email registrado.');
     }
 
-    setEntregandoId(null);
+    setEntregando(false);
+    actualizarResultadoConBrazos(brazosActualizados);
 
-    let cargador = resultado?.cargador;
-    if (!cargador?.correo?.trim() && brazoActualizado?.cargador_id) {
-      cargador = (await getCargadorById(brazoActualizado.cargador_id)) || cargador;
-    }
+    const nombre = resultado?.cargador?.nombre_completo || 'devoto(a)';
+    const n = brazosActualizados.length;
+    const turnoLabel = n === 1 ? 'Turno entregado' : `${n} turnos entregados`;
 
-    const nombre = cargador?.nombre_completo || 'devoto(a)';
     if (esTercero) {
-      setOkMsg(
-        `Turno entregado a ${receptorNombre.trim()} (tercero), titular ${nombre}.`
-      );
+      setOkMsg(`${turnoLabel} a ${receptorNombre.trim()} (tercero), titular ${nombre}.`);
     } else {
-      setOkMsg(`Turno entregado a ${nombre}.`);
+      setOkMsg(`${turnoLabel} a ${nombre}.`);
     }
-
-    setResultado({
-      ...resultado,
-      brazo: brazoActualizado,
-    });
   };
 
-  const yaEntregado = resultado?.brazo?.estado_entrega === 'entregado';
-  const estadoEntregaTxt = textoEstadoEntrega(resultado?.brazo);
+  const estadoEntregaTxt = esMulti
+    ? resumen.todosEntregados
+      ? `Recibo ${codigoRecibo} — todos entregados`
+      : resumen.entregados > 0
+        ? `${resumen.entregados} de ${resumen.total} entregados — ${resumen.pendientes} pendiente(s)`
+        : `${resumen.total} turno(s) en recibo ${codigoRecibo} — pendientes de entrega`
+    : textoEstadoEntrega(resultado?.brazo) || 'Pago confirmado — pendiente de entrega física';
 
   return (
     <Layout
@@ -207,7 +242,7 @@ export default function EntregaTurno() {
           <div className="entrega-manual entrega-manual--inline">
             <input
               type="text"
-              placeholder="Código VT-… o VR-…"
+              placeholder="Código VR-… o VT-…"
               value={codigoManual}
               onChange={(e) => setCodigoManual(e.target.value.toUpperCase())}
               onKeyDown={(e) => e.key === 'Enter' && buscar(codigoManual)}
@@ -229,24 +264,51 @@ export default function EntregaTurno() {
           ) : (
             <>
               <div className="entrega-status entrega-status--compact">
-                {yaEntregado ? (
+                {resumen.todosEntregados ? (
                   <StatusBadge status="entregado" />
                 ) : (
                   <StatusBadge status="pendiente_entrega" />
                 )}
-                <span>{estadoEntregaTxt || 'Pago confirmado — pendiente de entrega física'}</span>
+                <span>{estadoEntregaTxt}</span>
               </div>
 
-              <BoletaCard
-                organizacion={organizacion}
-                cortejo={resultado.cortejo}
-                turno={resultado.turno}
-                cargador={resultado.cargador}
-                brazo={resultado.brazo}
-                showEntrega
-              />
+              {esMulti ? (
+                <div className="entrega-recibo-multi">
+                  <BoletaContraseñaTurno
+                    organizacion={organizacion}
+                    cortejo={resultado.cortejo}
+                    turno={items[0]?.turno}
+                    brazo={items[0]?.brazo}
+                    items={items}
+                    compra={resultado.compra}
+                    cargador={resultado.cargador}
+                  />
+                  <p className="entrega-recibo-multi__estados">
+                    {items.length} turno(s) ·{' '}
+                    {items.map((item) => (
+                      <StatusBadge
+                        key={item.brazo.id}
+                        status={
+                          item.brazo.estado_entrega === 'entregado'
+                            ? 'entregado'
+                            : 'pendiente_entrega'
+                        }
+                      />
+                    ))}
+                  </p>
+                </div>
+              ) : (
+                <BoletaCard
+                  organizacion={organizacion}
+                  cortejo={resultado.cortejo}
+                  turno={resultado.turno}
+                  cargador={resultado.cargador}
+                  brazo={resultado.brazo}
+                  showEntrega
+                />
+              )}
 
-              {!yaEntregado ? (
+              {resumen.hayPendientes ? (
                 <EntregaConfirmForm
                   cargador={resultado.cargador}
                   esTercero={esTercero}
@@ -256,12 +318,15 @@ export default function EntregaTurno() {
                   enviarCorreo={enviarCorreo}
                   onEnviarCorreoChange={setEnviarCorreo}
                   onSubmit={handleEntregar}
-                  loading={entregandoId === resultado.brazo.id}
-                  disabled={Boolean(entregandoId)}
+                  loading={entregando}
+                  disabled={entregando}
+                  cantidadTurnos={pendientes.length}
                 />
               ) : (
                 <div className="info-box info-box--compact">
-                  Turno ya entregado. Si fue un error, un supervisor puede corregirlo en{' '}
+                  {esMulti
+                    ? 'Todos los turnos de este recibo ya fueron entregados. Si hubo un error, un supervisor puede corregirlo en '
+                    : 'Turno ya entregado. Si fue un error, un supervisor puede corregirlo en '}
                   <strong>Ajuste de entregas</strong>.
                 </div>
               )}

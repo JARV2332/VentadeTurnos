@@ -1,5 +1,6 @@
 /**
  * Marca entrega física (RPC) y envía correo de confirmación desde el servidor.
+ * Acepta un brazo (brazoId) o varios del mismo recibo (brazoIds).
  */
 import { createClient } from '@supabase/supabase-js';
 import { verifyOrgMember } from './verifyOrgMember.js';
@@ -73,13 +74,16 @@ export default async function handler(req, res) {
   const {
     organizacionId,
     brazoId,
+    brazoIds,
     entregado_a_tercero,
     entregado_receptor_nombre,
     enviarCorreo,
   } = req.body || {};
 
-  if (!organizacionId || !brazoId) {
-    return res.status(400).json({ error: 'organizacionId y brazoId son obligatorios' });
+  const ids = Array.isArray(brazoIds) && brazoIds.length ? brazoIds : brazoId ? [brazoId] : [];
+
+  if (!organizacionId || !ids.length) {
+    return res.status(400).json({ error: 'organizacionId y al menos un brazo son obligatorios' });
   }
 
   const member = await verifyOrgMember(req, organizacionId);
@@ -101,30 +105,42 @@ export default async function handler(req, res) {
     },
   });
 
-  const { data: brazo, error: rpcErr } = await userClient.rpc('marcar_entregado_brazo', {
-    p_brazo_id: brazoId,
-    p_entregado_a_tercero: esTercero,
-    p_entregado_receptor_nombre: esTercero ? receptor : null,
-  });
+  const brazosEntregados = [];
+  for (const id of ids) {
+    const { data: brazo, error: rpcErr } = await userClient.rpc('marcar_entregado_brazo', {
+      p_brazo_id: id,
+      p_entregado_a_tercero: esTercero,
+      p_entregado_receptor_nombre: esTercero ? receptor : null,
+    });
 
-  if (rpcErr) {
-    const msg = rpcErr.message || 'No se pudo marcar entregado';
-    return res.status(400).json({ error: msg });
+    if (rpcErr) {
+      const msg = rpcErr.message || 'No se pudo marcar entregado';
+      if (brazosEntregados.length) {
+        return res.status(400).json({
+          error: `${msg} (${brazosEntregados.length} de ${ids.length} ya se marcaron entregados)`,
+          brazos: brazosEntregados,
+        });
+      }
+      return res.status(400).json({ error: msg });
+    }
+    brazosEntregados.push(brazo);
   }
 
+  const brazo = brazosEntregados[0];
   let correo = { ok: false, omitido: true, motivo: 'Correo no solicitado' };
 
   if (enviarCorreo) {
     const { admin } = member;
+    const turnoIds = [...new Set(brazosEntregados.map((b) => b.turno_id).filter(Boolean))];
 
-    const [{ data: cargador }, { data: turno }, { data: org }, { data: emailConfig }] =
+    const [{ data: cargador }, { data: turnos }, { data: org }, { data: emailConfig }] =
       await Promise.all([
         brazo.cargador_id
           ? admin.from('cargadores_organizacion').select('*').eq('id', brazo.cargador_id).maybeSingle()
           : Promise.resolve({ data: null }),
-        brazo.turno_id
-          ? admin.from('turnos').select('*').eq('id', brazo.turno_id).maybeSingle()
-          : Promise.resolve({ data: null }),
+        turnoIds.length
+          ? admin.from('turnos').select('*').in('id', turnoIds)
+          : Promise.resolve({ data: [] }),
         admin.from('organizaciones').select('nombre_oficial').eq('id', organizacionId).maybeSingle(),
         admin
           .from('configuracion_correo')
@@ -132,6 +148,9 @@ export default async function handler(req, res) {
           .eq('organizacion_id', organizacionId)
           .maybeSingle(),
       ]);
+
+    const turnosMap = Object.fromEntries((turnos || []).map((t) => [t.id, t]));
+    const turno = turnosMap[brazo.turno_id] || null;
 
     let cortejo = null;
     if (turno?.cortejo_id) {
@@ -141,12 +160,22 @@ export default async function handler(req, res) {
 
     const destinatario = cargador?.correo?.trim().toLowerCase() || '';
     const advertencia = advertirEmail(destinatario);
-    const asunto = `Confirmación de entrega — ${labelTurno(turno, brazo)}`;
-    const turnoTxt = labelTurno(turno, brazo);
-    const brazoTxt = labelBrazo(brazo);
-    const fechaEntrega = formatFechaHoraEntrega(brazo.entregado_en);
+    const n = brazosEntregados.length;
+    const detalleBrazos = brazosEntregados
+      .map((b) => labelBrazo(b))
+      .join(', ');
+    const turnoTxt =
+      n > 1
+        ? `${n} turnos — ${labelTurno(turno, brazo)}`
+        : labelTurno(turno, brazo);
+    const brazoTxt = n > 1 ? detalleBrazos : labelBrazo(brazo);
+    const fechaEntrega = formatFechaHoraEntrega(brazosEntregados[brazosEntregados.length - 1]?.entregado_en);
     const evento = cortejo?.nombre_evento || 'la procesión';
     const nombreOrg = org?.nombre_oficial || emailConfig?.nombre_remitente || '';
+    const asunto =
+      n > 1
+        ? `Confirmación de entrega — ${n} turnos`
+        : `Confirmación de entrega — ${labelTurno(turno, brazo)}`;
 
     if (!destinatario || !destinatario.includes('@')) {
       correo = {
@@ -184,9 +213,14 @@ export default async function handler(req, res) {
         const replyTo =
           emailConfig.correo_respuesta?.trim() || emailConfig.correo_remitente || creds.user;
 
-        const textoPlano = esTercero
-          ? `Confirmación de entrega de ${turnoTxt} (${brazoTxt}) a ${receptor} (tercero). Fecha: ${fechaEntrega}.`
-          : `Confirmación de entrega de ${turnoTxt} (${brazoTxt}). Fecha: ${fechaEntrega}.`;
+        const textoPlano =
+          n > 1
+            ? esTercero
+              ? `Confirmación de entrega de ${n} turnos (${detalleBrazos}) a ${receptor} (tercero). Fecha: ${fechaEntrega}.`
+              : `Confirmación de entrega de ${n} turnos (${detalleBrazos}). Fecha: ${fechaEntrega}.`
+            : esTercero
+              ? `Confirmación de entrega de ${turnoTxt} (${brazoTxt}) a ${receptor} (tercero). Fecha: ${fechaEntrega}.`
+              : `Confirmación de entrega de ${turnoTxt} (${brazoTxt}). Fecha: ${fechaEntrega}.`;
 
         try {
           const transporter = createTransporter(creds.user, creds.pass);
@@ -209,7 +243,8 @@ export default async function handler(req, res) {
               modo: 'gmail',
               tipo: 'entrega_confirmada',
               message_id: info.messageId,
-              brazo_id: brazo.id,
+              brazo_ids: brazosEntregados.map((b) => b.id),
+              cantidad: n,
               cargador_id: cargador?.id || null,
               enviado_en: new Date().toISOString(),
               origen_smtp: creds.origen,
@@ -233,7 +268,7 @@ export default async function handler(req, res) {
               modo: 'gmail',
               tipo: 'entrega_confirmada',
               error: msg,
-              brazo_id: brazo.id,
+              brazo_ids: brazosEntregados.map((b) => b.id),
               enviado_en: new Date().toISOString(),
             },
           });
@@ -243,5 +278,9 @@ export default async function handler(req, res) {
     }
   }
 
-  return res.status(200).json({ data: brazo, correo });
+  return res.status(200).json({
+    data: brazosEntregados.length === 1 ? brazosEntregados[0] : brazosEntregados,
+    brazos: brazosEntregados,
+    correo,
+  });
 }
