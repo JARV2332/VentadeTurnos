@@ -1713,6 +1713,32 @@ export async function buscarBoletaPorCodigo(organizacionId, codigo) {
     return { error: 'Código de boleta inválido.' };
   }
 
+  const { data: rpcData, error: rpcError } = await supabase.rpc('buscar_boleta_entrega', {
+    p_codigo: codigoLimpio,
+  });
+
+  if (!rpcError && rpcData && typeof rpcData === 'object') {
+    if (rpcData.error) return { error: rpcData.error };
+    return {
+      brazo: rpcData.brazo,
+      brazos: rpcData.brazos || [],
+      compra: rpcData.compra || null,
+      turno: rpcData.turno || null,
+      cortejo: rpcData.cortejo || null,
+      cargador: rpcData.cargador || null,
+      items: rpcData.items || [],
+    };
+  }
+
+  if (rpcError && !/Could not find the function|schema cache/i.test(rpcError.message || '')) {
+    return err(rpcError);
+  }
+
+  return buscarBoletaPorCodigoLegacy(organizacionId, codigoLimpio);
+}
+
+async function buscarBoletaPorCodigoLegacy(organizacionId, codigoLimpio) {
+
   const esVR = /^VR-[A-Z0-9]+$/.test(codigoLimpio);
 
   if (esVR) {
@@ -1746,13 +1772,16 @@ export async function buscarBoletaPorCodigo(organizacionId, codigo) {
     const brazo = brazos[0];
     const turnosMap = await getTurnosByIds(brazos.map((b) => b.turno_id));
     const turno = turnosMap[brazo.turno_id] || null;
-    const { data: cortejo } = turno?.cortejo_id
-      ? await supabase.from('cortejos').select('*').eq('id', turno.cortejo_id).single()
-      : { data: null };
+    const cortejoId = turno?.cortejo_id;
+    const [{ data: cortejo }, cargador] = await Promise.all([
+      cortejoId
+        ? supabase.from('cortejos').select('*').eq('id', cortejoId).single()
+        : Promise.resolve({ data: null }),
+      brazo.cargador_id ? getCargadorById(brazo.cargador_id) : Promise.resolve(null),
+    ]);
     if (cortejo?.estado === 'inactiva') {
       return { error: 'La procesión de esta boleta está inactiva.' };
     }
-    const cargador = brazo.cargador_id ? await getCargadorById(brazo.cargador_id) : null;
     const items = brazos.map((b) => ({
       brazo: b,
       turno: turnosMap[b.turno_id] || null,
@@ -1791,13 +1820,16 @@ export async function buscarBoletaPorCodigo(organizacionId, codigo) {
 
   const turnosMap = await getTurnosByIds(brazos.map((b) => b.turno_id));
   const turno = turnosMap[brazo.turno_id] || null;
-  const { data: cortejo } = turno?.cortejo_id
-    ? await supabase.from('cortejos').select('*').eq('id', turno.cortejo_id).single()
-    : { data: null };
+  const cortejoId = turno?.cortejo_id;
+  const [{ data: cortejo }, cargador] = await Promise.all([
+    cortejoId
+      ? supabase.from('cortejos').select('*').eq('id', cortejoId).single()
+      : Promise.resolve({ data: null }),
+    brazo.cargador_id ? getCargadorById(brazo.cargador_id) : Promise.resolve(null),
+  ]);
   if (cortejo?.estado === 'inactiva') {
     return { error: 'La procesión de esta boleta está inactiva.' };
   }
-  const cargador = brazo.cargador_id ? await getCargadorById(brazo.cargador_id) : null;
   const items = brazos.map((b) => ({
     brazo: b,
     turno: turnosMap[b.turno_id] || null,

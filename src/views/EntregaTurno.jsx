@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   buscarBoletaPorCodigo,
   getCargadorById,
+  getReciboConfig,
   marcarEntregado,
 } from '../services/dataService';
 import { confirmarEntregaServidor } from '../services/entregaApi';
@@ -20,17 +21,27 @@ import {
   resumenEntregaItems,
 } from '../utils/entregaItemsUtils';
 import { codigoReciboDisplay } from '../utils/compraUtils';
+import {
+  getBoletaCache,
+  setBoletaCache,
+  invalidateBoletaCachePorBrazos,
+} from '../utils/boletaLookupCache';
 
 export default function EntregaTurno() {
   const { organizacionId, organizacion, user } = useAuth();
   const validacionRef = useRef(null);
+  const buscarSeqRef = useRef(0);
+  const resetTimerRef = useRef(null);
   const [codigoManual, setCodigoManual] = useState('');
   const [resultado, setResultado] = useState(null);
+  const [codigoActivo, setCodigoActivo] = useState('');
+  const [buscando, setBuscando] = useState(false);
   const [error, setError] = useState('');
   const [okMsg, setOkMsg] = useState('');
   const [avisoCorreoMsg, setAvisoCorreoMsg] = useState('');
   const [scannerOn, setScannerOn] = useState(true);
   const [entregando, setEntregando] = useState(false);
+  const [reciboConfig, setReciboConfig] = useState(null);
 
   const [esTercero, setEsTercero] = useState(false);
   const [receptorNombre, setReceptorNombre] = useState('');
@@ -51,38 +62,92 @@ export default function EntregaTurno() {
     setEnviarCorreo(Boolean(resultado?.cargador?.correo?.trim()));
   }, [resultado?.brazo?.id, resultado?.cargador?.correo, resultado?.compra?.id]);
 
+  useEffect(() => {
+    if (!organizacionId) return undefined;
+    let cancel = false;
+    getReciboConfig(organizacionId).then((saved) => {
+      if (!cancel && saved && !saved.error) setReciboConfig(saved);
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [organizacionId]);
+
+  useEffect(
+    () => () => {
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    },
+    []
+  );
+
   const scrollAValidacion = () => {
     requestAnimationFrame(() => {
       validacionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   };
 
+  const limpiarParaSiguiente = useCallback(() => {
+    setResultado(null);
+    setCodigoActivo('');
+    setCodigoManual('');
+    setEsTercero(false);
+    setReceptorNombre('');
+  }, []);
+
   const buscar = useCallback(async (texto) => {
-    setError('');
-    setOkMsg('');
-    setAvisoCorreoMsg('');
     const codigo = extraerCodigoBoleta(texto);
     if (!codigo) {
       setError('Código QR no válido.');
       setResultado(null);
+      setCodigoActivo('');
       return;
     }
 
+    if (buscando && codigo === codigoActivo) return;
+
+    const cacheHit = getBoletaCache(organizacionId, codigo);
+    if (cacheHit) {
+      setError('');
+      setOkMsg('');
+      setAvisoCorreoMsg('');
+      setCodigoActivo(codigo);
+      setCodigoManual(codigo);
+      setResultado(cacheHit);
+      scrollAValidacion();
+      return;
+    }
+
+    const seq = ++buscarSeqRef.current;
+    setBuscando(true);
+    setCodigoActivo(codigo);
+    setCodigoManual(codigo);
+    setError('');
+    setOkMsg('');
+    setAvisoCorreoMsg('');
+    setResultado(null);
+    scrollAValidacion();
+
     const res = await buscarBoletaPorCodigo(organizacionId, codigo);
+    if (seq !== buscarSeqRef.current) return;
+
+    setBuscando(false);
     if (res.error) {
       setError(res.error);
       setResultado(null);
       return;
     }
-    setResultado(res);
-    setCodigoManual(codigo);
-    scrollAValidacion();
-  }, [organizacionId]);
 
-  const handleScan = useCallback((decoded) => {
-    buscar(decoded);
-    setScannerOn(false);
-  }, [buscar]);
+    setBoletaCache(organizacionId, codigo, res);
+    setResultado(res);
+  }, [organizacionId, buscando, codigoActivo]);
+
+  const handleScan = useCallback(
+    (decoded) => {
+      if (entregando) return;
+      buscar(decoded);
+    },
+    [buscar, entregando]
+  );
 
   const actualizarResultadoConBrazos = (brazosActualizados) => {
     const map = Object.fromEntries(brazosActualizados.map((b) => [b.id, b]));
@@ -173,14 +238,21 @@ export default function EntregaTurno() {
     }
 
     if (quiereCorreo && correoResult) {
-      if (correoResult.ok) {
+      if (correoResult.encolado) {
+        const dest = resultado?.cargador?.correo?.trim() || correoResult.destinatario || '';
+        setAvisoCorreoMsg(
+          dest
+            ? `Correo de confirmación en cola — se enviará a ${dest} en breve.`
+            : correoResult.mensaje || 'Correo de confirmación en cola — se enviará en breve.'
+        );
+      } else if (correoResult.ok && correoResult.destinatario) {
         let msg = `Correo de confirmación enviado a ${correoResult.destinatario}.`;
         if (correoResult.advertencia) msg += ` ${correoResult.advertencia}`;
         setAvisoCorreoMsg(msg);
       } else if (correoResult.omitido) {
         setAvisoCorreoMsg(correoResult.motivo || 'Correo omitido.');
       } else {
-        let msg = correoResult.error || 'No se pudo enviar el correo de confirmación.';
+        let msg = correoResult.error || 'No se pudo encolar el correo de confirmación.';
         if (correoResult.advertencia) msg += ` ${correoResult.advertencia}`;
         setAvisoCorreoMsg(msg);
       }
@@ -200,6 +272,12 @@ export default function EntregaTurno() {
     } else {
       setOkMsg(`${turnoLabel} a ${nombre}.`);
     }
+
+    invalidateBoletaCachePorBrazos(organizacionId, brazosActualizados, resultado?.compra);
+    if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    resetTimerRef.current = setTimeout(() => {
+      limpiarParaSiguiente();
+    }, 1200);
   };
 
   const estadoEntregaTxt = esMulti
@@ -218,7 +296,7 @@ export default function EntregaTurno() {
       {okMsg && <div className="alert alert--success">{okMsg}</div>}
       {avisoCorreoMsg && (
         <div
-          className={`alert ${avisoCorreoMsg.includes('enviado a') && !avisoCorreoMsg.includes('parece') && !avisoCorreoMsg.includes('error') ? 'alert--success' : 'alert--warning'}`}
+          className={`alert ${(avisoCorreoMsg.includes('enviado a') || avisoCorreoMsg.includes('en cola')) && !avisoCorreoMsg.includes('parece') && !avisoCorreoMsg.includes('error') && !avisoCorreoMsg.includes('No se pudo') ? 'alert--success' : 'alert--warning'}`}
         >
           {avisoCorreoMsg}
         </div>
@@ -248,8 +326,13 @@ export default function EntregaTurno() {
               onKeyDown={(e) => e.key === 'Enter' && buscar(codigoManual)}
               aria-label="Código de boleta"
             />
-            <button type="button" className="btn btn--primary btn--sm" onClick={() => buscar(codigoManual)}>
-              Validar
+            <button
+              type="button"
+              className="btn btn--primary btn--sm"
+              onClick={() => buscar(codigoManual)}
+              disabled={buscando}
+            >
+              {buscando ? 'Buscando…' : 'Validar'}
             </button>
           </div>
         </section>
@@ -257,7 +340,12 @@ export default function EntregaTurno() {
         <section className="panel panel--compact" ref={validacionRef}>
           <h3 className="panel__title panel__title--sm">Validación y entrega</h3>
 
-          {!resultado ? (
+          {buscando ? (
+            <div className="entrega-buscando" aria-live="polite">
+              <div className="entrega-buscando__pulse" />
+              <p>Cargando boleta <strong>{codigoActivo}</strong>…</p>
+            </div>
+          ) : !resultado ? (
             <p className="text-muted entrega-empty">
               Escanee el QR de la boleta o ingrese el código manualmente para confirmar la entrega.
             </p>
@@ -283,6 +371,7 @@ export default function EntregaTurno() {
                       items={items}
                       compra={resultado.compra}
                       cargador={resultado.cargador}
+                      config={reciboConfig}
                     />
                   </div>
                   <p className="entrega-recibo-multi__estados">
@@ -306,6 +395,7 @@ export default function EntregaTurno() {
                   turno={resultado.turno}
                   cargador={resultado.cargador}
                   brazo={resultado.brazo}
+                  config={reciboConfig}
                   showEntrega
                 />
               )}
@@ -321,7 +411,7 @@ export default function EntregaTurno() {
                   onEnviarCorreoChange={setEnviarCorreo}
                   onSubmit={handleEntregar}
                   loading={entregando}
-                  disabled={entregando}
+                  disabled={entregando || buscando}
                   cantidadTurnos={pendientes.length}
                 />
               ) : (

@@ -33,7 +33,7 @@ export async function confirmarEntregaServidor({
 
   try {
     const controller = new AbortController();
-    const timeoutMs = ids.length > 1 ? 45000 : 20000;
+    const timeoutMs = ids.length > 1 ? 15000 : 10000;
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     const res = await fetch(CONFIRMAR_ENTREGA_URL, {

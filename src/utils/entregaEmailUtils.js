@@ -1,83 +1,37 @@
-import { formatFechaDiaMes } from './boletaUtils';
+const CUERPO_PARRAFOS = [
+  'Nos llena de satisfacción informarte que ya hemos entregado el turno correspondiente para acompañar a Nuestra Señora de la Asunción este próximo 15 de agosto.',
+  'Tienes en tus manos el privilegio de ser parte de un momento sagrado. Más que un cortejo, viviremos un día donde las calles se visten de fiesta y la fe se transforma en arte, devoción y oración compartida bajo la mirada amorosa de la Virgen.',
+  'Aguardamos con entusiasmo este 15 de agosto para caminar juntos.',
+];
 
-function formatFechaHoraEntrega(iso) {
-  if (!iso) return '—';
-  try {
-    return new Date(iso).toLocaleString('es-GT', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return String(iso);
-  }
-}
-
-function labelTurno(turno, brazo) {
-  const num = turno?.numero_turno ?? brazo?.numero_turno ?? '—';
-  const honor = turno?.etiqueta || turno?.tipo_turno || '';
-  return honor ? `Turno #${num} (${honor})` : `Turno #${num}`;
-}
+export const ENTREGA_EMAIL_ASUNTO = 'Confirmación de entrega — Nuestra Señora de la Asunción';
 
 /**
  * Texto plano del correo de confirmación de entrega física.
  */
 export function construirCorreoEntrega({
   cargador,
-  brazo,
-  turno,
-  cortejo,
   organizacion,
   entregado_a_tercero,
   entregado_receptor_nombre,
-  entregado_en,
 }) {
   const primerNombre = cargador?.nombre_completo?.trim().split(/\s+/)[0] || 'devoto(a)';
   const nombreCompleto = cargador?.nombre_completo?.trim() || 'Devoto(a)';
-  const evento = cortejo?.nombre_evento || 'la procesión';
-  const fechaProcesion = formatFechaDiaMes(cortejo?.fecha);
-  const fechaEntrega = formatFechaHoraEntrega(entregado_en || new Date().toISOString());
-  const turnoTxt = labelTurno(turno, brazo);
   const org = organizacion?.nombre_oficial?.trim() || 'Organización';
+  const asunto = ENTREGA_EMAIL_ASUNTO;
 
-  const asunto = `Confirmación de entrega — ${turnoTxt}`;
+  const lineas = [`Estimado/a ${primerNombre},`, '', ...CUERPO_PARRAFOS];
 
-  let cuerpo;
   if (entregado_a_tercero && entregado_receptor_nombre?.trim()) {
-    const receptor = entregado_receptor_nombre.trim();
-    cuerpo = [
-      `Estimado/a ${primerNombre},`,
+    lineas.push(
       '',
-      `Le confirmamos que su turno de ${evento}${fechaProcesion ? ` (${fechaProcesion})` : ''} fue entregado en físico.`,
-      '',
-      `• ${turnoTxt}`,
-      `• Entregado a: ${receptor} (tercero autorizado)`,
-      `• Fecha y hora: ${fechaEntrega}`,
-      '',
-      `El turno a nombre de ${nombreCompleto} fue recibido por ${receptor}. Conserve este correo como comprobante.`,
-      '',
-      `Atentamente,`,
-      org,
-    ].join('\n');
-  } else {
-    cuerpo = [
-      `Estimado/a ${primerNombre},`,
-      '',
-      `Le confirmamos que su turno de ${evento}${fechaProcesion ? ` (${fechaProcesion})` : ''} fue entregado en físico.`,
-      '',
-      `• ${turnoTxt}`,
-      `• Entregado personalmente a usted`,
-      `• Fecha y hora: ${fechaEntrega}`,
-      '',
-      `Gracias por su participación. Conserve este correo como comprobante de entrega.`,
-      '',
-      `Atentamente,`,
-      org,
-    ].join('\n');
+      `Nota: El turno fue entregado a ${entregado_receptor_nombre.trim()} (tercero autorizado), a nombre de ${nombreCompleto}.`
+    );
   }
 
-  return { asunto, cuerpo, primerNombre, nombreCompleto, turnoTxt, fechaEntrega, evento };
+  lineas.push('', `Atentamente,`, org);
+
+  const cuerpo = lineas.join('\n');
+
+  return { asunto, cuerpo, primerNombre, nombreCompleto };
 }

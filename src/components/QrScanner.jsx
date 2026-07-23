@@ -3,9 +3,10 @@ import { Html5Qrcode } from 'html5-qrcode';
 
 const SCANNER_ID = 'qr-reader-entrega';
 
-export default function QrScanner({ onScan, active = true }) {
+export default function QrScanner({ onScan, active = true, cooldownMs = 1200 }) {
   const scannerRef = useRef(null);
   const onScanRef = useRef(onScan);
+  const lastScanRef = useRef({ codigo: '', ts: 0 });
   const [error, setError] = useState('');
   const [camOk, setCamOk] = useState(false);
 
@@ -28,11 +29,21 @@ export default function QrScanner({ onScan, active = true }) {
         scanner
           .start(
             camId,
-            { fps: 8, qrbox: { width: 220, height: 220 } },
-            (decoded) => onScanRef.current(decoded),
+            { fps: 15, qrbox: { width: 240, height: 240 } },
+            (decoded) => {
+              const codigo = String(decoded || '').trim();
+              if (!codigo) return;
+              const ahora = Date.now();
+              const prev = lastScanRef.current;
+              if (codigo === prev.codigo && ahora - prev.ts < cooldownMs) return;
+              lastScanRef.current = { codigo, ts: ahora };
+              onScanRef.current(decoded);
+            },
             () => {}
           )
-          .then(() => { if (mounted) setCamOk(true); })
+          .then(() => {
+            if (mounted) setCamOk(true);
+          })
           .catch(() => setError('No se pudo iniciar la cámara. Ingrese el código manualmente.'));
       })
       .catch(() => setError('Permiso de cámara denegado. Ingrese el código manualmente.'));
@@ -44,7 +55,7 @@ export default function QrScanner({ onScan, active = true }) {
       }
       scannerRef.current = null;
     };
-  }, [active]);
+  }, [active, cooldownMs]);
 
   return (
     <div className="qr-scanner">

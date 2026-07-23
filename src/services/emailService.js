@@ -308,21 +308,14 @@ export async function enviarCorreoEntregaConfirmada({
 
   const correo = construirCorreoEntrega({
     cargador,
-    brazo,
-    turno,
-    cortejo,
     organizacion,
     entregado_a_tercero,
     entregado_receptor_nombre,
-    entregado_en,
   });
 
   const entregaHtml = {
     primerNombre: correo.primerNombre,
     nombreCompleto: correo.nombreCompleto,
-    evento: correo.evento,
-    turnoTxt: correo.turnoTxt,
-    fechaEntrega: correo.fechaEntrega,
     entregado_a_tercero,
     entregado_receptor_nombre,
     organizacion: organizacion?.nombre_oficial || emailConfig?.nombre_remitente || '',

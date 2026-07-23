@@ -70,6 +70,7 @@ export default async function handler(req, res) {
     if (!mailHtml && tipo === 'entrega' && entrega) {
       const built = buildEntregaEmailContent(entrega);
       mailHtml = built.html;
+      attachments = built.attachments || [];
     } else if (!mailHtml && codigo_boleta) {
       const built = await buildBoletaEmailContent({
         text: text || '',
