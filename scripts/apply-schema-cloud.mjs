@@ -40,6 +40,11 @@ const SQL_FILES = [
   '020_devoto_whatsapp_no_unique.sql',
   '021_perf_taquilla_impresion.sql',
   '022_brazos_cortejo_rpc.sql',
+  '023_taquilla_perf.sql',
+  '024_taquilla_rpc_definer.sql',
+  '025_finanzas_perf.sql',
+  '026_entrega_tercero.sql',
+  '027_revertir_entrega.sql',
 ];
 
 if (!DATABASE_URL || DATABASE_URL.includes('[YOUR-PASSWORD]')) {

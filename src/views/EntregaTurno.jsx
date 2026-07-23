@@ -1,13 +1,16 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import Layout from '../components/Layout';
 import BoletaCard from '../components/BoletaCard';
 import QrScanner from '../components/QrScanner';
 import StatusBadge from '../components/StatusBadge';
 import Loader from '../components/Loader';
+import EntregaConfirmForm, { textoEstadoEntrega } from '../components/EntregaConfirmForm';
+import EntregaEstadoMenu from '../components/EntregaEstadoMenu';
 import { useAuth } from '../context/AuthContext';
 import {
   buscarBoletaPorCodigo,
   marcarEntregado,
+  revertirEntregaBrazo,
   getBrazosPendientesEntregaByOrg,
   getCortejosByOrg,
   getCargadoresByIds,
@@ -15,16 +18,19 @@ import {
   getTurnosByIds,
   subscribeData,
 } from '../services/dataService';
+import { enviarCorreoEntregaConfirmada } from '../services/emailService';
 import { extraerCodigoBoleta } from '../utils/boletaUtils';
 import { construirFilasPendientesEntrega } from '../utils/entregaPendientesUtils';
 
 export default function EntregaTurno() {
   const { organizacionId, organizacion, user } = useAuth();
+  const validacionRef = useRef(null);
   const [codigoManual, setCodigoManual] = useState('');
   const [resultado, setResultado] = useState(null);
   const [error, setError] = useState('');
   const [okMsg, setOkMsg] = useState('');
   const [scannerOn, setScannerOn] = useState(true);
+  const [listaAbierta, setListaAbierta] = useState(true);
 
   const [cortejos, setCortejos] = useState([]);
   const [brazosVendidos, setBrazosVendidos] = useState([]);
@@ -36,6 +42,11 @@ export default function EntregaTurno() {
   const [filtroTurno, setFiltroTurno] = useState('');
   const [busquedaPendientes, setBusquedaPendientes] = useState('');
   const [entregandoId, setEntregandoId] = useState(null);
+  const [revirtiendoId, setRevirtiendoId] = useState(null);
+
+  const [esTercero, setEsTercero] = useState(false);
+  const [receptorNombre, setReceptorNombre] = useState('');
+  const [enviarCorreo, setEnviarCorreo] = useState(true);
 
   const cortejosPorId = useMemo(
     () => Object.fromEntries(cortejos.map((c) => [c.id, c])),
@@ -83,6 +94,12 @@ export default function EntregaTurno() {
     return subscribeData(organizacionId, cargarPendientes);
   }, [organizacionId, cargarPendientes]);
 
+  useEffect(() => {
+    setEsTercero(false);
+    setReceptorNombre('');
+    setEnviarCorreo(Boolean(resultado?.cargador?.correo?.trim()));
+  }, [resultado?.brazo?.id, resultado?.cargador?.correo]);
+
   const pendientes = useMemo(
     () =>
       construirFilasPendientesEntrega({
@@ -106,6 +123,12 @@ export default function EntregaTurno() {
     ]
   );
 
+  const scrollAValidacion = () => {
+    requestAnimationFrame(() => {
+      validacionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
   const buscar = useCallback(async (texto) => {
     setError('');
     setOkMsg('');
@@ -124,6 +147,7 @@ export default function EntregaTurno() {
     }
     setResultado(res);
     setCodigoManual(codigo);
+    scrollAValidacion();
   }, [organizacionId]);
 
   const handleScan = useCallback((decoded) => {
@@ -141,237 +165,301 @@ export default function EntregaTurno() {
     setScannerOn(false);
   };
 
-  const handleEntregar = async (brazoIdOverride) => {
-    const brazoId = brazoIdOverride || resultado?.brazo?.id;
+  const handleEntregar = async () => {
+    const brazoId = resultado?.brazo?.id;
     if (!brazoId) return;
+    if (esTercero && !receptorNombre.trim()) {
+      setError('Indique el nombre de quien recibe el turno (tercero).');
+      return;
+    }
+
     setError('');
     setEntregandoId(brazoId);
-    const res = await marcarEntregado(brazoId, organizacionId, user?.authUserId || user?.id);
+
+    const opts = {
+      entregado_a_tercero: esTercero,
+      entregado_receptor_nombre: esTercero ? receptorNombre.trim() : null,
+    };
+
+    const res = await marcarEntregado(brazoId, organizacionId, user?.authUserId || user?.id, opts);
+    if (res.error) {
+      setEntregandoId(null);
+      setError(res.error);
+      return;
+    }
+
+    const brazoActualizado = res.data;
+    const cargador =
+      resultado?.cargador ||
+      (brazoActualizado?.cargador_id ? cargadoresPorId[brazoActualizado.cargador_id] : null);
+
+    let avisoCorreo = '';
+    if (enviarCorreo && cargador?.correo?.trim()) {
+      const mail = await enviarCorreoEntregaConfirmada({
+        organizacionId,
+        organizacion,
+        cargador,
+        brazo: brazoActualizado,
+        turno: resultado?.turno,
+        cortejo: resultado?.cortejo,
+        entregado_a_tercero: esTercero,
+        entregado_receptor_nombre: opts.entregado_receptor_nombre,
+        entregado_en: brazoActualizado?.entregado_en,
+      });
+      if (mail.ok) {
+        avisoCorreo = ` Correo enviado a ${mail.destinatario}.`;
+      } else if (!mail.omitido) {
+        avisoCorreo = ` (Correo: ${mail.error || 'no enviado'})`;
+      }
+    }
+
     setEntregandoId(null);
+
+    const nombre = cargador?.nombre_completo || 'devoto(a)';
+    if (esTercero) {
+      setOkMsg(
+        `Turno entregado a ${receptorNombre.trim()} (tercero), titular ${nombre}.${avisoCorreo}`
+      );
+    } else {
+      setOkMsg(`Turno entregado a ${nombre}.${avisoCorreo}`);
+    }
+
+    setResultado({
+      ...resultado,
+      brazo: brazoActualizado,
+    });
+    cargarPendientes();
+  };
+
+  const handleRevertirPendiente = async () => {
+    const brazoId = resultado?.brazo?.id;
+    if (!brazoId) return;
+
+    setError('');
+    setRevirtiendoId(brazoId);
+    const res = await revertirEntregaBrazo(brazoId, organizacionId);
+    setRevirtiendoId(null);
+
     if (res.error) {
       setError(res.error);
       return;
     }
-    const nombre =
-      resultado?.cargador?.nombre_completo ||
-      cargadoresPorId[res.data?.cargador_id]?.nombre_completo ||
-      'devoto(a)';
-    setOkMsg(`Turno entregado correctamente a ${nombre}.`);
-    if (resultado?.brazo?.id === brazoId) {
-      setResultado({
-        ...resultado,
-        brazo: res.data,
-      });
-    }
+
+    setOkMsg('Turno marcado como pendiente de entrega. Puede volver a confirmar la entrega.');
+    setResultado({
+      ...resultado,
+      brazo: res.data,
+    });
+    setEsTercero(false);
+    setReceptorNombre('');
     cargarPendientes();
   };
 
   const yaEntregado = resultado?.brazo?.estado_entrega === 'entregado';
+  const estadoEntregaTxt = textoEstadoEntrega(resultado?.brazo);
 
   return (
     <Layout
       title="Entrega de turnos"
-      subtitle="Escanee el QR o use el listado de pendientes para entregar turnos pagados"
+      subtitle="Escanee, valide y confirme la entrega física del turno"
     >
       {okMsg && <div className="alert alert--success">{okMsg}</div>}
       {error && <div className="alert alert--error">{error}</div>}
 
-      <section className="panel entrega-pendientes">
-        <h3 className="panel__title">
-          Pendientes de entrega
-          {!cargandoPendientes && (
-            <span className="entrega-pendientes__count">{pendientes.length}</span>
-          )}
-        </h3>
-        <p className="text-muted config-hint">
-          Turnos <strong>pagados</strong> que aún no se han entregado en físico. Filtre por procesión
-          o turno y busque por nombre o DPI.
-        </p>
-        <div className="entrega-pendientes__filtros">
-          <label>
-            Procesión
-            <select value={filtroCortejo} onChange={(e) => setFiltroCortejo(e.target.value)}>
-              {(cortejos || []).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre_evento}
-                  {c.estado !== 'activa' ? ' (inactiva)' : ''}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            N.º turno
-            <input
-              type="number"
-              min="1"
-              value={filtroTurno}
-              onChange={(e) => setFiltroTurno(e.target.value)}
-              placeholder="Todos"
-            />
-          </label>
-          <label className="entrega-pendientes__busqueda">
-            Buscar nombre / DPI
-            <input
-              type="search"
-              value={busquedaPendientes}
-              onChange={(e) => setBusquedaPendientes(e.target.value)}
-              placeholder="Nombre o DPI…"
-              autoComplete="off"
-            />
-          </label>
-        </div>
+      <div className="entrega-layout">
+        <div className="entrega-layout__main">
+          <section className="panel panel--compact entrega-scan">
+            <h3 className="panel__title panel__title--sm">Escanear o validar</h3>
+            {scannerOn ? (
+              <QrScanner onScan={handleScan} active={scannerOn} />
+            ) : (
+              <div className="entrega-scanner-off">
+                <p className="text-muted">Escaneo pausado.</p>
+                <button type="button" className="btn btn--ghost btn--sm" onClick={() => setScannerOn(true)}>
+                  Activar cámara
+                </button>
+              </div>
+            )}
 
-        {cargandoPendientes ? (
-          <Loader text="Cargando pendientes…" />
-        ) : !pendientes.length ? (
-          <p className="text-muted">No hay turnos pendientes de entrega con estos filtros.</p>
-        ) : (
-          <div className="table-wrap">
-            <table className="data-table data-table--compact entrega-pendientes__tabla">
-              <thead>
-                <tr>
-                  <th>Procesión</th>
-                  <th>Turno</th>
-                  <th>Brazo</th>
-                  <th>Persona</th>
-                  <th>Pago</th>
-                  <th>Boleta</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendientes.map((fila) => (
-                  <tr
-                    key={fila.id}
-                    className={
-                      resultado?.brazo?.id === fila.id ? 'entrega-pendientes__fila--activa' : ''
-                    }
-                  >
-                    <td>{fila.procesion}</td>
-                    <td>
-                      <strong>#{fila.numeroTurno}</strong>
-                      <span className="text-muted entrega-pendientes__honor"> {fila.honor}</span>
-                    </td>
-                    <td>{fila.brazoLabel}</td>
-                    <td>
-                      <strong>{fila.nombre}</strong>
-                    </td>
-                    <td>
-                      {fila.fechaPago}
-                      <span className="text-muted entrega-pendientes__hora"> {fila.horaPago}</span>
-                    </td>
-                    <td>
-                      <code>{fila.codigoBoleta}</code>
-                    </td>
-                    <td className="entrega-pendientes__acciones">
-                      <button
-                        type="button"
-                        className="btn btn--ghost btn--sm"
-                        onClick={() => seleccionarPendiente(fila)}
-                      >
-                        Ver
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--primary btn--sm"
-                        disabled={entregandoId === fila.id}
-                        onClick={() => handleEntregar(fila.id)}
-                      >
-                        {entregandoId === fila.id ? 'Entregando…' : 'Entregar'}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      <div className="entrega-grid">
-        <section className="panel">
-          <h3 className="panel__title">Escanear QR</h3>
-          {scannerOn ? (
-            <QrScanner onScan={handleScan} active={scannerOn} />
-          ) : (
-            <div className="entrega-scanner-off">
-              <p className="text-muted">Escaneo pausado tras lectura exitosa.</p>
-              <button type="button" className="btn btn--ghost" onClick={() => setScannerOn(true)}>
-                Activar cámara de nuevo
-              </button>
-            </div>
-          )}
-
-          <div className="entrega-manual">
-            <label>
-              O ingrese el código manualmente
+            <div className="entrega-manual entrega-manual--inline">
               <input
                 type="text"
-                placeholder="VT-DEMO0001"
+                placeholder="Código VT-… o VR-…"
                 value={codigoManual}
                 onChange={(e) => setCodigoManual(e.target.value.toUpperCase())}
                 onKeyDown={(e) => e.key === 'Enter' && buscar(codigoManual)}
+                aria-label="Código de boleta"
               />
-            </label>
-            <button type="button" className="btn btn--primary" onClick={() => buscar(codigoManual)}>
-              Validar boleta
-            </button>
-          </div>
-        </section>
+              <button type="button" className="btn btn--primary btn--sm" onClick={() => buscar(codigoManual)}>
+                Validar
+              </button>
+            </div>
+          </section>
 
-        <section className="panel">
-          <h3 className="panel__title">Resultado de validación</h3>
+          <section className="panel panel--compact" ref={validacionRef}>
+            <h3 className="panel__title panel__title--sm">Validación y entrega</h3>
 
-          {!resultado ? (
-            <p className="text-muted">
-              Escanee, busque en el listado o ingrese el código QR de la boleta para verificar que
-              la compra es válida y proceder con la entrega del turno de cartulina.
-            </p>
-          ) : (
-            <>
-              <div className="entrega-status">
-                {yaEntregado ? (
-                  <StatusBadge status="entregado" />
-                ) : (
-                  <StatusBadge status="pendiente_entrega" />
-                )}
-                <span>
-                  {yaEntregado
-                    ? `Entregado el ${new Date(resultado.brazo.entregado_en).toLocaleString('es-GT')}`
-                    : 'Pago confirmado — pendiente de entrega física'}
-                </span>
-              </div>
-
-              <BoletaCard
-                organizacion={organizacion}
-                cortejo={resultado.cortejo}
-                turno={resultado.turno}
-                cargador={resultado.cargador}
-                brazo={resultado.brazo}
-                showEntrega
-              />
-
-              {!yaEntregado && (
-                <button
-                  type="button"
-                  className="btn btn--primary btn--block entrega-btn"
-                  disabled={entregandoId === resultado.brazo.id}
-                  onClick={() => handleEntregar()}
-                >
-                  {entregandoId === resultado.brazo.id
-                    ? 'Confirmando…'
-                    : 'Confirmar entrega del turno'}
-                </button>
-              )}
-
-              {yaEntregado && (
-                <div className="info-box">
-                  Este turno ya fue entregado. No es necesario volver a procesarlo.
+            {!resultado ? (
+              <p className="text-muted entrega-empty">
+                Escanee el QR o elija un turno del listado para confirmar la entrega.
+              </p>
+            ) : (
+              <>
+                <div className="entrega-status entrega-status--compact">
+                  {yaEntregado ? (
+                    <StatusBadge status="entregado" />
+                  ) : (
+                    <StatusBadge status="pendiente_entrega" />
+                  )}
+                  <span>{estadoEntregaTxt || 'Pago confirmado — pendiente de entrega física'}</span>
                 </div>
-              )}
-            </>
-          )}
-        </section>
+
+                <BoletaCard
+                  organizacion={organizacion}
+                  cortejo={resultado.cortejo}
+                  turno={resultado.turno}
+                  cargador={resultado.cargador}
+                  brazo={resultado.brazo}
+                  showEntrega
+                />
+
+                <EntregaEstadoMenu
+                  brazo={resultado.brazo}
+                  onRevertirPendiente={handleRevertirPendiente}
+                  loading={revirtiendoId === resultado.brazo.id}
+                  disabled={Boolean(entregandoId || revirtiendoId)}
+                />
+
+                {!yaEntregado ? (
+                  <EntregaConfirmForm
+                    cargador={resultado.cargador}
+                    esTercero={esTercero}
+                    onEsTerceroChange={setEsTercero}
+                    receptorNombre={receptorNombre}
+                    onReceptorNombreChange={setReceptorNombre}
+                    enviarCorreo={enviarCorreo}
+                    onEnviarCorreoChange={setEnviarCorreo}
+                    onSubmit={handleEntregar}
+                    loading={entregandoId === resultado.brazo.id}
+                    disabled={Boolean(entregandoId || revirtiendoId)}
+                  />
+                ) : null}
+              </>
+            )}
+          </section>
+        </div>
+
+        <aside className="entrega-layout__side">
+          <section className="panel panel--compact entrega-pendientes">
+            <button
+              type="button"
+              className="entrega-pendientes__toggle"
+              onClick={() => setListaAbierta((v) => !v)}
+              aria-expanded={listaAbierta}
+            >
+              <h3 className="panel__title panel__title--sm">
+                Pendientes
+                {!cargandoPendientes && (
+                  <span className="entrega-pendientes__count">{pendientes.length}</span>
+                )}
+              </h3>
+              <span className="entrega-pendientes__chevron" aria-hidden>
+                {listaAbierta ? '▾' : '▸'}
+              </span>
+            </button>
+
+            {listaAbierta && (
+              <>
+                <div className="entrega-pendientes__filtros entrega-pendientes__filtros--compact">
+                  <label>
+                    Procesión
+                    <select value={filtroCortejo} onChange={(e) => setFiltroCortejo(e.target.value)}>
+                      {(cortejos || []).map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombre_evento}
+                          {c.estado !== 'activa' ? ' (inact.)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    N.º
+                    <input
+                      type="number"
+                      min="1"
+                      value={filtroTurno}
+                      onChange={(e) => setFiltroTurno(e.target.value)}
+                      placeholder="Todos"
+                    />
+                  </label>
+                  <label className="entrega-pendientes__busqueda">
+                    Buscar
+                    <input
+                      type="search"
+                      value={busquedaPendientes}
+                      onChange={(e) => setBusquedaPendientes(e.target.value)}
+                      placeholder="Nombre, DPI…"
+                      autoComplete="off"
+                    />
+                  </label>
+                </div>
+
+                {cargandoPendientes ? (
+                  <Loader text="Cargando…" />
+                ) : !pendientes.length ? (
+                  <p className="text-muted entrega-empty">Sin pendientes con estos filtros.</p>
+                ) : (
+                  <div className="table-wrap table-wrap--cards">
+                    <table className="data-table data-table--compact data-table--stack entrega-pendientes__tabla">
+                      <thead>
+                        <tr>
+                          <th>Turno</th>
+                          <th>Persona</th>
+                          <th>Pago</th>
+                          <th>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pendientes.map((fila) => (
+                          <tr
+                            key={fila.id}
+                            className={
+                              resultado?.brazo?.id === fila.id ? 'entrega-pendientes__fila--activa' : ''
+                            }
+                          >
+                            <td data-label="Turno">
+                              <strong>#{fila.numeroTurno}</strong>
+                              <span className="text-muted entrega-pendientes__honor"> {fila.honor}</span>
+                              <div className="text-muted entrega-pendientes__meta">
+                                {fila.procesion} · Brazo {fila.brazoLabel}
+                              </div>
+                            </td>
+                            <td data-label="Persona">
+                              <strong>{fila.nombre}</strong>
+                            </td>
+                            <td data-label="Pago">
+                              {fila.fechaPago}
+                              <span className="text-muted entrega-pendientes__hora"> {fila.horaPago}</span>
+                            </td>
+                            <td data-label="Acciones">
+                              <button
+                                type="button"
+                                className="btn btn--primary btn--sm btn--block"
+                                onClick={() => seleccionarPendiente(fila)}
+                              >
+                                Abrir
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        </aside>
       </div>
     </Layout>
   );

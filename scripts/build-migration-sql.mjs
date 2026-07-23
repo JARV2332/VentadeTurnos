@@ -26,6 +26,11 @@ const SQL_FILES = [
   '018_anular_venta.sql',
   '019_horario_turno.sql',
   '020_devoto_whatsapp_no_unique.sql',
+  '021_perf_taquilla_impresion.sql',
+  '022_brazos_cortejo_rpc.sql',
+  '023_taquilla_perf.sql',
+  '024_taquilla_rpc_definer.sql',
+  '025_finanzas_perf.sql',
 ];
 
 const parts = [

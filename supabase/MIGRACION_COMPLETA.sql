@@ -1,5 +1,5 @@
 -- MIGRACION_COMPLETA.sql — generado automáticamente
--- 2026-07-07T16:07:27.703Z
+-- 2026-07-14T23:48:49.454Z
 -- Pegar en Supabase nuevo → SQL Editor → Run
 
 
@@ -1348,3 +1348,450 @@ COMMENT ON COLUMN public.turnos.hora_estimada IS 'Hora estimada de paso del turn
 
 ALTER TABLE public.cargadores_organizacion
   DROP CONSTRAINT IF EXISTS cargadores_organizacion_organizacion_id_whatsapp_key;
+
+
+-- ═══ 021_perf_taquilla_impresion.sql ═══
+
+-- Rendimiento: índices + RPC POST para liberar reservas (evita PATCH lento vía proxy)
+
+CREATE INDEX IF NOT EXISTS idx_brazos_org_estado_updated
+  ON public.brazos(organizacion_id, estado, updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_compras_org_pago
+  ON public.compras(organizacion_id, pago_confirmado_en DESC NULLS LAST);
+
+CREATE OR REPLACE FUNCTION public.liberar_reservas_taquilla_expiradas(p_organizacion_id uuid)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$
+DECLARE
+  cnt integer;
+BEGIN
+  UPDATE public.brazos
+  SET
+    estado = 'disponible',
+    bloqueado_hasta = NULL,
+    mesa_id = NULL,
+    vendedor_id = NULL
+  WHERE organizacion_id = p_organizacion_id
+    AND estado = 'reservado'
+    AND reserva_apartado = false
+    AND bloqueado_hasta IS NOT NULL
+    AND bloqueado_hasta < now();
+  GET DIAGNOSTICS cnt = ROW_COUNT;
+  RETURN cnt;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.liberar_reservas_taquilla_expiradas(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.liberar_reservas_taquilla_expiradas(uuid) TO anon;
+
+
+-- ═══ 022_brazos_cortejo_rpc.sql ═══
+
+-- Taquilla: JOIN cortejo→turnos→brazos (evita IN gigante + OFFSET lento)
+
+CREATE INDEX IF NOT EXISTS idx_brazos_turno_numero
+  ON public.brazos(turno_id, numero_brazo);
+
+CREATE INDEX IF NOT EXISTS idx_turnos_cortejo_numero
+  ON public.turnos(cortejo_id, numero_turno);
+
+CREATE OR REPLACE FUNCTION public.get_brazos_cortejo(
+  p_cortejo_id uuid,
+  p_organizacion_id uuid
+)
+RETURNS SETOF public.brazos
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = public
+AS $$
+  SELECT b.*
+  FROM public.turnos t
+  INNER JOIN public.brazos b
+    ON b.turno_id = t.id
+   AND b.organizacion_id = p_organizacion_id
+  WHERE t.cortejo_id = p_cortejo_id
+  ORDER BY t.numero_turno ASC, b.lado ASC, b.numero_brazo ASC;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_brazos_cortejo(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_brazos_cortejo(uuid, uuid) TO anon;
+
+
+-- ═══ 023_taquilla_perf.sql ═══
+
+-- Taquilla: una sola llamada turnos + brazos (campos ligeros) + nombre devoto
+
+CREATE OR REPLACE FUNCTION public.get_taquilla_cortejo(
+  p_cortejo_id uuid,
+  p_organizacion_id uuid
+)
+RETURNS json
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = public
+AS $$
+  SELECT json_build_object(
+    'turnos', COALESCE((
+      SELECT json_agg(t ORDER BY t.numero_turno)
+      FROM (
+        SELECT
+          id,
+          cortejo_id,
+          numero_turno,
+          tipo_turno,
+          etiqueta,
+          precio,
+          son,
+          alabado,
+          hora_estimada,
+          total_brazos,
+          organizacion_id
+        FROM public.turnos
+        WHERE cortejo_id = p_cortejo_id
+      ) AS t
+    ), '[]'::json),
+    'brazos', COALESCE((
+      SELECT json_agg(b ORDER BY b.numero_turno, b.lado_ord, b.numero_brazo)
+      FROM (
+        SELECT
+          br.id,
+          br.turno_id,
+          br.numero_turno,
+          br.numero_brazo,
+          br.lado,
+          br.estado,
+          br.reserva_apartado,
+          br.apartado_notas,
+          br.asignado_nombre,
+          br.cargador_id,
+          br.bloqueado_hasta,
+          br.mesa_id,
+          br.vendedor_id,
+          br.precio_pagado,
+          c.nombre_completo AS cargador_nombre,
+          CASE br.lado WHEN 'Izquierda' THEN 0 ELSE 1 END AS lado_ord
+        FROM public.turnos t
+        INNER JOIN public.brazos br
+          ON br.turno_id = t.id
+         AND br.organizacion_id = p_organizacion_id
+        LEFT JOIN public.cargadores_organizacion c
+          ON c.id = br.cargador_id
+         AND c.organizacion_id = p_organizacion_id
+        WHERE t.cortejo_id = p_cortejo_id
+      ) AS b
+    ), '[]'::json)
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_taquilla_cortejo(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_taquilla_cortejo(uuid, uuid) TO anon;
+
+
+-- ═══ 024_taquilla_rpc_definer.sql ═══
+
+-- Taquilla: RPC SECURITY DEFINER (sin RLS lento) + JSON sin límite PostgREST de 1000 filas
+
+CREATE OR REPLACE FUNCTION public.assert_org_access(p_organizacion_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.role() = 'service_role' THEN
+    RETURN;
+  END IF;
+  IF p_organizacion_id IS NULL
+     OR p_organizacion_id IS DISTINCT FROM public.get_user_organizacion_id() THEN
+    RAISE EXCEPTION 'forbidden' USING ERRCODE = '42501';
+  END IF;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.assert_org_access(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.assert_org_access(uuid) TO anon;
+
+CREATE OR REPLACE FUNCTION public.get_taquilla_cortejo(
+  p_cortejo_id uuid,
+  p_organizacion_id uuid
+)
+RETURNS json
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  PERFORM public.assert_org_access(p_organizacion_id);
+
+  RETURN (
+    SELECT json_build_object(
+      'turnos', COALESCE((
+        SELECT json_agg(t ORDER BY t.numero_turno)
+        FROM (
+          SELECT
+            id,
+            cortejo_id,
+            numero_turno,
+            tipo_turno,
+            etiqueta,
+            precio,
+            son,
+            alabado,
+            hora_estimada,
+            total_brazos,
+            organizacion_id
+          FROM public.turnos
+          WHERE cortejo_id = p_cortejo_id
+        ) AS t
+      ), '[]'::json),
+      'brazos', COALESCE((
+        SELECT json_agg(b ORDER BY b.numero_turno, b.lado_ord, b.numero_brazo)
+        FROM (
+          SELECT
+            br.id,
+            br.turno_id,
+            br.numero_turno,
+            br.numero_brazo,
+            br.lado,
+            br.estado,
+            br.reserva_apartado,
+            br.apartado_notas,
+            br.asignado_nombre,
+            br.cargador_id,
+            br.bloqueado_hasta,
+            br.mesa_id,
+            br.vendedor_id,
+            br.precio_pagado,
+            c.nombre_completo AS cargador_nombre,
+            CASE br.lado WHEN 'Izquierda' THEN 0 ELSE 1 END AS lado_ord
+          FROM public.turnos t
+          INNER JOIN public.brazos br
+            ON br.turno_id = t.id
+           AND br.organizacion_id = p_organizacion_id
+          LEFT JOIN public.cargadores_organizacion c
+            ON c.id = br.cargador_id
+           AND c.organizacion_id = p_organizacion_id
+          WHERE t.cortejo_id = p_cortejo_id
+        ) AS b
+      ), '[]'::json)
+    )
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_taquilla_cortejo(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_taquilla_cortejo(uuid, uuid) TO anon;
+
+CREATE OR REPLACE FUNCTION public.get_brazos_cortejo_json(
+  p_cortejo_id uuid,
+  p_organizacion_id uuid
+)
+RETURNS json
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  PERFORM public.assert_org_access(p_organizacion_id);
+
+  RETURN COALESCE((
+    SELECT json_agg(b ORDER BY b.numero_turno, b.lado_ord, b.numero_brazo)
+    FROM (
+      SELECT
+        br.*,
+        CASE br.lado WHEN 'Izquierda' THEN 0 ELSE 1 END AS lado_ord
+      FROM public.turnos t
+      INNER JOIN public.brazos br
+        ON br.turno_id = t.id
+       AND br.organizacion_id = p_organizacion_id
+      WHERE t.cortejo_id = p_cortejo_id
+    ) AS b
+  ), '[]'::json);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_brazos_cortejo_json(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_brazos_cortejo_json(uuid, uuid) TO anon;
+
+CREATE OR REPLACE FUNCTION public.get_brazos_cortejo(
+  p_cortejo_id uuid,
+  p_organizacion_id uuid
+)
+RETURNS SETOF public.brazos
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  PERFORM public.assert_org_access(p_organizacion_id);
+
+  RETURN QUERY
+  SELECT b.*
+  FROM public.turnos t
+  INNER JOIN public.brazos b
+    ON b.turno_id = t.id
+   AND b.organizacion_id = p_organizacion_id
+  WHERE t.cortejo_id = p_cortejo_id
+  ORDER BY t.numero_turno ASC, b.lado ASC, b.numero_brazo ASC;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_brazos_cortejo(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_brazos_cortejo(uuid, uuid) TO anon;
+
+DROP FUNCTION IF EXISTS public.get_brazos_cortejo_offset(uuid, uuid, integer, integer);
+DROP FUNCTION IF EXISTS public.get_brazos_cortejo_offset(uuid, integer, integer, uuid);
+
+
+-- ═══ 025_finanzas_perf.sql ═══
+
+-- Finanzas / Caja: ventas y compras en JSON (SECURITY DEFINER, sin OFFSET lento ni RLS fila a fila)
+
+CREATE INDEX IF NOT EXISTS idx_brazos_org_vendido_pago
+  ON public.brazos(organizacion_id, pago_confirmado_en DESC NULLS LAST)
+  WHERE estado = 'vendido';
+
+CREATE INDEX IF NOT EXISTS idx_compras_org_pago
+  ON public.compras(organizacion_id, pago_confirmado_en DESC NULLS LAST);
+
+CREATE OR REPLACE FUNCTION public.get_finanzas_ventas_json(p_organizacion_id uuid)
+RETURNS json
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  PERFORM public.assert_org_access(p_organizacion_id);
+
+  RETURN COALESCE((
+    SELECT json_agg(row_to_json(x))
+    FROM (
+      SELECT
+        b.id,
+        b.turno_id,
+        COALESCE(b.numero_turno, t.numero_turno) AS numero_turno,
+        b.numero_brazo,
+        b.lado,
+        b.estado,
+        b.precio_pagado,
+        b.codigo_boleta_qr,
+        b.compra_id,
+        b.cargador_id,
+        b.mesa_id,
+        COALESCE(b.vendedor_id, c.vendedor_id) AS vendedor_id,
+        COALESCE(NULLIF(trim(b.operador_nombre), ''), NULLIF(trim(c.operador_nombre), '')) AS operador_nombre,
+        b.metodo_pago,
+        (b.comprobante_url IS NOT NULL AND b.comprobante_url <> '') AS tiene_comprobante,
+        b.estado_entrega,
+        b.pago_confirmado_en,
+        b.updated_at,
+        b.created_at,
+        t.tipo_turno,
+        COALESCE(t.etiqueta, t.tipo_turno) AS turno_etiqueta,
+        t.hora_estimada,
+        cj.fecha AS fecha_evento,
+        cj.nombre_evento AS cortejo_nombre
+      FROM public.brazos b
+      LEFT JOIN public.turnos t ON t.id = b.turno_id
+      LEFT JOIN public.cortejos cj ON cj.id = t.cortejo_id
+      LEFT JOIN public.compras c ON c.id = b.compra_id
+      WHERE b.organizacion_id = p_organizacion_id
+        AND b.estado = 'vendido'
+    ) x
+  ), '[]'::json);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_finanzas_ventas_json(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_finanzas_ventas_json(uuid) TO anon;
+
+CREATE OR REPLACE FUNCTION public.get_compras_org_json(p_organizacion_id uuid)
+RETURNS json
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  PERFORM public.assert_org_access(p_organizacion_id);
+
+  RETURN COALESCE((
+    SELECT json_agg(row_to_json(c))
+    FROM (
+      SELECT
+        id,
+        organizacion_id,
+        codigo_recibo,
+        total_pagado,
+        cargador_id,
+        vendedor_id,
+        operador_nombre,
+        metodo_pago,
+        (comprobante_url IS NOT NULL AND comprobante_url <> '') AS tiene_comprobante,
+        estado,
+        pago_confirmado_en,
+        created_at
+      FROM public.compras
+      WHERE organizacion_id = p_organizacion_id
+    ) c
+  ), '[]'::json);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_compras_org_json(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_compras_org_json(uuid) TO anon;
+
+CREATE OR REPLACE FUNCTION public.get_brazos_vendidos_org_json(p_organizacion_id uuid)
+RETURNS json
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  PERFORM public.assert_org_access(p_organizacion_id);
+
+  RETURN COALESCE((
+    SELECT json_agg(row_to_json(b))
+    FROM (
+      SELECT
+        id,
+        turno_id,
+        numero_turno,
+        numero_brazo,
+        lado,
+        estado,
+        precio_pagado,
+        codigo_boleta_qr,
+        compra_id,
+        cargador_id,
+        mesa_id,
+        vendedor_id,
+        operador_nombre,
+        metodo_pago,
+        (comprobante_url IS NOT NULL AND comprobante_url <> '') AS tiene_comprobante,
+        estado_entrega,
+        pago_confirmado_en,
+        updated_at,
+        created_at
+      FROM public.brazos
+      WHERE organizacion_id = p_organizacion_id
+        AND estado = 'vendido'
+    ) b
+  ), '[]'::json);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_brazos_vendidos_org_json(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_brazos_vendidos_org_json(uuid) TO anon;

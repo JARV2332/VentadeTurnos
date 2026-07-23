@@ -32,7 +32,7 @@ run('3/3 Restore datos en proyecto nuevo (REST)', path.join(__dirname, 'restore-
 
 console.log('\n🎉 Migración HTTPS terminada.\n');
 console.log('Actualiza Vercel con:');
-console.log('  REACT_APP_SUPABASE_URL=https://dblphvmvusbgopcejbyh.supabase.co');
-console.log('  REACT_APP_SUPABASE_ANON_KEY=sb_publishable_IpP44gZyVDxYNz5IkKuWdA_pbBtDNvA');
+console.log('  REACT_APP_SUPABASE_URL=https://emmkatautioefhmvxejg.supabase.co');
+console.log('  REACT_APP_SUPABASE_ANON_KEY=sb_publishable_2eCHPUySC-tupIYgMoCa6g_Us8vUiQd');
 console.log('  SUPABASE_SERVICE_ROLE_KEY=<service_role del NUEVO proyecto>\n');
 console.log('En Supabase nuevo → Database → Replication: activa brazos y turnos.\n');

@@ -15,14 +15,21 @@ const TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
 const REF =
   process.env.SUPABASE_PROJECT_REF_NEW ||
   process.env.SUPABASE_PROJECT_REF ||
-  'dblphvmvusbgopcejbyh';
+  'emmkatautioefhmvxejg';
 
-const SITE_URL = 'https://ventadeturnos.vercel.app';
+const PRODUCTION_URLS = [
+  'https://ventade-turnos.vercel.app',
+  'https://ventadeturnos.vercel.app',
+];
+
+const SITE_URL = PRODUCTION_URLS[0];
 const REDIRECT_URLS = [
-  `${SITE_URL}/`,
-  `${SITE_URL}/restablecer-contrasena`,
-  `${SITE_URL}/confirmar-correo`,
-  `${SITE_URL}/**`,
+  ...PRODUCTION_URLS.flatMap((base) => [
+    `${base}/`,
+    `${base}/restablecer-contrasena`,
+    `${base}/confirmar-correo`,
+    `${base}/**`,
+  ]),
   'http://localhost:3000/**',
 ];
 

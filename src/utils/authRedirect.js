@@ -10,7 +10,7 @@ export function getAppUrl() {
   if (typeof window !== 'undefined' && window.location?.origin) {
     return window.location.origin.replace(/\/$/, '');
   }
-  return 'https://ventadeturnos.vercel.app';
+  return 'https://ventade-turnos.vercel.app';
 }
 
 export function authCallbackUrl(path) {

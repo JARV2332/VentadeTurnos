@@ -1952,8 +1952,21 @@ export async function actualizarPagoPorCodigo(organizacionId, codigo, pagoData =
   };
 }
 
-export async function marcarEntregado(brazoId) {
-  const { data, error } = await supabase.rpc('marcar_entregado_brazo', { p_brazo_id: brazoId });
+export async function marcarEntregado(brazoId, opts = {}) {
+  const entregado_a_tercero = Boolean(opts.entregado_a_tercero);
+  const entregado_receptor_nombre = entregado_a_tercero
+    ? String(opts.entregado_receptor_nombre || '').trim() || null
+    : null;
+
+  if (entregado_a_tercero && !entregado_receptor_nombre) {
+    return { error: 'Indique el nombre de quien recibe el turno (tercero).' };
+  }
+
+  const { data, error } = await supabase.rpc('marcar_entregado_brazo', {
+    p_brazo_id: brazoId,
+    p_entregado_a_tercero: entregado_a_tercero,
+    p_entregado_receptor_nombre: entregado_receptor_nombre,
+  });
   if (error) {
     if (isMissingRpc(error)) {
       const { data: brazo, error: upErr } = await supabase
@@ -1961,9 +1974,38 @@ export async function marcarEntregado(brazoId) {
         .update({
           estado_entrega: 'entregado',
           entregado_en: new Date().toISOString(),
+          entregado_a_tercero,
+          entregado_receptor_nombre,
         })
         .eq('id', brazoId)
         .eq('estado', 'vendido')
+        .select()
+        .single();
+      if (upErr) return err(upErr);
+      return { data: brazo };
+    }
+    return err(error);
+  }
+  return { data };
+}
+
+/** Revierte entrega errónea → pendiente de entrega. */
+export async function revertirEntregaBrazo(brazoId) {
+  const { data, error } = await supabase.rpc('revertir_entrega_brazo', { p_brazo_id: brazoId });
+  if (error) {
+    if (isMissingRpc(error)) {
+      const { data: brazo, error: upErr } = await supabase
+        .from('brazos')
+        .update({
+          estado_entrega: 'pendiente',
+          entregado_en: null,
+          entregado_por: null,
+          entregado_a_tercero: false,
+          entregado_receptor_nombre: null,
+        })
+        .eq('id', brazoId)
+        .eq('estado', 'vendido')
+        .eq('estado_entrega', 'entregado')
         .select()
         .single();
       if (upErr) return err(upErr);

@@ -1,4 +1,8 @@
 import './config/installSupabaseFetch';
+import { redirectAuthCallbackFromLocalhost } from './utils/authRecoveryRedirect';
+
+redirectAuthCallbackFromLocalhost();
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './styles/global.css';

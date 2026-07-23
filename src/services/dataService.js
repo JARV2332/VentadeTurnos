@@ -202,10 +202,15 @@ export const actualizarPagoPorCodigo = (organizacionId, codigo, pagoData) =>
     ? sb.actualizarPagoPorCodigo(organizacionId, codigo, pagoData)
     : Promise.resolve(mock.actualizarPagoPorCodigoMock(organizacionId, codigo, pagoData));
 
-export const marcarEntregado = (brazoId, organizacionId, usuarioId) =>
+export const marcarEntregado = (brazoId, organizacionId, usuarioId, opts) =>
   isSupabaseBackend()
-    ? sb.marcarEntregado(brazoId)
-    : Promise.resolve(mock.marcarEntregadoMock(brazoId, organizacionId, usuarioId));
+    ? sb.marcarEntregado(brazoId, opts)
+    : Promise.resolve(mock.marcarEntregadoMock(brazoId, organizacionId, usuarioId, opts));
+
+export const revertirEntregaBrazo = (brazoId, organizacionId) =>
+  isSupabaseBackend()
+    ? sb.revertirEntregaBrazo(brazoId)
+    : Promise.resolve(mock.revertirEntregaBrazoMock(brazoId, organizacionId));
 
 export const getFinanzasByOrg = (organizacionId) =>
   isSupabaseBackend()

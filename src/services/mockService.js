@@ -865,7 +865,7 @@ export function actualizarPagoPorCodigoMock(organizacionId, codigo, pagoData = {
 }
 
 /** Marca el turno físico como entregado tras validar QR. */
-export function marcarEntregadoMock(brazoId, organizacionId, usuarioId) {
+export function marcarEntregadoMock(brazoId, organizacionId, usuarioId, opts = {}) {
   const brazo = store.brazos.find(
     (b) => b.id === brazoId && b.organizacion_id === organizacionId && b.estado === 'vendido'
   );
@@ -875,16 +875,52 @@ export function marcarEntregadoMock(brazoId, organizacionId, usuarioId) {
     return { error: 'Este turno ya fue entregado anteriormente.' };
   }
 
+  const entregado_a_tercero = Boolean(opts.entregado_a_tercero);
+  const entregado_receptor_nombre = entregado_a_tercero
+    ? String(opts.entregado_receptor_nombre || '').trim()
+    : null;
+  if (entregado_a_tercero && !entregado_receptor_nombre) {
+    return { error: 'Indique el nombre de quien recibe el turno (tercero).' };
+  }
+
   const actualizado = {
     ...brazo,
     estado_entrega: 'entregado',
     entregado_en: new Date().toISOString(),
     entregado_por: usuarioId,
+    entregado_a_tercero,
+    entregado_receptor_nombre,
   };
 
   store.brazos = store.brazos.map((b) => (b.id === brazoId ? actualizado : b));
   emit('brazos', { eventType: 'UPDATE', new: actualizado });
   emit('entrega:confirmada', { brazo: actualizado });
+  return { data: actualizado };
+}
+
+/** Revierte entrega errónea → pendiente. */
+export function revertirEntregaBrazoMock(brazoId, organizacionId) {
+  const brazo = store.brazos.find(
+    (b) => b.id === brazoId && b.organizacion_id === organizacionId && b.estado === 'vendido'
+  );
+
+  if (!brazo) return { error: 'Boleta no válida' };
+  if (brazo.estado_entrega !== 'entregado') {
+    return { error: 'Este turno no está marcado como entregado.' };
+  }
+
+  const actualizado = {
+    ...brazo,
+    estado_entrega: 'pendiente',
+    entregado_en: null,
+    entregado_por: null,
+    entregado_a_tercero: false,
+    entregado_receptor_nombre: null,
+  };
+
+  store.brazos = store.brazos.map((b) => (b.id === brazoId ? actualizado : b));
+  emit('brazos', { eventType: 'UPDATE', new: actualizado });
+  emit('entrega:revertida', { brazo: actualizado });
   return { data: actualizado };
 }
 
