@@ -30,6 +30,7 @@ import {
 } from '../utils/consultaDevotoUtils';
 import { enriquecerDashboardMetrics } from '../utils/dashboardMetricsUtils';
 import { MINUTOS_RESERVA_TAQUILLA_COLGADA } from '../utils/reservasTaquillaUtils';
+import { getBoletaCache, setBoletaCache } from '../utils/boletaLookupCache';
 
 function err(error) {
   if (!error) return null;
@@ -1713,13 +1714,18 @@ export async function buscarBoletaPorCodigo(organizacionId, codigo) {
     return { error: 'Código de boleta inválido.' };
   }
 
+  const cached = getBoletaCache(organizacionId, codigoLimpio);
+  if (cached) return cached;
+
+  let result;
+
   const { data: rpcData, error: rpcError } = await supabase.rpc('buscar_boleta_entrega', {
     p_codigo: codigoLimpio,
   });
 
   if (!rpcError && rpcData && typeof rpcData === 'object') {
     if (rpcData.error) return { error: rpcData.error };
-    return {
+    result = {
       brazo: rpcData.brazo,
       brazos: rpcData.brazos || [],
       compra: rpcData.compra || null,
@@ -1728,17 +1734,19 @@ export async function buscarBoletaPorCodigo(organizacionId, codigo) {
       cargador: rpcData.cargador || null,
       items: rpcData.items || [],
     };
-  }
-
-  if (rpcError && !/Could not find the function|schema cache/i.test(rpcError.message || '')) {
+  } else if (rpcError && !/Could not find the function|schema cache/i.test(rpcError.message || '')) {
     return err(rpcError);
+  } else {
+    result = await buscarBoletaPorCodigoLegacy(organizacionId, codigoLimpio);
   }
 
-  return buscarBoletaPorCodigoLegacy(organizacionId, codigoLimpio);
+  if (result && !result.error) {
+    setBoletaCache(organizacionId, codigoLimpio, result);
+  }
+  return result;
 }
 
 async function buscarBoletaPorCodigoLegacy(organizacionId, codigoLimpio) {
-
   const esVR = /^VR-[A-Z0-9]+$/.test(codigoLimpio);
 
   if (esVR) {

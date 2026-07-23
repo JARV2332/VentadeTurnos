@@ -92,11 +92,6 @@ export default async function handler(req, res) {
           console.error('[confirmar-entrega] cola pendiente:', err?.message || err)
         )
       );
-    } else {
-      await Promise.race([
-        procesarCorreosEntregaPendientes(admin, organizacionId, 3),
-        new Promise((resolve) => setTimeout(resolve, 4000)),
-      ]).catch((err) => console.error('[confirmar-entrega] cola pendiente:', err?.message || err));
     }
 
     const { url, anonKey } = getSupabaseConfig();

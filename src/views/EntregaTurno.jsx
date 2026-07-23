@@ -22,8 +22,6 @@ import {
 } from '../utils/entregaItemsUtils';
 import { codigoReciboDisplay } from '../utils/compraUtils';
 import {
-  getBoletaCache,
-  setBoletaCache,
   invalidateBoletaCachePorBrazos,
 } from '../utils/boletaLookupCache';
 
@@ -105,18 +103,6 @@ export default function EntregaTurno() {
 
     if (buscando && codigo === codigoActivo) return;
 
-    const cacheHit = getBoletaCache(organizacionId, codigo);
-    if (cacheHit) {
-      setError('');
-      setOkMsg('');
-      setAvisoCorreoMsg('');
-      setCodigoActivo(codigo);
-      setCodigoManual(codigo);
-      setResultado(cacheHit);
-      scrollAValidacion();
-      return;
-    }
-
     const seq = ++buscarSeqRef.current;
     setBuscando(true);
     setCodigoActivo(codigo);
@@ -137,7 +123,6 @@ export default function EntregaTurno() {
       return;
     }
 
-    setBoletaCache(organizacionId, codigo, res);
     setResultado(res);
   }, [organizacionId, buscando, codigoActivo]);
 

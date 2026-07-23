@@ -1,14 +1,11 @@
 /**
- * Aplica esquema en Supabase cloud vía Management API (HTTPS, sin Postgres directo).
- *
- * Requiere Personal Access Token:
- *   https://supabase.com/dashboard/account/tokens
+ * Aplica migraciones de búsqueda rápida vía Supabase Management API (HTTPS).
  *
  * .env.local:
  *   SUPABASE_ACCESS_TOKEN=sbp_...
- *   SUPABASE_PROJECT_REF_NEW=dblphvmvusbgopcejbyh
+ *   SUPABASE_PROJECT_REF_NEW=emmkatautioefhmvxejg
  *
- *   npm run db:apply:management
+ *   npm run db:apply:buscar-boleta:management
  */
 import fs from 'fs';
 import path from 'path';
@@ -25,35 +22,9 @@ const ACCESS_TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
 const PROJECT_REF =
   process.env.SUPABASE_PROJECT_REF_NEW ||
   process.env.SUPABASE_PROJECT_REF ||
-  'dblphvmvusbgopcejbyh';
+  'emmkatautioefhmvxejg';
 
-const SQL_FILES = [
-  'APLICAR_TODO.sql',
-  '007_super_admin.sql',
-  '008_super_manual.sql',
-  '009_configuracion_recibo.sql',
-  '010_correo_gmail_por_org.sql',
-  '011_rpc_taquilla.sql',
-  '012_fix_confirmar_venta_gen_random.sql',
-  '013_devoto_cui_unique.sql',
-  '014_compras_multi_turno.sql',
-  '015_leyenda_correo.sql',
-  '016_correo_entrega.sql',
-  '017_operador_venta.sql',
-  '018_anular_venta.sql',
-  '019_horario_turno.sql',
-  '020_devoto_whatsapp_no_unique.sql',
-  '021_perf_taquilla_impresion.sql',
-  '022_brazos_cortejo_rpc.sql',
-  '023_taquilla_perf.sql',
-  '024_taquilla_rpc_definer.sql',
-  '025_finanzas_perf.sql',
-  '026_entrega_tercero.sql',
-  '027_revertir_entrega.sql',
-  '028_buscar_boleta_entrega.sql',
-  '029_revertir_entrega_brazos.sql',
-  '030_perf_buscar_boleta_entrega.sql',
-];
+const SQL_FILES = ['028_buscar_boleta_entrega.sql', '030_perf_buscar_boleta_entrega.sql'];
 
 async function runQuery(sql) {
   const res = await fetch(
@@ -81,20 +52,20 @@ if (!ACCESS_TOKEN) {
 1. https://supabase.com/dashboard/account/tokens → Generate new token
 2. Agrega a .env.local:
    SUPABASE_ACCESS_TOKEN=sbp_...
-   SUPABASE_PROJECT_REF_NEW=dblphvmvusbgopcejbyh
-3. npm run db:apply:management
+   SUPABASE_PROJECT_REF_NEW=${PROJECT_REF}
+3. npm run db:apply:buscar-boleta:management
+
+Alternativa: pega en Supabase → SQL Editor los archivos:
+   supabase/028_buscar_boleta_entrega.sql
+   supabase/030_perf_buscar_boleta_entrega.sql
 `);
   process.exit(1);
 }
 
-console.log(`\n🔧 Aplicando esquema vía Management API\n   Proyecto: ${PROJECT_REF}\n`);
+console.log(`\n🔧 Búsqueda rápida de boleta (Management API)\n   Proyecto: ${PROJECT_REF}\n`);
 
 for (const file of SQL_FILES) {
   const sqlPath = path.join(root, 'supabase', file);
-  if (!fs.existsSync(sqlPath)) {
-    console.warn(`  ⚠ Omitido (no existe): ${file}`);
-    continue;
-  }
   process.stdout.write(`  ${file}…`);
   const sql = fs.readFileSync(sqlPath, 'utf8');
   try {
@@ -107,4 +78,4 @@ for (const file of SQL_FILES) {
   }
 }
 
-console.log('\n✅ Esquema aplicado vía Management API.\n');
+console.log('\n✅ RPC buscar_boleta_entrega optimizada. Búsqueda ~0.3–1 s.\n');

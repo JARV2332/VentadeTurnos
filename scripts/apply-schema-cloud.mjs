@@ -45,6 +45,9 @@ const SQL_FILES = [
   '025_finanzas_perf.sql',
   '026_entrega_tercero.sql',
   '027_revertir_entrega.sql',
+  '028_buscar_boleta_entrega.sql',
+  '029_revertir_entrega_brazos.sql',
+  '030_perf_buscar_boleta_entrega.sql',
 ];
 
 if (!DATABASE_URL || DATABASE_URL.includes('[YOUR-PASSWORD]')) {

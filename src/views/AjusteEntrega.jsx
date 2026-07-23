@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import Layout from '../components/Layout';
 import BoletaCard from '../components/BoletaCard';
 import BoletaContraseñaTurno from '../components/BoletaContraseñaTurno';
@@ -7,7 +7,7 @@ import StatusBadge from '../components/StatusBadge';
 import EntregaEstadoMenu from '../components/EntregaEstadoMenu';
 import { textoEstadoEntrega } from '../components/EntregaConfirmForm';
 import { useAuth } from '../context/AuthContext';
-import { buscarBoletaPorCodigo, revertirEntregaBrazos } from '../services/dataService';
+import { buscarBoletaPorCodigo, getReciboConfig, revertirEntregaBrazos } from '../services/dataService';
 import { extraerCodigoBoleta } from '../utils/boletaUtils';
 import {
   itemsDesdeResultado,
@@ -15,7 +15,7 @@ import {
   brazosEntregadosEnItems,
 } from '../utils/entregaItemsUtils';
 import { codigoReciboDisplay } from '../utils/compraUtils';
-import { invalidateBoletaCachePorBrazos } from '../utils/boletaLookupCache';
+import { setBoletaCache } from '../utils/boletaLookupCache';
 
 /**
  * Corrección de estado de entrega (supervisor / coordinación).
@@ -24,12 +24,16 @@ import { invalidateBoletaCachePorBrazos } from '../utils/boletaLookupCache';
 export default function AjusteEntrega() {
   const { organizacionId, organizacion } = useAuth();
   const validacionRef = useRef(null);
+  const buscarSeqRef = useRef(0);
   const [codigoManual, setCodigoManual] = useState('');
+  const [codigoActivo, setCodigoActivo] = useState('');
   const [resultado, setResultado] = useState(null);
   const [error, setError] = useState('');
   const [okMsg, setOkMsg] = useState('');
+  const [buscando, setBuscando] = useState(false);
   const [scannerOn, setScannerOn] = useState(true);
   const [revirtiendo, setRevirtiendo] = useState(false);
+  const [reciboConfig, setReciboConfig] = useState(null);
 
   const items = useMemo(() => itemsDesdeResultado(resultado), [resultado]);
   const resumen = useMemo(() => resumenEntregaItems(items), [items]);
@@ -40,48 +44,77 @@ export default function AjusteEntrega() {
     [resultado, items]
   );
 
+  useEffect(() => {
+    if (!organizacionId) return undefined;
+    let cancel = false;
+    getReciboConfig(organizacionId).then((saved) => {
+      if (!cancel && saved && !saved.error) setReciboConfig(saved);
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [organizacionId]);
+
+  const scrollAValidacion = () => {
+    requestAnimationFrame(() => {
+      validacionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
   const buscar = useCallback(async (texto) => {
-    setError('');
-    setOkMsg('');
     const codigo = extraerCodigoBoleta(texto);
     if (!codigo) {
       setError('Código QR no válido.');
       setResultado(null);
+      setCodigoActivo('');
       return;
     }
 
+    if (buscando && codigo === codigoActivo) return;
+
+    const seq = ++buscarSeqRef.current;
+    setBuscando(true);
+    setCodigoActivo(codigo);
+    setCodigoManual(codigo);
+    setError('');
+    setOkMsg('');
+    setResultado(null);
+    scrollAValidacion();
+
     const res = await buscarBoletaPorCodigo(organizacionId, codigo);
+    if (seq !== buscarSeqRef.current) return;
+
+    setBuscando(false);
     if (res.error) {
       setError(res.error);
       setResultado(null);
       return;
     }
     setResultado(res);
-    setCodigoManual(codigo);
-    requestAnimationFrame(() => {
-      validacionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  }, [organizacionId]);
+  }, [organizacionId, buscando, codigoActivo]);
 
   const handleScan = useCallback(
     (decoded) => {
+      if (revirtiendo) return;
       buscar(decoded);
     },
-    [buscar]
+    [buscar, revirtiendo]
   );
 
-  const actualizarResultadoConBrazos = (brazosActualizados) => {
+  const actualizarResultadoConBrazos = (brazosActualizados, codigoCache = codigoActivo) => {
     const map = Object.fromEntries(brazosActualizados.map((b) => [b.id, b]));
     const itemsNuevos = items.map((item) => ({
       ...item,
       brazo: map[item.brazo.id] || item.brazo,
     }));
-    setResultado({
+    const nuevo = {
       ...resultado,
       items: itemsNuevos,
       brazos: itemsNuevos.map((i) => i.brazo),
       brazo: itemsNuevos[0]?.brazo || resultado.brazo,
-    });
+    };
+    setResultado(nuevo);
+    if (codigoCache) setBoletaCache(organizacionId, codigoCache, nuevo);
   };
 
   const handleRevertirPendiente = async () => {
@@ -101,7 +134,6 @@ export default function AjusteEntrega() {
 
     const brazosActualizados = res.brazos || (Array.isArray(res.data) ? res.data : [res.data]);
     actualizarResultadoConBrazos(brazosActualizados);
-    invalidateBoletaCachePorBrazos(organizacionId, items.map((i) => i.brazo), resultado?.compra);
 
     const n = brazosActualizados.length;
     setOkMsg(
@@ -151,8 +183,13 @@ export default function AjusteEntrega() {
               onKeyDown={(e) => e.key === 'Enter' && buscar(codigoManual)}
               aria-label="Código de boleta"
             />
-            <button type="button" className="btn btn--primary btn--sm" onClick={() => buscar(codigoManual)}>
-              Buscar
+            <button
+              type="button"
+              className="btn btn--primary btn--sm"
+              onClick={() => buscar(codigoManual)}
+              disabled={buscando}
+            >
+              {buscando ? 'Buscando…' : 'Buscar'}
             </button>
           </div>
         </section>
@@ -160,7 +197,12 @@ export default function AjusteEntrega() {
         <section className="panel panel--compact" ref={validacionRef}>
           <h3 className="panel__title panel__title--sm">Estado y corrección</h3>
 
-          {!resultado ? (
+          {buscando ? (
+            <div className="entrega-buscando" aria-live="polite">
+              <div className="entrega-buscando__pulse" />
+              <p>Cargando boleta <strong>{codigoActivo}</strong>…</p>
+            </div>
+          ) : !resultado ? (
             <p className="text-muted entrega-empty">
               Busque la boleta para ver su estado y, si fue entregada por error, volverla a{' '}
               <strong>pendiente de entrega</strong>.
@@ -170,8 +212,6 @@ export default function AjusteEntrega() {
               <div className="entrega-status entrega-status--compact">
                 {resumen.todosEntregados ? (
                   <StatusBadge status="entregado" />
-                ) : resumen.entregados > 0 ? (
-                  <StatusBadge status="pendiente_entrega" />
                 ) : (
                   <StatusBadge status="pendiente_entrega" />
                 )}
@@ -189,6 +229,7 @@ export default function AjusteEntrega() {
                       items={items}
                       compra={resultado.compra}
                       cargador={resultado.cargador}
+                      config={reciboConfig}
                     />
                   </div>
                   <p className="entrega-recibo-multi__estados">
@@ -212,6 +253,7 @@ export default function AjusteEntrega() {
                   turno={resultado.turno}
                   cargador={resultado.cargador}
                   brazo={resultado.brazo}
+                  config={reciboConfig}
                   showEntrega
                 />
               )}
@@ -224,7 +266,7 @@ export default function AjusteEntrega() {
                   esReciboMulti={esMulti}
                   onRevertirPendiente={handleRevertirPendiente}
                   loading={revirtiendo}
-                  disabled={revirtiendo}
+                  disabled={revirtiendo || buscando}
                 />
               ) : (
                 <div className="info-box info-box--compact">

@@ -38,6 +38,8 @@
     "db:apply:local": "node scripts/apply-schema-local.mjs",
     "db:restore:local": "node scripts/restore-backup-local.mjs",
     "db:apply:cloud": "node scripts/apply-schema-cloud.mjs",
+    "db:apply:buscar-boleta": "node scripts/apply-buscar-boleta-perf.mjs",
+    "db:apply:buscar-boleta:management": "node scripts/apply-buscar-boleta-management.mjs",
     "db:apply:management": "node scripts/apply-schema-management.mjs",
     "db:migrate:cloud": "node scripts/migrate-data-cloud.mjs",
     "db:migrate:full": "node scripts/run-full-migration.mjs",
