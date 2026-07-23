@@ -4,7 +4,6 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
 export const ENTREGA_EMAIL_ASUNTO = 'Confirmación de entrega — Nuestra Señora de la Asunción';
 
@@ -17,7 +16,6 @@ const CUERPO_PARRAFOS = [
   'Aguardamos con entusiasmo este 15 de agosto para caminar juntos.',
 ];
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 let imagenEntregaCache = null;
 
 function escapeHtml(value) {
@@ -41,7 +39,7 @@ export function urlImagenEntregaEmail() {
 function cargarImagenEntrega() {
   if (imagenEntregaCache) return imagenEntregaCache;
   const rutas = [
-    path.join(__dirname, 'assets', 'asuncion-entrega.png'),
+    path.join(process.cwd(), 'api', '_lib', 'assets', 'asuncion-entrega.png'),
     path.join(process.cwd(), 'public', 'email', 'asuncion-entrega.png'),
   ];
   for (const ruta of rutas) {

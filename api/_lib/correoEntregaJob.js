@@ -389,8 +389,13 @@ export function programarCorreoEntregaEnBackground(waitUntil, admin, organizacio
   })();
 
   if (typeof waitUntil === 'function') {
-    waitUntil(tarea);
-  } else {
-    tarea.catch((err) => console.error('[correoEntregaJob] fire-and-forget error:', err));
+    try {
+      waitUntil(tarea);
+      return;
+    } catch (err) {
+      console.error('[correoEntregaJob] waitUntil error:', err?.message || err);
+    }
   }
+
+  tarea.catch((err) => console.error('[correoEntregaJob] fire-and-forget error:', err));
 }
