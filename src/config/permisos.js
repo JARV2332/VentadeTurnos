@@ -14,6 +14,13 @@ export const PANTALLAS = [
   { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: '◫', grupo: 'Operación' },
   { id: 'taquilla', label: 'Taquilla', path: '/taquilla', icon: '▦', grupo: 'Operación' },
   { id: 'entrega', label: 'Entrega turnos', path: '/entrega', icon: '⎔', grupo: 'Operación' },
+  {
+    id: 'ajuste_entrega',
+    label: 'Ajuste de entregas',
+    path: '/ajuste-entrega',
+    icon: '↺',
+    grupo: 'Operación',
+  },
   { id: 'caja', label: 'Caja', path: '/caja', icon: '◈', grupo: 'Reportes' },
   { id: 'impresion', label: 'Impresión', path: '/impresion', icon: '▣', grupo: 'Reportes' },
   { id: 'devotos', label: 'Devotos', path: '/devotos', icon: '👤', grupo: 'Operación' },
@@ -99,17 +106,23 @@ export const PLANTILLAS_ROL = {
   },
   coordinacion: {
     nombre: 'Coordinación',
-    descripcion: 'Dashboard, reportes, apartados y consultas operativas.',
+    descripcion: 'Dashboard, reportes, apartados, ajuste de entregas y consultas operativas.',
     permisos: [
       'dashboard',
       'consulta_turnos',
       'listado_turnos',
       'disponibilidad_turnos',
       'apartados_pendientes',
+      'ajuste_entrega',
       'caja',
       'impresion',
       'devotos',
     ],
+  },
+  supervisor_entrega: {
+    nombre: 'Supervisor de entrega',
+    descripcion: 'Entrega en taquilla y corrección de estados registrados por error.',
+    permisos: ['entrega', 'ajuste_entrega', 'consulta_turnos', 'impresion'],
   },
 };
 

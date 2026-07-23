@@ -4,12 +4,10 @@ import BoletaCard from '../components/BoletaCard';
 import QrScanner from '../components/QrScanner';
 import StatusBadge from '../components/StatusBadge';
 import EntregaConfirmForm, { textoEstadoEntrega } from '../components/EntregaConfirmForm';
-import EntregaEstadoMenu from '../components/EntregaEstadoMenu';
 import { useAuth } from '../context/AuthContext';
 import {
   buscarBoletaPorCodigo,
   marcarEntregado,
-  revertirEntregaBrazo,
 } from '../services/dataService';
 import { enviarCorreoEntregaConfirmada } from '../services/emailService';
 import { extraerCodigoBoleta } from '../utils/boletaUtils';
@@ -23,7 +21,6 @@ export default function EntregaTurno() {
   const [okMsg, setOkMsg] = useState('');
   const [scannerOn, setScannerOn] = useState(true);
   const [entregandoId, setEntregandoId] = useState(null);
-  const [revirtiendoId, setRevirtiendoId] = useState(null);
 
   const [esTercero, setEsTercero] = useState(false);
   const [receptorNombre, setReceptorNombre] = useState('');
@@ -130,29 +127,6 @@ export default function EntregaTurno() {
     });
   };
 
-  const handleRevertirPendiente = async () => {
-    const brazoId = resultado?.brazo?.id;
-    if (!brazoId) return;
-
-    setError('');
-    setRevirtiendoId(brazoId);
-    const res = await revertirEntregaBrazo(brazoId, organizacionId);
-    setRevirtiendoId(null);
-
-    if (res.error) {
-      setError(res.error);
-      return;
-    }
-
-    setOkMsg('Turno marcado como pendiente de entrega. Puede volver a confirmar la entrega.');
-    setResultado({
-      ...resultado,
-      brazo: res.data,
-    });
-    setEsTercero(false);
-    setReceptorNombre('');
-  };
-
   const yaEntregado = resultado?.brazo?.estado_entrega === 'entregado';
   const estadoEntregaTxt = textoEstadoEntrega(resultado?.brazo);
 
@@ -220,13 +194,6 @@ export default function EntregaTurno() {
                 showEntrega
               />
 
-              <EntregaEstadoMenu
-                brazo={resultado.brazo}
-                onRevertirPendiente={handleRevertirPendiente}
-                loading={revirtiendoId === resultado.brazo.id}
-                disabled={Boolean(entregandoId || revirtiendoId)}
-              />
-
               {!yaEntregado ? (
                 <EntregaConfirmForm
                   cargador={resultado.cargador}
@@ -238,9 +205,14 @@ export default function EntregaTurno() {
                   onEnviarCorreoChange={setEnviarCorreo}
                   onSubmit={handleEntregar}
                   loading={entregandoId === resultado.brazo.id}
-                  disabled={Boolean(entregandoId || revirtiendoId)}
+                  disabled={Boolean(entregandoId)}
                 />
-              ) : null}
+              ) : (
+                <div className="info-box info-box--compact">
+                  Turno ya entregado. Si fue un error, un supervisor puede corregirlo en{' '}
+                  <strong>Ajuste de entregas</strong>.
+                </div>
+              )}
             </>
           )}
         </section>

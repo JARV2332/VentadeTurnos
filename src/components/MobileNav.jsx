@@ -8,6 +8,7 @@ const LABEL_CORTO = {
   dashboard: 'Inicio',
   taquilla: 'Taquilla',
   entrega: 'Entrega',
+  ajuste_entrega: 'Ajuste',
   caja: 'Caja',
   impresion: 'Imprimir',
   devotos: 'Devotos',

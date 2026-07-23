@@ -17,6 +17,7 @@ import CajaSaaS from './views/CajaSaaS';
 import Impresion from './views/Impresion';
 import Devotos from './views/Devotos';
 import EntregaTurno from './views/EntregaTurno';
+import AjusteEntrega from './views/AjusteEntrega';
 import PerfilUsuario from './views/PerfilUsuario';
 import PlataformaAdmin from './views/PlataformaAdmin';
 import BoletaPublica from './views/BoletaPublica';
@@ -114,6 +115,14 @@ function App() {
             element={
               <PrivateRoute permission="entrega">
                 <EntregaTurno />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/ajuste-entrega"
+            element={
+              <PrivateRoute permission="ajuste_entrega">
+                <AjusteEntrega />
               </PrivateRoute>
             }
           />

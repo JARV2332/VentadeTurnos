@@ -57,7 +57,7 @@ export default function EntregaEstadoMenu({
 
       {!entregado && (
         <p className="entrega-estado-menu__hint text-muted">
-          Use el formulario abajo para confirmar la entrega.
+          Este turno ya está pendiente. Confirme la entrega en la pantalla Entrega turnos.
         </p>
       )}
 
