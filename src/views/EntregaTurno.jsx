@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   buscarBoletaPorCodigo,
   marcarEntregado,
+  getCargadorById,
 } from '../services/dataService';
 import { enviarCorreoEntregaConfirmada } from '../services/emailService';
 import { extraerCodigoBoleta } from '../utils/boletaUtils';
@@ -19,6 +20,7 @@ export default function EntregaTurno() {
   const [resultado, setResultado] = useState(null);
   const [error, setError] = useState('');
   const [okMsg, setOkMsg] = useState('');
+  const [avisoCorreoMsg, setAvisoCorreoMsg] = useState('');
   const [scannerOn, setScannerOn] = useState(true);
   const [entregandoId, setEntregandoId] = useState(null);
 
@@ -41,6 +43,7 @@ export default function EntregaTurno() {
   const buscar = useCallback(async (texto) => {
     setError('');
     setOkMsg('');
+    setAvisoCorreoMsg('');
     const codigo = extraerCodigoBoleta(texto);
     if (!codigo) {
       setError('Código QR no válido.');
@@ -73,6 +76,8 @@ export default function EntregaTurno() {
     }
 
     setError('');
+    setOkMsg('');
+    setAvisoCorreoMsg('');
     setEntregandoId(brazoId);
 
     const opts = {
@@ -88,25 +93,34 @@ export default function EntregaTurno() {
     }
 
     const brazoActualizado = res.data;
-    const cargador = resultado?.cargador;
+    let cargador = resultado?.cargador;
+    if (!cargador?.correo?.trim() && brazoActualizado?.cargador_id) {
+      cargador = (await getCargadorById(brazoActualizado.cargador_id)) || cargador;
+    }
 
-    let avisoCorreo = '';
-    if (enviarCorreo && cargador?.correo?.trim()) {
-      const mail = await enviarCorreoEntregaConfirmada({
-        organizacionId,
-        organizacion,
-        cargador,
-        brazo: brazoActualizado,
-        turno: resultado?.turno,
-        cortejo: resultado?.cortejo,
-        entregado_a_tercero: esTercero,
-        entregado_receptor_nombre: opts.entregado_receptor_nombre,
-        entregado_en: brazoActualizado?.entregado_en,
-      });
-      if (mail.ok) {
-        avisoCorreo = ` Correo enviado a ${mail.destinatario}.`;
-      } else if (!mail.omitido) {
-        avisoCorreo = ` (Correo: ${mail.error || 'no enviado'})`;
+    if (enviarCorreo) {
+      if (!cargador?.correo?.trim()) {
+        setAvisoCorreoMsg('No se envió correo: el devoto(a) no tiene email registrado.');
+      } else {
+        const mail = await enviarCorreoEntregaConfirmada({
+          organizacionId,
+          organizacion,
+          cargador,
+          brazo: brazoActualizado,
+          turno: resultado?.turno,
+          cortejo: resultado?.cortejo,
+          entregado_a_tercero: esTercero,
+          entregado_receptor_nombre: opts.entregado_receptor_nombre,
+          entregado_en: brazoActualizado?.entregado_en,
+          forzarEnvio: true,
+        });
+        if (mail.ok) {
+          setAvisoCorreoMsg(`Correo de confirmación enviado a ${mail.destinatario}.`);
+        } else if (mail.omitido) {
+          setAvisoCorreoMsg(mail.motivo || 'Correo omitido por configuración.');
+        } else {
+          setAvisoCorreoMsg(mail.error || 'No se pudo enviar el correo de confirmación.');
+        }
       }
     }
 
@@ -115,10 +129,10 @@ export default function EntregaTurno() {
     const nombre = cargador?.nombre_completo || 'devoto(a)';
     if (esTercero) {
       setOkMsg(
-        `Turno entregado a ${receptorNombre.trim()} (tercero), titular ${nombre}.${avisoCorreo}`
+        `Turno entregado a ${receptorNombre.trim()} (tercero), titular ${nombre}.`
       );
     } else {
-      setOkMsg(`Turno entregado a ${nombre}.${avisoCorreo}`);
+      setOkMsg(`Turno entregado a ${nombre}.`);
     }
 
     setResultado({
@@ -136,6 +150,13 @@ export default function EntregaTurno() {
       subtitle="Escanee el QR o ingrese el código para validar y entregar"
     >
       {okMsg && <div className="alert alert--success">{okMsg}</div>}
+      {avisoCorreoMsg && (
+        <div
+          className={`alert ${avisoCorreoMsg.includes('enviado a') ? 'alert--success' : 'alert--warning'}`}
+        >
+          {avisoCorreoMsg}
+        </div>
+      )}
       {error && <div className="alert alert--error">{error}</div>}
 
       <div className="entrega-layout entrega-layout--solo">

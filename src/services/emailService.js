@@ -290,10 +290,11 @@ export async function enviarCorreoEntregaConfirmada({
   entregado_a_tercero,
   entregado_receptor_nombre,
   entregado_en,
+  forzarEnvio = true,
 }) {
   const emailConfig = await getEmailConfig(organizacionId);
 
-  if (!emailConfig?.notificaciones_activas) {
+  if (!forzarEnvio && !emailConfig?.notificaciones_activas) {
     return { ok: false, omitido: true, motivo: 'Notificaciones por correo desactivadas' };
   }
 
