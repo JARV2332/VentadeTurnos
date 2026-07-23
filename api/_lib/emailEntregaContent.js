@@ -16,7 +16,6 @@ function escapeHtml(value) {
  *   nombreCompleto: string,
  *   evento: string,
  *   turnoTxt: string,
- *   brazoTxt: string,
  *   fechaEntrega: string,
  *   entregado_a_tercero?: boolean,
  *   entregado_receptor_nombre?: string,
@@ -28,7 +27,6 @@ export function buildEntregaEmailContent({
   nombreCompleto,
   evento,
   turnoTxt,
-  brazoTxt,
   fechaEntrega,
   entregado_a_tercero,
   entregado_receptor_nombre,
@@ -78,10 +76,6 @@ export function buildEntregaEmailContent({
                 <tr>
                   <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:13px;width:38%;">Turno</td>
                   <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-size:14px;font-weight:600;">${escapeHtml(turnoTxt)}</td>
-                </tr>
-                <tr>
-                  <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:13px;">Brazo</td>
-                  <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-size:14px;font-weight:600;">${escapeHtml(brazoTxt)}</td>
                 </tr>
                 ${filaReceptor}
                 <tr>

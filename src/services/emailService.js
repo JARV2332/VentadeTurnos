@@ -322,7 +322,6 @@ export async function enviarCorreoEntregaConfirmada({
     nombreCompleto: correo.nombreCompleto,
     evento: correo.evento,
     turnoTxt: correo.turnoTxt,
-    brazoTxt: correo.brazoTxt,
     fechaEntrega: correo.fechaEntrega,
     entregado_a_tercero,
     entregado_receptor_nombre,

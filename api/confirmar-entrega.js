@@ -33,12 +33,6 @@ function labelTurno(turno, brazo) {
   return honor ? `Turno #${num} (${honor})` : `Turno #${num}`;
 }
 
-function labelBrazo(brazo) {
-  if (!brazo) return '—';
-  const lado = brazo.lado ? ` ${String(brazo.lado).charAt(0).toUpperCase()}` : '';
-  return `Brazo ${brazo.numero_brazo}${lado}`.trim();
-}
-
 function formatFechaHoraEntrega(iso) {
   if (!iso) return '—';
   try {
@@ -161,14 +155,10 @@ export default async function handler(req, res) {
     const destinatario = cargador?.correo?.trim().toLowerCase() || '';
     const advertencia = advertirEmail(destinatario);
     const n = brazosEntregados.length;
-    const detalleBrazos = brazosEntregados
-      .map((b) => labelBrazo(b))
-      .join(', ');
     const turnoTxt =
       n > 1
         ? `${n} turnos — ${labelTurno(turno, brazo)}`
         : labelTurno(turno, brazo);
-    const brazoTxt = n > 1 ? detalleBrazos : labelBrazo(brazo);
     const fechaEntrega = formatFechaHoraEntrega(brazosEntregados[brazosEntregados.length - 1]?.entregado_en);
     const evento = cortejo?.nombre_evento || 'la procesión';
     const nombreOrg = org?.nombre_oficial || emailConfig?.nombre_remitente || '';
@@ -201,7 +191,6 @@ export default async function handler(req, res) {
           nombreCompleto: cargador.nombre_completo?.trim() || 'Devoto(a)',
           evento,
           turnoTxt,
-          brazoTxt,
           fechaEntrega,
           entregado_a_tercero: esTercero,
           entregado_receptor_nombre: esTercero ? receptor : null,
@@ -216,11 +205,11 @@ export default async function handler(req, res) {
         const textoPlano =
           n > 1
             ? esTercero
-              ? `Confirmación de entrega de ${n} turnos (${detalleBrazos}) a ${receptor} (tercero). Fecha: ${fechaEntrega}.`
-              : `Confirmación de entrega de ${n} turnos (${detalleBrazos}). Fecha: ${fechaEntrega}.`
+              ? `Confirmación de entrega de ${turnoTxt} a ${receptor} (tercero). Fecha: ${fechaEntrega}.`
+              : `Confirmación de entrega de ${turnoTxt}. Fecha: ${fechaEntrega}.`
             : esTercero
-              ? `Confirmación de entrega de ${turnoTxt} (${brazoTxt}) a ${receptor} (tercero). Fecha: ${fechaEntrega}.`
-              : `Confirmación de entrega de ${turnoTxt} (${brazoTxt}). Fecha: ${fechaEntrega}.`;
+              ? `Confirmación de entrega de ${turnoTxt} a ${receptor} (tercero). Fecha: ${fechaEntrega}.`
+              : `Confirmación de entrega de ${turnoTxt}. Fecha: ${fechaEntrega}.`;
 
         try {
           const transporter = createTransporter(creds.user, creds.pass);

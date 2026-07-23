@@ -22,12 +22,6 @@ function labelTurno(turno, brazo) {
   return honor ? `Turno #${num} (${honor})` : `Turno #${num}`;
 }
 
-function labelBrazo(brazo) {
-  if (!brazo) return '—';
-  const lado = brazo.lado ? ` ${String(brazo.lado).charAt(0).toUpperCase()}` : '';
-  return `Brazo ${brazo.numero_brazo}${lado}`.trim();
-}
-
 /**
  * Texto plano del correo de confirmación de entrega física.
  */
@@ -47,7 +41,6 @@ export function construirCorreoEntrega({
   const fechaProcesion = formatFechaDiaMes(cortejo?.fecha);
   const fechaEntrega = formatFechaHoraEntrega(entregado_en || new Date().toISOString());
   const turnoTxt = labelTurno(turno, brazo);
-  const brazoTxt = labelBrazo(brazo);
   const org = organizacion?.nombre_oficial?.trim() || 'Organización';
 
   const asunto = `Confirmación de entrega — ${turnoTxt}`;
@@ -61,7 +54,6 @@ export function construirCorreoEntrega({
       `Le confirmamos que su turno de ${evento}${fechaProcesion ? ` (${fechaProcesion})` : ''} fue entregado en físico.`,
       '',
       `• ${turnoTxt}`,
-      `• ${brazoTxt}`,
       `• Entregado a: ${receptor} (tercero autorizado)`,
       `• Fecha y hora: ${fechaEntrega}`,
       '',
@@ -77,7 +69,6 @@ export function construirCorreoEntrega({
       `Le confirmamos que su turno de ${evento}${fechaProcesion ? ` (${fechaProcesion})` : ''} fue entregado en físico.`,
       '',
       `• ${turnoTxt}`,
-      `• ${brazoTxt}`,
       `• Entregado personalmente a usted`,
       `• Fecha y hora: ${fechaEntrega}`,
       '',
@@ -88,5 +79,5 @@ export function construirCorreoEntrega({
     ].join('\n');
   }
 
-  return { asunto, cuerpo, primerNombre, nombreCompleto, turnoTxt, brazoTxt, fechaEntrega, evento };
+  return { asunto, cuerpo, primerNombre, nombreCompleto, turnoTxt, fechaEntrega, evento };
 }
