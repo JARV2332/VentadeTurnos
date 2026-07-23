@@ -4985,6 +4985,17 @@ html {
   cursor: not-allowed;
 }
 
+.entrega-form__warn {
+  margin: 0.35rem 0 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+}
+
 .entrega-form__field {
   display: block;
   margin: 0 0 0.75rem 1.5rem;

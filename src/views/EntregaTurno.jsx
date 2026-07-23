@@ -7,9 +7,10 @@ import EntregaConfirmForm, { textoEstadoEntrega } from '../components/EntregaCon
 import { useAuth } from '../context/AuthContext';
 import {
   buscarBoletaPorCodigo,
-  marcarEntregado,
   getCargadorById,
+  marcarEntregado,
 } from '../services/dataService';
+import { confirmarEntregaServidor } from '../services/entregaApi';
 import { enviarCorreoEntregaConfirmada } from '../services/emailService';
 import { extraerCodigoBoleta } from '../utils/boletaUtils';
 
@@ -85,24 +86,33 @@ export default function EntregaTurno() {
       entregado_receptor_nombre: esTercero ? receptorNombre.trim() : null,
     };
 
-    const res = await marcarEntregado(brazoId, organizacionId, user?.authUserId || user?.id, opts);
-    if (res.error) {
-      setEntregandoId(null);
-      setError(res.error);
-      return;
-    }
+    const quiereCorreo = enviarCorreo && Boolean(resultado?.cargador?.correo?.trim());
 
-    const brazoActualizado = res.data;
-    let cargador = resultado?.cargador;
-    if (!cargador?.correo?.trim() && brazoActualizado?.cargador_id) {
-      cargador = (await getCargadorById(brazoActualizado.cargador_id)) || cargador;
-    }
+    const resApi = await confirmarEntregaServidor({
+      organizacionId,
+      brazoId,
+      entregado_a_tercero: esTercero,
+      entregado_receptor_nombre: opts.entregado_receptor_nombre,
+      enviarCorreo: quiereCorreo,
+    });
 
-    if (enviarCorreo) {
-      if (!cargador?.correo?.trim()) {
-        setAvisoCorreoMsg('No se envió correo: el devoto(a) no tiene email registrado.');
-      } else {
-        const mail = await enviarCorreoEntregaConfirmada({
+    let brazoActualizado;
+    let correoResult = null;
+
+    if (resApi.error && resApi.error.includes('API de entrega no configurada')) {
+      const res = await marcarEntregado(brazoId, organizacionId, user?.authUserId || user?.id, opts);
+      if (res.error) {
+        setEntregandoId(null);
+        setError(res.error);
+        return;
+      }
+      brazoActualizado = res.data;
+      if (quiereCorreo) {
+        let cargador = resultado?.cargador;
+        if (!cargador?.correo?.trim() && brazoActualizado?.cargador_id) {
+          cargador = (await getCargadorById(brazoActualizado.cargador_id)) || cargador;
+        }
+        correoResult = await enviarCorreoEntregaConfirmada({
           organizacionId,
           organizacion,
           cargador,
@@ -114,17 +124,38 @@ export default function EntregaTurno() {
           entregado_en: brazoActualizado?.entregado_en,
           forzarEnvio: true,
         });
-        if (mail.ok) {
-          setAvisoCorreoMsg(`Correo de confirmación enviado a ${mail.destinatario}.`);
-        } else if (mail.omitido) {
-          setAvisoCorreoMsg(mail.motivo || 'Correo omitido por configuración.');
-        } else {
-          setAvisoCorreoMsg(mail.error || 'No se pudo enviar el correo de confirmación.');
-        }
       }
+    } else if (resApi.error) {
+      setEntregandoId(null);
+      setError(resApi.error);
+      return;
+    } else {
+      brazoActualizado = resApi.data;
+      correoResult = resApi.correo;
+    }
+
+    if (quiereCorreo && correoResult) {
+      if (correoResult.ok) {
+        let msg = `Correo de confirmación enviado a ${correoResult.destinatario}.`;
+        if (correoResult.advertencia) msg += ` ${correoResult.advertencia}`;
+        setAvisoCorreoMsg(msg);
+      } else if (correoResult.omitido) {
+        setAvisoCorreoMsg(correoResult.motivo || 'Correo omitido.');
+      } else {
+        let msg = correoResult.error || 'No se pudo enviar el correo de confirmación.';
+        if (correoResult.advertencia) msg += ` ${correoResult.advertencia}`;
+        setAvisoCorreoMsg(msg);
+      }
+    } else if (quiereCorreo && !correoResult) {
+      setAvisoCorreoMsg('No se envió correo: el devoto(a) no tiene email registrado.');
     }
 
     setEntregandoId(null);
+
+    let cargador = resultado?.cargador;
+    if (!cargador?.correo?.trim() && brazoActualizado?.cargador_id) {
+      cargador = (await getCargadorById(brazoActualizado.cargador_id)) || cargador;
+    }
 
     const nombre = cargador?.nombre_completo || 'devoto(a)';
     if (esTercero) {
@@ -152,7 +183,7 @@ export default function EntregaTurno() {
       {okMsg && <div className="alert alert--success">{okMsg}</div>}
       {avisoCorreoMsg && (
         <div
-          className={`alert ${avisoCorreoMsg.includes('enviado a') ? 'alert--success' : 'alert--warning'}`}
+          className={`alert ${avisoCorreoMsg.includes('enviado a') && !avisoCorreoMsg.includes('parece') && !avisoCorreoMsg.includes('error') ? 'alert--success' : 'alert--warning'}`}
         >
           {avisoCorreoMsg}
         </div>

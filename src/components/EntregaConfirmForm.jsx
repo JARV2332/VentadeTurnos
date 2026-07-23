@@ -1,4 +1,5 @@
 import React from 'react';
+import { advertirTypoCorreo } from '../utils/emailValidation';
 
 /**
  * Formulario compacto: entrega directa o a tercero + opción de correo al devoto.
@@ -16,6 +17,7 @@ export default function EntregaConfirmForm({
   disabled,
 }) {
   const tieneCorreo = Boolean(cargador?.correo?.trim());
+  const avisoTypo = tieneCorreo ? advertirTypoCorreo(cargador.correo) : null;
 
   return (
     <form
@@ -70,6 +72,12 @@ export default function EntregaConfirmForm({
             </small>
           </span>
         </label>
+
+        {avisoTypo && (
+          <p className="entrega-form__warn" role="alert">
+            {avisoTypo}
+          </p>
+        )}
       </fieldset>
 
       <button
