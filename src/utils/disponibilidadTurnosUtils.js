@@ -2,27 +2,42 @@ import * as XLSX from 'xlsx';
 import { labelTipoTurno, formatQ } from './cajaReportUtils';
 import { formatHoraDisplay } from './turnoHorarioUtils';
 import { etiquetaHonorTurno, textoMelodiaTurno } from './turnoUtils';
+import { esReservaTaquillaExpirada } from './reservasTaquillaUtils';
 
 function brazosDeTurno(turno) {
   return [...(turno?.izquierda || []), ...(turno?.derecha || [])];
 }
 
+/** Libre para venta: disponible o reserva de taquilla ya vencida (igual que Taquilla). */
+export function esBrazoLibreParaVenta(brazo) {
+  if (!brazo) return false;
+  if (brazo.estado === 'disponible') return true;
+  return esReservaTaquillaExpirada(brazo);
+}
+
 export function contarBrazosTurno(turno) {
   const brazos = brazosDeTurno(turno);
-  const disponibles = brazos.filter((b) => b.estado === 'disponible');
+  const disponibles = brazos.filter(esBrazoLibreParaVenta);
   const vendidos = brazos.filter((b) => b.estado === 'vendido');
   const apartados = brazos.filter((b) => b.estado === 'reservado' && b.reserva_apartado);
   const reservaTaquilla = brazos.filter(
-    (b) => b.estado === 'reservado' && !b.reserva_apartado
+    (b) => b.estado === 'reservado' && !b.reserva_apartado && !esReservaTaquillaExpirada(b)
   );
 
+  // Si faltan filas de brazos vs total_brazos, esos huecos también son libres.
+  const totalConfigurado = Number(turno?.total_brazos) || 0;
+  const total = Math.max(brazos.length, totalConfigurado);
+  const ocupadosContados = vendidos.length + apartados.length + reservaTaquilla.length;
+  const libresPorHuecos = Math.max(0, total - ocupadosContados);
+  const libres = Math.max(disponibles.length, libresPorHuecos);
+
   return {
-    total: brazos.length,
-    disponibles: disponibles.length,
+    total,
+    disponibles: libres,
     vendidos: vendidos.length,
     apartados: apartados.length,
     reservaTaquilla: reservaTaquilla.length,
-    ocupados: brazos.length - disponibles.length,
+    ocupados: Math.max(0, total - libres),
   };
 }
 

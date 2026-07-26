@@ -99,6 +99,14 @@ export default function DisponibilidadTurnos() {
     [filas]
   );
 
+  // Todos los turnos con libres (sin filtro de tipo/número) para no ocultar casos como el #55.
+  const filasDisponiblesReporte = useMemo(() => {
+    const base = construirReporteDisponibilidad(turnosAgrupados, {
+      soloConDisponibles: true,
+    });
+    return base;
+  }, [turnosAgrupados]);
+
   const columnasActivas = useMemo(() => columnasActivasOrdenadas(columnas), [columnas]);
   const hayColumnas = columnasActivas.length > 0;
 
@@ -236,12 +244,14 @@ export default function DisponibilidadTurnos() {
             className="btn btn--primary btn--sm"
             onClick={() =>
               exportTurnosDisponiblesBonito({
-                ...exportarBase(),
-                soloConLibres: true,
+                filas: filasDisponiblesReporte,
+                cortejoNombre: cortejoSel?.nombre_evento,
+                orgNombre: organizacion?.nombre_oficial,
+                soloConLibres: false,
                 columnas,
               })
             }
-            disabled={!filasDisponibles.length || !hayColumnas}
+            disabled={!filasDisponiblesReporte.length || !hayColumnas}
           >
             Imprimir turnos disponibles
           </button>
@@ -251,6 +261,10 @@ export default function DisponibilidadTurnos() {
             Seleccione al menos una columna para poder imprimir.
           </p>
         )}
+        <p className="text-muted config-hint" style={{ marginTop: '0.5rem' }}>
+          El cuadro e impresión incluyen todos los turnos de la procesión con al menos un brazo
+          libre (incluye reservas de taquilla vencidas).
+        </p>
       </section>
 
       {error && <div className="alert alert--error">{error}</div>}
@@ -292,7 +306,7 @@ export default function DisponibilidadTurnos() {
         </section>
       ) : (
         <>
-          {filasDisponibles.length > 0 && hayColumnas && (
+          {filasDisponiblesReporte.length > 0 && hayColumnas && (
             <section className="panel turnos-disponibles-cuadro">
               <header className="turnos-disponibles-cuadro__head">
                 <p className="turnos-disponibles-cuadro__eyebrow">
@@ -313,7 +327,7 @@ export default function DisponibilidadTurnos() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filasDisponibles.map((f) => (
+                    {filasDisponiblesReporte.map((f) => (
                       <tr key={`disp-${f.turno.id}`}>
                         {columnasActivas.map((col) => {
                           const valor = celdaReporteDisponible(f, col.id);
@@ -342,8 +356,8 @@ export default function DisponibilidadTurnos() {
                 </table>
               </div>
               <p className="turnos-disponibles-cuadro__foot">
-                {filasDisponibles.length} turno
-                {filasDisponibles.length === 1 ? '' : 's'} con espacio libre
+                {filasDisponiblesReporte.length} turno
+                {filasDisponiblesReporte.length === 1 ? '' : 's'} con espacio libre
               </p>
             </section>
           )}
