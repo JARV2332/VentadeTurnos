@@ -22,7 +22,7 @@ export const DEFAULT_RECIBO_CONFIG = {
   mostrar_codigo_texto: true,
   mensaje_qr: 'Presente este QR para retirar su turno',
   pie_texto: '',
-  color_primario: '#6366f1',
+  color_primario: '#1d4ed8',
   tamano_fuente: 'normal',
   editor_visual: true,
   /* Contraseña formal (media carta — estilo inscripción) */

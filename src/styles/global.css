@@ -3581,13 +3581,23 @@ html {
 
 /* Contraseña de turno (impresión formal — media carta horizontal) */
 .boleta-contraseña {
+  --boleta-ink: #1e3a8a;
+  --boleta-ink-soft: #1d4ed8;
+  --boleta-muted: #3b82f6;
+  --boleta-line: #93c5fd;
+  --boleta-line-soft: #bfdbfe;
+  --boleta-wash: #eff6ff;
+  --boleta-wash-strong: #dbeafe;
+  --boleta-primary: #1d4ed8;
   margin: 0 auto;
   background: #fff;
-  border: 2px solid #cbd5e1;
+  border: 2px solid var(--boleta-line);
   border-radius: 10px;
-  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
-  color: #1e293b;
+  box-shadow: 0 4px 24px rgba(30, 58, 138, 0.1);
+  color: var(--boleta-ink);
   box-sizing: border-box;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 .boleta-contraseña--media-carta {
@@ -3603,7 +3613,7 @@ html {
 /* Contraseña formal — estilo inscripción procesional */
 .boleta-contraseña--formal {
   font-family: 'Times New Roman', Times, Georgia, serif;
-  border: 1px solid #94a3b8;
+  border: 1.5px solid var(--boleta-ink-soft);
   box-shadow: none;
   gap: 0.35rem;
 }
@@ -3614,14 +3624,14 @@ html {
   gap: 0.65rem;
   align-items: start;
   padding-bottom: 0.45rem;
-  border-bottom: 1px solid #cbd5e1;
+  border-bottom: 1.5px solid var(--boleta-line);
 }
 
 .boleta-formal__saludo-devoto {
   margin: 0 0 0.2rem;
   font-size: 0.68rem;
   font-style: italic;
-  color: #475569;
+  color: var(--boleta-muted);
   line-height: 1.35;
 }
 
@@ -3636,6 +3646,7 @@ html {
   text-transform: uppercase;
   letter-spacing: 0.02em;
   line-height: 1.25;
+  color: var(--boleta-ink);
 }
 
 .boleta-formal__pastoral,
@@ -3644,7 +3655,7 @@ html {
   margin: 0.12rem 0 0;
   font-size: 0.72rem;
   line-height: 1.35;
-  color: #334155;
+  color: var(--boleta-ink-soft);
 }
 
 .boleta-formal__inscripcion {
@@ -3667,7 +3678,7 @@ html {
 .boleta-formal__qr-mini {
   line-height: 0;
   padding: 2px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--boleta-line);
   border-radius: 4px;
   background: #fff;
 }
@@ -3678,7 +3689,7 @@ html {
   align-items: flex-start;
   gap: 1rem;
   padding: 0.35rem 0 0.25rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--boleta-line-soft);
 }
 
 .boleta-formal__devoto-nombre strong {
@@ -3687,7 +3698,7 @@ html {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.02em;
-  color: #0f172a;
+  color: var(--boleta-ink);
 }
 
 .boleta-formal__dpi {
@@ -3698,7 +3709,7 @@ html {
 .boleta-formal__dpi span,
 .boleta-formal__boleta-nums span {
   font-weight: 600;
-  color: #64748b;
+  color: var(--boleta-muted);
 }
 
 .boleta-formal__boleta-nums {
@@ -3716,7 +3727,7 @@ html {
   font-size: 0.78rem;
   font-style: italic;
   line-height: 1.45;
-  color: #334155;
+  color: var(--boleta-ink-soft);
 }
 
 .boleta-formal__cuerpo {
@@ -3742,28 +3753,31 @@ html {
 .boleta-formal__honor span,
 .boleta-formal__melodia span {
   font-weight: 600;
-  color: #64748b;
+  color: var(--boleta-muted);
 }
 
 .boleta-formal__honor strong {
   font-size: 0.88rem;
   letter-spacing: 0.04em;
+  color: var(--boleta-ink);
 }
 
 .boleta-formal__precio-caja {
   flex-shrink: 0;
   min-width: 6.5rem;
   padding: 0.45rem 0.65rem;
-  background: #e2e8f0;
-  border: 1px solid #94a3b8;
+  background: var(--boleta-wash-strong);
+  border: 1px solid var(--boleta-ink-soft);
   text-align: center;
   font-size: 0.72rem;
+  color: var(--boleta-ink);
 }
 
 .boleta-formal__precio-caja strong {
   display: block;
   font-size: 1rem;
   margin-top: 0.15rem;
+  color: var(--boleta-ink);
 }
 
 .boleta-formal__seccion-label {
@@ -3771,7 +3785,7 @@ html {
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--boleta-muted);
 }
 
 .boleta-turnos-tabla--formal {
@@ -3933,7 +3947,7 @@ html {
   text-align: center;
   font-size: 0.75rem;
   font-style: italic;
-  color: #475569;
+  color: var(--boleta-ink-soft);
 }
 
 .boleta-formal__pie {
@@ -3942,10 +3956,11 @@ html {
   gap: 0.65rem;
   margin-top: auto;
   padding: 0.55rem 0.65rem;
-  background: #e2e8f0;
-  border: 1px solid #94a3b8;
+  background: var(--boleta-wash-strong);
+  border: 1px solid var(--boleta-ink-soft);
   font-size: 0.68rem;
   line-height: 1.4;
+  color: var(--boleta-ink);
 }
 
 .boleta-formal__uniformidad strong {
@@ -3953,6 +3968,7 @@ html {
   margin-bottom: 0.15rem;
   font-size: 0.7rem;
   text-transform: uppercase;
+  color: var(--boleta-ink);
 }
 
 .boleta-formal__uniformidad p,
@@ -3961,29 +3977,33 @@ html {
 }
 
 .boleta-formal__entrega {
-  border-left: 1px solid #94a3b8;
+  border-left: 1px solid var(--boleta-ink-soft);
   padding-left: 0.55rem;
+}
+
+.boleta-formal__entrega strong {
+  color: var(--boleta-ink);
 }
 
 .boleta-formal__nota-extra {
   margin: 0.25rem 0 0;
   font-size: 0.65rem;
   text-align: center;
-  color: #64748b;
+  color: var(--boleta-muted);
 }
 
 .boleta-formal__operador {
   margin: 0.35rem 0 0;
   font-size: 0.58rem;
   text-align: center;
-  color: #94a3b8;
+  color: var(--boleta-muted);
   letter-spacing: 0.01em;
 }
 
 .recibo-preview-stage--formal {
   overflow: auto;
   padding: 0.5rem;
-  background: #f1f5f9;
+  background: var(--boleta-wash, #eff6ff);
 }
 
 .form-row--3 {
@@ -4027,7 +4047,7 @@ html {
   .boleta-formal__entrega {
     border-left: none;
     padding-left: 0;
-    border-top: 1px solid #94a3b8;
+    border-top: 1px solid var(--boleta-ink-soft, #1d4ed8);
     padding-top: 0.45rem;
   }
 }
@@ -4039,7 +4059,7 @@ html {
   gap: 0.75rem;
   padding-bottom: 0.5rem;
   margin-bottom: 0.5rem;
-  border-bottom: 2px solid #e2e8f0;
+  border-bottom: 2px solid var(--boleta-line, #93c5fd);
   flex-shrink: 0;
 }
 
@@ -4076,14 +4096,14 @@ html {
   font-weight: 800;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: #0f172a;
+  color: var(--boleta-ink, #1e3a8a);
   line-height: 1.2;
 }
 
 .boleta-contraseña__evento {
   margin: 0.35rem 0 0;
   font-size: 0.82rem;
-  color: #64748b;
+  color: var(--boleta-muted, #3b82f6);
 }
 
 .boleta-contraseña__seccion {
@@ -4103,10 +4123,10 @@ html {
 }
 
 .boleta-contraseña__caja {
-  border: 1.5px solid #cbd5e1;
+  border: 1.5px solid var(--boleta-line, #93c5fd);
   border-radius: 10px;
   padding: 0.85rem 1rem;
-  background: #f8fafc;
+  background: var(--boleta-wash, #eff6ff);
 }
 
 .boleta-contraseña__cui-box {
@@ -4126,14 +4146,14 @@ html {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #64748b;
+  color: var(--boleta-muted, #3b82f6);
 }
 
 .boleta-contraseña__cui-valor {
   font-size: 0.95rem;
   font-family: Consolas, Monaco, monospace;
   letter-spacing: 0.04em;
-  color: #0f172a;
+  color: var(--boleta-ink, #1e3a8a);
 }
 
 .boleta-contraseña__datos-grid p {
@@ -4149,12 +4169,12 @@ html {
   font-size: 0.68rem;
   font-weight: 600;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--boleta-muted, #3b82f6);
   min-width: 4.5rem;
 }
 
 .boleta-contraseña__datos-grid p strong {
-  color: #0f172a;
+  color: var(--boleta-ink, #1e3a8a);
   font-weight: 600;
 }
 
@@ -4168,20 +4188,22 @@ html {
 .boleta-turnos-tabla th,
 .boleta-turnos-tabla td {
   padding: 0.35rem 0.45rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--boleta-line-soft, #bfdbfe);
   text-align: left;
+  color: var(--boleta-ink, #1e3a8a);
 }
 
 .boleta-turnos-tabla th {
   font-size: 0.65rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #64748b;
+  color: var(--boleta-muted, #3b82f6);
   font-weight: 600;
+  background: var(--boleta-wash, #eff6ff);
 }
 
 .boleta-turnos-tabla tfoot td {
-  border-top: 2px solid #cbd5e1;
+  border-top: 2px solid var(--boleta-ink-soft, #1d4ed8);
   border-bottom: none;
   padding-top: 0.5rem;
 }
@@ -4190,7 +4212,7 @@ html {
   display: block;
   font-size: 0.72rem;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--boleta-ink, #1e3a8a);
 }
 
 .boleta-turnos-tabla__total-label {
@@ -4198,7 +4220,7 @@ html {
   font-weight: 600;
   text-transform: uppercase;
   font-size: 0.68rem;
-  color: #64748b;
+  color: var(--boleta-muted, #3b82f6);
 }
 
 .boleta-turnos-tabla__total-valor {
@@ -4521,14 +4543,16 @@ html {
 
 /* Boleta configurable (térmico / media carta) */
 .boleta-recibo {
-  border: 2px solid var(--border);
+  border: 2px solid #93c5fd;
   border-radius: 12px;
   padding: 1rem;
   margin: 0 auto;
   background: #fff;
   text-align: center;
-  color: #1e293b;
+  color: #1e3a8a;
   box-sizing: border-box;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 .boleta-recibo--termico_58 { max-width: 220px; font-size: 0.8rem; }
@@ -5831,12 +5855,15 @@ html {
   .boleta-card,
   .boleta-recibo,
   .boleta-contraseña {
-    border: 2px solid #94a3b8 !important;
+    border: 2px solid #1d4ed8 !important;
     box-shadow: none !important;
     page-break-inside: avoid;
     break-inside: avoid;
     margin: 0 auto !important;
     background: #fff !important;
+    color: #1e3a8a !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .boleta-contraseña--media-carta,
@@ -5876,8 +5903,19 @@ html {
   }
 
   .boleta-contraseña__caja {
-    background: #f8fafc !important;
-    border-color: #94a3b8 !important;
+    background: #eff6ff !important;
+    border-color: #1d4ed8 !important;
+  }
+
+  .boleta-formal__pie,
+  .boleta-formal__precio-caja {
+    background: #dbeafe !important;
+    border-color: #1d4ed8 !important;
+  }
+
+  .boleta-turnos-tabla th {
+    background: #eff6ff !important;
+    color: #1d4ed8 !important;
   }
 
   .boleta-recibo--termico_58 {

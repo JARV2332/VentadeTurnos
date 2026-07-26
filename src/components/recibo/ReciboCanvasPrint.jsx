@@ -29,7 +29,7 @@ export default function ReciboCanvasPrint({
     <article
       className={`boleta-recibo boleta-recibo--canvas boleta-recibo--${cfg.formato} ${className}`.trim()}
       style={{
-        '--recibo-primary': cfg.color_primario || '#6366f1',
+        '--recibo-primary': cfg.color_primario || '#1d4ed8',
         width: canvas.width * scale,
         minHeight: canvas.height * scale,
       }}

@@ -62,7 +62,7 @@ export default function ReciboCanvasEditor({
         style={{
           width: canvas.width,
           height: canvas.height,
-          '--recibo-primary': cfg.color_primario || '#6366f1',
+          '--recibo-primary': cfg.color_primario || '#1d4ed8',
         }}
         onClick={() => setSelectedId(null)}
       >

@@ -137,7 +137,7 @@ export default function BoletaContraseñaTurno({
                 level="M"
                 includeMargin={false}
                 bgColor="#ffffff"
-                fgColor="#1e293b"
+                fgColor="#1e3a8a"
               />
             </div>
           )}

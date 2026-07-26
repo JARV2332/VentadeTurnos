@@ -242,7 +242,7 @@ export default function BoletaRecibo({
 
         bgColor="#ffffff"
 
-        fgColor="#1e293b"
+        fgColor="#1e3a8a"
 
       />
 
@@ -289,7 +289,7 @@ export default function BoletaRecibo({
 
       className={`boleta-recibo ${formatoClass} ${fontClass} ${alignClass} ${className}`.trim()}
 
-      style={{ '--recibo-primary': cfg.color_primario || '#6366f1' }}
+      style={{ '--recibo-primary': cfg.color_primario || '#1d4ed8' }}
 
       data-formato={cfg.formato}
 
