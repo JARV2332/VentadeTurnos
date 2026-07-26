@@ -94,11 +94,6 @@ export default function DisponibilidadTurnos() {
 
   const resumen = useMemo(() => resumenDisponibilidad(filas), [filas]);
 
-  const filasDisponibles = useMemo(
-    () => filas.filter((f) => f.disponibles > 0),
-    [filas]
-  );
-
   // Todos los turnos con libres (sin filtro de tipo/número) para no ocultar casos como el #55.
   const filasDisponiblesReporte = useMemo(() => {
     const base = construirReporteDisponibilidad(turnosAgrupados, {
