@@ -11,6 +11,7 @@ import {
   tiposTurnoDisponibilidad,
   exportDisponibilidadExcel,
   exportDisponibilidadPdf,
+  exportTurnosDisponiblesBonito,
 } from '../utils/disponibilidadTurnosUtils';
 import {
   resolverCortejoInicial,
@@ -81,6 +82,11 @@ export default function DisponibilidadTurnos() {
   );
 
   const resumen = useMemo(() => resumenDisponibilidad(filas), [filas]);
+
+  const filasDisponibles = useMemo(
+    () => filas.filter((f) => f.disponibles > 0),
+    [filas]
+  );
 
   const limpiarFiltros = () => {
     setFiltroTipo('all');
@@ -161,11 +167,24 @@ export default function DisponibilidadTurnos() {
           </button>
           <button
             type="button"
-            className="btn btn--primary btn--sm"
+            className="btn btn--ghost btn--sm"
             onClick={() => exportDisponibilidadPdf(exportarBase())}
             disabled={!filas.length}
           >
-            Imprimir / Guardar PDF
+            PDF completo
+          </button>
+          <button
+            type="button"
+            className="btn btn--primary btn--sm"
+            onClick={() =>
+              exportTurnosDisponiblesBonito({
+                ...exportarBase(),
+                soloConLibres: true,
+              })
+            }
+            disabled={!filas.some((f) => f.disponibles > 0)}
+          >
+            Imprimir turnos disponibles
           </button>
         </div>
       </section>
@@ -208,77 +227,121 @@ export default function DisponibilidadTurnos() {
           </p>
         </section>
       ) : (
-        <section className="panel">
-          <h3 className="panel__title">
-            {cortejoSel?.nombre_evento || 'Procesión'} — {filas.length} turno(s)
-          </h3>
-          <div className="table-wrap">
-            <table className="data-table data-table--compact disponibilidad-turnos__tabla">
-              <thead>
-                <tr>
-                  <th>Turno</th>
-                  <th>Nombre</th>
-                  <th>Melodías / son</th>
-                  <th>Hora</th>
-                  <th>Precio</th>
-                  <th>Total</th>
-                  <th>Libres</th>
-                  <th>Vendidos</th>
-                  <th>Apartados</th>
-                  <th>Res. taquilla</th>
-                  <th>% libre</th>
-                  <th className="no-print">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filas.map((f) => (
-                  <tr
-                    key={f.turno.id}
-                    className={f.disponibles === 0 ? 'disponibilidad-turnos__fila-llena' : ''}
-                  >
-                    <td>
-                      <strong>#{f.numero}</strong>
-                    </td>
-                    <td>{f.nombre}</td>
-                    <td>
-                      <span className="disponibilidad-turnos__melodias">{f.melodias}</span>
-                    </td>
-                    <td>{f.hora}</td>
-                    <td>{f.precio}</td>
-                    <td>{f.total}</td>
-                    <td className={f.disponibles > 0 ? 'disponibilidad-turnos__celda-libres' : undefined}>
-                      <strong
-                        className={
-                          f.disponibles > 0
-                            ? 'disponibilidad-turnos__libres'
-                            : 'text-muted'
-                        }
-                      >
-                        {f.disponibles}
-                      </strong>
-                    </td>
-                    <td>{f.vendidos}</td>
-                    <td>{f.apartados}</td>
-                    <td>{f.reservaTaquilla}</td>
-                    <td>{f.pctLibre}%</td>
-                    <td className="no-print">
-                      {f.disponibles > 0 ? (
-                        <Link
-                          to={`/taquilla?cortejo=${encodeURIComponent(cortejoId)}&turno=${f.numero}`}
-                          className="btn btn--primary btn--sm"
-                        >
-                          Vender en Taquilla
-                        </Link>
-                      ) : (
-                        <span className="text-muted">Lleno</span>
-                      )}
-                    </td>
+        <>
+          {filasDisponibles.length > 0 && (
+            <section className="panel turnos-disponibles-cuadro">
+              <header className="turnos-disponibles-cuadro__head">
+                <p className="turnos-disponibles-cuadro__eyebrow">
+                  {organizacion?.nombre_oficial || 'Organización'}
+                </p>
+                <h2 className="turnos-disponibles-cuadro__title">Turnos disponibles</h2>
+                {cortejoSel?.nombre_evento && (
+                  <p className="turnos-disponibles-cuadro__sub">{cortejoSel.nombre_evento}</p>
+                )}
+              </header>
+              <div className="table-wrap">
+                <table className="turnos-disponibles-cuadro__tabla">
+                  <thead>
+                    <tr>
+                      <th>Nombre del turno</th>
+                      <th>Melodía</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filasDisponibles.map((f) => (
+                      <tr key={`disp-${f.turno.id}`}>
+                        <td>
+                          <span className="turnos-disponibles-cuadro__num">#{f.numero}</span>
+                          <strong>{f.nombre}</strong>
+                        </td>
+                        <td className="turnos-disponibles-cuadro__melodia">
+                          {f.melodias === '—' ? '—' : f.melodias}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="turnos-disponibles-cuadro__foot">
+                {filasDisponibles.length} turno
+                {filasDisponibles.length === 1 ? '' : 's'} con espacio libre
+              </p>
+            </section>
+          )}
+
+          <section className="panel">
+            <h3 className="panel__title">
+              {cortejoSel?.nombre_evento || 'Procesión'} — detalle completo ({filas.length} turno
+              {filas.length === 1 ? '' : 's'})
+            </h3>
+            <div className="table-wrap">
+              <table className="data-table data-table--compact disponibilidad-turnos__tabla">
+                <thead>
+                  <tr>
+                    <th>Turno</th>
+                    <th>Nombre</th>
+                    <th>Melodías / son</th>
+                    <th>Hora</th>
+                    <th>Precio</th>
+                    <th>Total</th>
+                    <th>Libres</th>
+                    <th>Vendidos</th>
+                    <th>Apartados</th>
+                    <th>Res. taquilla</th>
+                    <th>% libre</th>
+                    <th className="no-print">Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+                </thead>
+                <tbody>
+                  {filas.map((f) => (
+                    <tr
+                      key={f.turno.id}
+                      className={f.disponibles === 0 ? 'disponibilidad-turnos__fila-llena' : ''}
+                    >
+                      <td>
+                        <strong>#{f.numero}</strong>
+                      </td>
+                      <td>{f.nombre}</td>
+                      <td>
+                        <span className="disponibilidad-turnos__melodias">{f.melodias}</span>
+                      </td>
+                      <td>{f.hora}</td>
+                      <td>{f.precio}</td>
+                      <td>{f.total}</td>
+                      <td className={f.disponibles > 0 ? 'disponibilidad-turnos__celda-libres' : undefined}>
+                        <strong
+                          className={
+                            f.disponibles > 0
+                              ? 'disponibilidad-turnos__libres'
+                              : 'text-muted'
+                          }
+                        >
+                          {f.disponibles}
+                        </strong>
+                      </td>
+                      <td>{f.vendidos}</td>
+                      <td>{f.apartados}</td>
+                      <td>{f.reservaTaquilla}</td>
+                      <td>{f.pctLibre}%</td>
+                      <td className="no-print">
+                        {f.disponibles > 0 ? (
+                          <Link
+                            to={`/taquilla?cortejo=${encodeURIComponent(cortejoId)}&turno=${f.numero}`}
+                            className="btn btn--primary btn--sm"
+                          >
+                            Vender en Taquilla
+                          </Link>
+                        ) : (
+                          <span className="text-muted">Lleno</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
       )}
     </Layout>
   );

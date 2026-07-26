@@ -2681,6 +2681,96 @@ html {
   background: #f0fdf4;
 }
 
+.turnos-disponibles-cuadro {
+  padding: 0;
+  overflow: hidden;
+  border: 2px solid #1d4ed8;
+}
+
+.turnos-disponibles-cuadro__head {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 55%, #2563eb 100%);
+  color: #fff;
+  text-align: center;
+  padding: 1.25rem 1rem 1rem;
+}
+
+.turnos-disponibles-cuadro__eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.88;
+  font-weight: 600;
+}
+
+.turnos-disponibles-cuadro__title {
+  margin: 0;
+  font-size: clamp(1.35rem, 3vw, 1.75rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.turnos-disponibles-cuadro__sub {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  opacity: 0.92;
+  font-weight: 500;
+}
+
+.turnos-disponibles-cuadro__tabla {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.turnos-disponibles-cuadro__tabla th {
+  background: #dbeafe;
+  color: #1e3a8a;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-bottom: 2px solid #93c5fd;
+}
+
+.turnos-disponibles-cuadro__tabla td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #bfdbfe;
+  color: #1e3a8a;
+  vertical-align: top;
+}
+
+.turnos-disponibles-cuadro__tabla tbody tr:nth-child(even) td {
+  background: #f8fbff;
+}
+
+.turnos-disponibles-cuadro__num {
+  display: inline-block;
+  min-width: 2.2rem;
+  margin-right: 0.45rem;
+  color: #3b82f6;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.turnos-disponibles-cuadro__melodia {
+  color: #1d4ed8;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.turnos-disponibles-cuadro__foot {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  background: #eff6ff;
+  border-top: 1px solid #bfdbfe;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #1e40af;
+  font-weight: 600;
+}
+
 .caja-filters__total {
   margin-left: auto;
   padding: 0.65rem 1rem;

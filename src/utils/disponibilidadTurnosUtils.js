@@ -238,3 +238,227 @@ export function exportDisponibilidadPdf({ filas, cortejoNombre, orgNombre = '', 
   }
   URL.revokeObjectURL(url);
 }
+
+function abrirHtmlImpresion(html) {
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const ventana = window.open(url, '_blank');
+  if (ventana) {
+    setTimeout(() => URL.revokeObjectURL(url), 120_000);
+    return true;
+  }
+  URL.revokeObjectURL(url);
+  return false;
+}
+
+/**
+ * Reporte limpio para publicar / imprimir:
+ * encabezado «Turnos disponibles» + cuadro con Nombre del turno y Melodía.
+ */
+export function exportTurnosDisponiblesBonito({
+  filas,
+  cortejoNombre,
+  orgNombre = '',
+  soloConLibres = true,
+}) {
+  const lista = (filas || []).filter((f) => (soloConLibres ? f.disponibles > 0 : true));
+  const generado = new Intl.DateTimeFormat('es-GT', {
+    dateStyle: 'long',
+  }).format(new Date());
+  const org = escapeHtml(orgNombre || '');
+  const procesion = escapeHtml(cortejoNombre || '');
+
+  const rows = lista
+    .map(
+      (f, i) => `
+    <tr class="${i % 2 === 0 ? 'par' : 'impar'}">
+      <td class="col-nombre">
+        <span class="num">#${escapeHtml(f.numero)}</span>
+        <strong>${escapeHtml(f.nombre)}</strong>
+      </td>
+      <td class="col-melodia">${escapeHtml(f.melodias === '—' ? '' : f.melodias) || '<span class="vacio">—</span>'}</td>
+    </tr>`
+    )
+    .join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <title>Turnos disponibles — ${procesion || 'Reporte'}</title>
+  <style>
+    @page { size: letter portrait; margin: 14mm 12mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      color: #1e3a8a;
+      background: #fff;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .toolbar {
+      margin: 0 0 14px;
+      padding: 12px 14px;
+      background: #eff6ff;
+      border: 1px solid #93c5fd;
+      border-radius: 10px;
+      font-size: 13px;
+      color: #1e40af;
+    }
+    .toolbar button {
+      margin-top: 8px;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 8px;
+      background: #1d4ed8;
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .sheet {
+      max-width: 820px;
+      margin: 0 auto;
+      border: 2px solid #1d4ed8;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 8px 28px rgba(30, 58, 138, 0.12);
+    }
+    .head {
+      background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 55%, #2563eb 100%);
+      color: #fff;
+      text-align: center;
+      padding: 22px 18px 18px;
+    }
+    .head__eyebrow {
+      margin: 0 0 6px;
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      opacity: 0.88;
+      font-weight: 600;
+    }
+    .head__title {
+      margin: 0;
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      line-height: 1.15;
+    }
+    .head__sub {
+      margin: 10px 0 0;
+      font-size: 13px;
+      opacity: 0.92;
+      font-weight: 500;
+    }
+    .meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 10px 16px;
+      background: #eff6ff;
+      border-bottom: 1px solid #bfdbfe;
+      font-size: 12px;
+      color: #1e40af;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    thead th {
+      background: #dbeafe;
+      color: #1e3a8a;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 2px solid #93c5fd;
+    }
+    tbody td {
+      padding: 13px 16px;
+      border-bottom: 1px solid #bfdbfe;
+      vertical-align: top;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    tbody tr.par td { background: #fff; }
+    tbody tr.impar td { background: #f8fbff; }
+    .col-nombre { width: 42%; }
+    .col-nombre .num {
+      display: inline-block;
+      min-width: 2.4rem;
+      margin-right: 8px;
+      color: #3b82f6;
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .col-nombre strong {
+      color: #1e3a8a;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .col-melodia {
+      color: #1d4ed8;
+      font-style: italic;
+    }
+    .col-melodia .vacio { color: #93c5fd; font-style: normal; }
+    .foot {
+      padding: 12px 16px;
+      background: #eff6ff;
+      border-top: 1px solid #bfdbfe;
+      text-align: center;
+      font-size: 12px;
+      color: #1e40af;
+      font-weight: 600;
+    }
+    .empty {
+      padding: 28px 16px;
+      text-align: center;
+      color: #64748b;
+    }
+    @media print {
+      .toolbar { display: none !important; }
+      .sheet { box-shadow: none; border-radius: 0; }
+      body { background: #fff; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <strong>Reporte listo</strong> — use Ctrl+P o el botón para imprimir / guardar PDF.
+    <br/><button type="button" onclick="window.print()">Imprimir / Guardar PDF</button>
+  </div>
+  <div class="sheet">
+    <header class="head">
+      ${org ? `<p class="head__eyebrow">${org}</p>` : ''}
+      <h1 class="head__title">Turnos disponibles</h1>
+      ${procesion ? `<p class="head__sub">${procesion}</p>` : ''}
+    </header>
+    <div class="meta">
+      <span>${lista.length} turno${lista.length === 1 ? '' : 's'} con espacio libre</span>
+      <span>${escapeHtml(generado)}</span>
+    </div>
+    ${
+      lista.length
+        ? `<table>
+      <thead>
+        <tr>
+          <th>Nombre del turno</th>
+          <th>Melodía</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <footer class="foot">${lista.length} turnos disponibles</footer>`
+        : `<p class="empty">No hay turnos disponibles con estos filtros.</p>`
+    }
+  </div>
+  <script>window.addEventListener('load', function(){ setTimeout(function(){ window.print(); }, 350); });</script>
+</body>
+</html>`;
+
+  return abrirHtmlImpresion(html);
+}
+
