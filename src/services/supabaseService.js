@@ -81,6 +81,9 @@ const BRAZO_METRICS_FIELDS =
 const BRAZO_VENDIDO_LIST_FIELDS =
   'id, turno_id, numero_turno, numero_brazo, lado, estado, precio_pagado, codigo_boleta_qr, compra_id, cargador_id, mesa_id, vendedor_id, operador_nombre, metodo_pago, estado_entrega, pago_confirmado_en, updated_at, created_at';
 
+const BRAZO_ENTREGA_REPORT_FIELDS =
+  'id, turno_id, numero_turno, numero_brazo, lado, estado, precio_pagado, codigo_boleta_qr, compra_id, cargador_id, mesa_id, vendedor_id, operador_nombre, metodo_pago, estado_entrega, entregado_en, entregado_por, entregado_a_tercero, entregado_receptor_nombre, pago_confirmado_en, updated_at, created_at';
+
 const CARGADOR_LIST_FIELDS =
   'id, organizacion_id, nombre_completo, whatsapp, correo, cui_o_identificacion, telefono_emergencia';
 
@@ -836,6 +839,21 @@ export async function getBrazosPendientesEntregaByOrg(organizacionId) {
       .eq('organizacion_id', organizacionId)
       .eq('estado', 'vendido')
       .eq('estado_entrega', 'pendiente')
+      .order('numero_turno', { ascending: true })
+      .order('numero_brazo', { ascending: true })
+      .range(from, to)
+  );
+}
+
+/** Reporte de entrega: vendidos con campos de entrega (pendientes + entregados). */
+export async function getBrazosEntregaReporteByOrg(organizacionId) {
+  if (!organizacionId) return [];
+  return fetchPaginatedRows((from, to) =>
+    supabase
+      .from('brazos')
+      .select(BRAZO_ENTREGA_REPORT_FIELDS)
+      .eq('organizacion_id', organizacionId)
+      .eq('estado', 'vendido')
       .order('numero_turno', { ascending: true })
       .order('numero_brazo', { ascending: true })
       .range(from, to)

@@ -41,6 +41,11 @@ export const getBrazosPendientesEntregaByOrg = (organizacionId) =>
     ? sb.getBrazosPendientesEntregaByOrg(organizacionId)
     : Promise.resolve(mock.getBrazosPendientesEntregaByOrg(organizacionId));
 
+export const getBrazosEntregaReporteByOrg = (organizacionId) =>
+  isSupabaseBackend()
+    ? sb.getBrazosEntregaReporteByOrg(organizacionId)
+    : Promise.resolve(mock.getBrazosEntregaReporteByOrg(organizacionId));
+
 export const getUltimosRecibosImpresion = (organizacionId, limit) =>
   isSupabaseBackend()
     ? sb.getUltimosRecibosImpresion(organizacionId, limit)

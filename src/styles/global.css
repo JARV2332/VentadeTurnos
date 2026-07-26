@@ -790,6 +790,9 @@ html {
   line-height: 1.2;
 }
 
+.metric-card__value--ok { color: var(--success); }
+.metric-card__value--warn { color: var(--warning); }
+
 .metric-card small { font-size: 0.75rem; color: var(--text-muted); }
 
 .progress-bar {

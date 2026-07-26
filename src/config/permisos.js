@@ -79,6 +79,14 @@ export const PANTALLAS = [
     grupo: 'Reportes',
     visibleConPermisos: ['import_reservas', 'taquilla', 'caja', 'dashboard', 'listado_turnos'],
   },
+  {
+    id: 'reporte_entrega',
+    label: 'Reporte de entrega',
+    path: '/reporte-entrega',
+    icon: '▦',
+    grupo: 'Reportes',
+    visibleConPermisos: ['entrega', 'ajuste_entrega', 'caja', 'dashboard', 'listado_turnos'],
+  },
 ];
 
 /** Plantillas rápidas al crear roles (incluyen pantallas de reportes nuevas). */
@@ -102,7 +110,7 @@ export const PLANTILLAS_ROL = {
   entrega: {
     nombre: 'Operador de entrega',
     descripcion: 'Escaneo QR, entrega física e impresión de boletas.',
-    permisos: ['entrega', 'consulta_turnos', 'listado_turnos', 'impresion'],
+    permisos: ['entrega', 'consulta_turnos', 'listado_turnos', 'impresion', 'reporte_entrega'],
   },
   coordinacion: {
     nombre: 'Coordinación',
@@ -113,6 +121,7 @@ export const PLANTILLAS_ROL = {
       'listado_turnos',
       'disponibilidad_turnos',
       'apartados_pendientes',
+      'reporte_entrega',
       'ajuste_entrega',
       'caja',
       'impresion',
@@ -122,7 +131,7 @@ export const PLANTILLAS_ROL = {
   supervisor_entrega: {
     nombre: 'Supervisor de entrega',
     descripcion: 'Entrega en taquilla y corrección de estados registrados por error.',
-    permisos: ['entrega', 'ajuste_entrega', 'consulta_turnos', 'impresion'],
+    permisos: ['entrega', 'ajuste_entrega', 'consulta_turnos', 'impresion', 'reporte_entrega'],
   },
 };
 

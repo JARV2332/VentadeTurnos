@@ -61,6 +61,10 @@ export function getBrazosPendientesEntregaByOrg(organizacionId) {
   );
 }
 
+export function getBrazosEntregaReporteByOrg(organizacionId) {
+  return getBrazosVendidosByOrg(organizacionId);
+}
+
 export function getUltimosRecibosImpresionMock(organizacionId, limit = 20) {
   const compras = (store.compras || [])
     .filter((c) => c.organizacion_id === organizacionId && c.estado !== 'anulada')
