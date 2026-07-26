@@ -24,7 +24,11 @@ const PROJECT_REF =
   process.env.SUPABASE_PROJECT_REF ||
   'emmkatautioefhmvxejg';
 
-const SQL_FILES = ['028_buscar_boleta_entrega.sql', '030_perf_buscar_boleta_entrega.sql'];
+const SQL_FILES = [
+  '028_buscar_boleta_entrega.sql',
+  '030_perf_buscar_boleta_entrega.sql',
+  '031_buscar_boleta_entrega_org.sql',
+];
 
 async function runQuery(sql) {
   const res = await fetch(

@@ -53,6 +53,7 @@ const SQL_FILES = [
   '028_buscar_boleta_entrega.sql',
   '029_revertir_entrega_brazos.sql',
   '030_perf_buscar_boleta_entrega.sql',
+  '031_buscar_boleta_entrega_org.sql',
 ];
 
 async function runQuery(sql) {

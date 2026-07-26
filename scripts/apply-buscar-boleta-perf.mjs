@@ -21,7 +21,11 @@ if (!baseUrl || baseUrl.includes('[YOUR-PASSWORD]')) {
   process.exit(1);
 }
 
-const SQL_FILES = ['028_buscar_boleta_entrega.sql', '030_perf_buscar_boleta_entrega.sql'];
+const SQL_FILES = [
+  '028_buscar_boleta_entrega.sql',
+  '030_perf_buscar_boleta_entrega.sql',
+  '031_buscar_boleta_entrega_org.sql',
+];
 
 function buildCandidates(url) {
   const out = new Set([url.split('?')[0]]);
