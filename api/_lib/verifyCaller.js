@@ -4,7 +4,7 @@ export function getSupabaseConfig() {
   const url =
     process.env.REACT_APP_SUPABASE_URL ||
     process.env.SUPABASE_URL ||
-    'https://kolhnoectddjgfowyvux.supabase.co';
+    'https://emmkatautioefhmvxejg.supabase.co';
   const anonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   return { url, anonKey, serviceKey };

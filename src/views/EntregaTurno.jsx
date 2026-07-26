@@ -63,6 +63,7 @@ export default function EntregaTurno() {
   useEffect(() => {
     if (!organizacionId) return undefined;
     let cancel = false;
+    // Precarga recibo (también calienta la conexión a Supabase).
     getReciboConfig(organizacionId).then((saved) => {
       if (!cancel && saved && !saved.error) setReciboConfig(saved);
     });
@@ -113,6 +114,7 @@ export default function EntregaTurno() {
     setResultado(null);
     scrollAValidacion();
 
+    const t0 = performance.now();
     const res = await buscarBoletaPorCodigo(organizacionId, codigo);
     if (seq !== buscarSeqRef.current) return;
 
@@ -124,6 +126,10 @@ export default function EntregaTurno() {
     }
 
     setResultado(res);
+    const ms = Math.round(performance.now() - t0);
+    if (ms > 2500) {
+      setAvisoCorreoMsg(`Búsqueda lenta: ${ms} ms. Revise la consola (F12) línea [boleta].`);
+    }
   }, [organizacionId, buscando, codigoActivo]);
 
   const handleScan = useCallback(

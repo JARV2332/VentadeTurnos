@@ -31,7 +31,7 @@ import {
 import { enriquecerDashboardMetrics } from '../utils/dashboardMetricsUtils';
 import { MINUTOS_RESERVA_TAQUILLA_COLGADA } from '../utils/reservasTaquillaUtils';
 import { getBoletaCache, setBoletaCache } from '../utils/boletaLookupCache';
-import { buscarBoletaEntregaServidor } from './boletaEntregaApi';
+import { buscarBoletaPorCodigoEmbed } from './boletaLookupEmbed';
 
 function err(error) {
   if (!error) return null;
@@ -1706,6 +1706,7 @@ async function confirmarVentaCompraDirecto(brazoIds, cargador, precios, orgId, p
 }
 
 export async function buscarBoletaPorCodigo(organizacionId, codigo) {
+  const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const codigoLimpio = String(codigo || '')
     .trim()
     .toUpperCase()
@@ -1716,21 +1717,25 @@ export async function buscarBoletaPorCodigo(organizacionId, codigo) {
   }
 
   const cached = getBoletaCache(organizacionId, codigoLimpio);
-  if (cached) return cached;
+  if (cached) {
+    if (typeof console !== 'undefined') {
+      console.info(`[boleta] cache hit ${codigoLimpio} (${Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0)}ms)`);
+    }
+    return cached;
+  }
 
   let result;
+  let via = 'rpc';
 
-  const apiRes = await buscarBoletaEntregaServidor(organizacionId, codigoLimpio);
-  if (!apiRes.skipped) {
-    if (apiRes.error) return { error: apiRes.error };
-    result = apiRes.data;
-  } else {
-    const { data: rpcData, error: rpcError } = await supabase.rpc('buscar_boleta_entrega', {
-      p_codigo: codigoLimpio,
-    });
+  // Directo a Supabase (sin API Vercel: el cold start sumaba 10–20 s).
+  const { data: rpcData, error: rpcError } = await supabase.rpc('buscar_boleta_entrega', {
+    p_codigo: codigoLimpio,
+  });
 
-    if (!rpcError && rpcData && typeof rpcData === 'object' && !Array.isArray(rpcData)) {
-      if (rpcData.error) return { error: rpcData.error };
+  if (!rpcError && rpcData && typeof rpcData === 'object' && !Array.isArray(rpcData)) {
+    if (rpcData.error) {
+      result = { error: rpcData.error };
+    } else {
       result = {
         brazo: rpcData.brazo,
         brazos: rpcData.brazos || [],
@@ -1740,11 +1745,22 @@ export async function buscarBoletaPorCodigo(organizacionId, codigo) {
         cargador: rpcData.cargador || null,
         items: rpcData.items || [],
       };
-    } else if (rpcError && !isMissingRpc(rpcError)) {
-      return err(rpcError);
-    } else {
+    }
+  } else if (rpcError && !isMissingRpc(rpcError)) {
+    result = err(rpcError);
+  } else {
+    // RPC ausente: 1 consulta con joins; si falla, legacy.
+    via = 'embed';
+    result = await buscarBoletaPorCodigoEmbed(organizacionId, codigoLimpio);
+    if (result?.error && /relationship|could not find|schema cache|embed/i.test(result.error)) {
+      via = 'legacy';
       result = await buscarBoletaPorCodigoLegacy(organizacionId, codigoLimpio);
     }
+  }
+
+  const ms = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0);
+  if (typeof console !== 'undefined') {
+    console.info(`[boleta] ${codigoLimpio} via=${via} ${ms}ms`, result?.error || 'ok');
   }
 
   if (result && !result.error) {

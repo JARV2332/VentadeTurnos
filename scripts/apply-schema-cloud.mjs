@@ -49,6 +49,7 @@ const SQL_FILES = [
   '029_revertir_entrega_brazos.sql',
   '030_perf_buscar_boleta_entrega.sql',
   '031_buscar_boleta_entrega_org.sql',
+  '032_perf_auth_org_index.sql',
 ];
 
 if (!DATABASE_URL || DATABASE_URL.includes('[YOUR-PASSWORD]')) {
