@@ -2771,6 +2771,18 @@ html {
   font-weight: 600;
 }
 
+.disponibilidad-columnas__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 1.1rem;
+  margin: 0.75rem 0 0.35rem;
+}
+
+.disponibilidad-columnas__item {
+  margin: 0;
+  min-width: 9.5rem;
+}
+
 .caja-filters__total {
   margin-left: auto;
   padding: 0.65rem 1rem;

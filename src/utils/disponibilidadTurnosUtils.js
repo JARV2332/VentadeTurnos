@@ -251,34 +251,139 @@ function abrirHtmlImpresion(html) {
   return false;
 }
 
+/** Columnas disponibles para el reporte imprimible «Turnos disponibles». */
+export const COLUMNAS_REPORTE_DISPONIBLES = [
+  { id: 'numero', label: 'N.º turno', defaultOn: true },
+  { id: 'nombre', label: 'Nombre del turno', defaultOn: true },
+  { id: 'melodia', label: 'Melodía', defaultOn: true },
+  { id: 'hora', label: 'Hora', defaultOn: false },
+  { id: 'precio', label: 'Precio / ofrenda', defaultOn: false },
+  { id: 'libres', label: 'Brazos libres', defaultOn: false },
+  { id: 'total', label: 'Total brazos', defaultOn: false },
+  { id: 'vendidos', label: 'Vendidos', defaultOn: false },
+  { id: 'apartados', label: 'Apartados', defaultOn: false },
+  { id: 'pctLibre', label: '% libre', defaultOn: false },
+];
+
+export const COLUMNAS_REPORTE_DEFAULT = Object.fromEntries(
+  COLUMNAS_REPORTE_DISPONIBLES.map((c) => [c.id, c.defaultOn])
+);
+
+const STORAGE_COLUMNAS_KEY = 'vt_disponibilidad_columnas_impresion';
+
+export function cargarColumnasReporteGuardadas() {
+  try {
+    const raw = localStorage.getItem(STORAGE_COLUMNAS_KEY);
+    if (!raw) return { ...COLUMNAS_REPORTE_DEFAULT };
+    const parsed = JSON.parse(raw);
+    const next = { ...COLUMNAS_REPORTE_DEFAULT };
+    for (const col of COLUMNAS_REPORTE_DISPONIBLES) {
+      if (typeof parsed[col.id] === 'boolean') next[col.id] = parsed[col.id];
+    }
+    return next;
+  } catch {
+    return { ...COLUMNAS_REPORTE_DEFAULT };
+  }
+}
+
+export function guardarColumnasReporte(columnas) {
+  try {
+    localStorage.setItem(STORAGE_COLUMNAS_KEY, JSON.stringify(columnas));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function columnasActivasOrdenadas(columnas = {}) {
+  return COLUMNAS_REPORTE_DISPONIBLES.filter((c) => columnas[c.id]);
+}
+
+function valorCeldaColumna(fila, colId) {
+  switch (colId) {
+    case 'numero':
+      return `#${fila.numero ?? ''}`;
+    case 'nombre':
+      return fila.nombre || '—';
+    case 'melodia':
+      return fila.melodias === '—' ? '' : fila.melodias || '';
+    case 'hora':
+      return fila.hora || '—';
+    case 'precio':
+      return fila.precio || '—';
+    case 'libres':
+      return String(fila.disponibles ?? 0);
+    case 'total':
+      return String(fila.total ?? 0);
+    case 'vendidos':
+      return String(fila.vendidos ?? 0);
+    case 'apartados':
+      return String(fila.apartados ?? 0);
+    case 'pctLibre':
+      return `${fila.pctLibre ?? 0}%`;
+    default:
+      return '—';
+  }
+}
+
+export function celdaReporteDisponible(fila, colId) {
+  return valorCeldaColumna(fila, colId);
+}
+
 /**
- * Reporte limpio para publicar / imprimir:
- * encabezado «Turnos disponibles» + cuadro con Nombre del turno y Melodía.
+ * Reporte limpio para publicar / imprimir.
+ * columnas: { numero, nombre, melodia, hora, ... } booleanos.
  */
 export function exportTurnosDisponiblesBonito({
   filas,
   cortejoNombre,
   orgNombre = '',
   soloConLibres = true,
+  columnas = COLUMNAS_REPORTE_DEFAULT,
 }) {
+  const activas = columnasActivasOrdenadas(columnas);
+  if (!activas.length) {
+    window.alert('Seleccione al menos una columna para imprimir.');
+    return false;
+  }
+
   const lista = (filas || []).filter((f) => (soloConLibres ? f.disponibles > 0 : true));
   const generado = new Intl.DateTimeFormat('es-GT', {
     dateStyle: 'long',
   }).format(new Date());
   const org = escapeHtml(orgNombre || '');
   const procesion = escapeHtml(cortejoNombre || '');
+  const colCount = activas.length;
+
+  const headCells = activas
+    .map((c) => `<th class="col-${c.id}">${escapeHtml(c.label)}</th>`)
+    .join('');
 
   const rows = lista
-    .map(
-      (f, i) => `
-    <tr class="${i % 2 === 0 ? 'par' : 'impar'}">
-      <td class="col-nombre">
-        <span class="num">#${escapeHtml(f.numero)}</span>
-        <strong>${escapeHtml(f.nombre)}</strong>
-      </td>
-      <td class="col-melodia">${escapeHtml(f.melodias === '—' ? '' : f.melodias) || '<span class="vacio">—</span>'}</td>
-    </tr>`
-    )
+    .map((f, i) => {
+      const tds = activas
+        .map((c) => {
+          const raw = valorCeldaColumna(f, c.id);
+          if (c.id === 'nombre') {
+            const num = columnas.numero
+              ? ''
+              : `<span class="num">#${escapeHtml(f.numero)}</span>`;
+            return `<td class="col-nombre">${num}<strong>${escapeHtml(raw)}</strong></td>`;
+          }
+          if (c.id === 'melodia') {
+            const txt = escapeHtml(raw) || '<span class="vacio">—</span>';
+            return `<td class="col-melodia">${txt}</td>`;
+          }
+          if (c.id === 'libres' || c.id === 'pctLibre') {
+            return `<td class="col-num col-libres"><strong>${escapeHtml(raw)}</strong></td>`;
+          }
+          if (['total', 'vendidos', 'apartados', 'numero'].includes(c.id)) {
+            return `<td class="col-num">${escapeHtml(raw)}</td>`;
+          }
+          return `<td class="col-${c.id}">${escapeHtml(raw)}</td>`;
+        })
+        .join('');
+      return `<tr class="${i % 2 === 0 ? 'par' : 'impar'}">${tds}</tr>`;
+    })
     .join('');
 
   const html = `<!DOCTYPE html>
@@ -287,7 +392,7 @@ export function exportTurnosDisponiblesBonito({
   <meta charset="utf-8"/>
   <title>Turnos disponibles — ${procesion || 'Reporte'}</title>
   <style>
-    @page { size: letter portrait; margin: 14mm 12mm; }
+    @page { size: letter ${colCount > 5 ? 'landscape' : 'portrait'}; margin: 12mm 10mm; }
     * { box-sizing: border-box; }
     body {
       margin: 0;
@@ -317,7 +422,7 @@ export function exportTurnosDisponiblesBonito({
       cursor: pointer;
     }
     .sheet {
-      max-width: 820px;
+      max-width: ${colCount > 5 ? '1100px' : '820px'};
       margin: 0 auto;
       border: 2px solid #1d4ed8;
       border-radius: 14px;
@@ -362,48 +467,40 @@ export function exportTurnosDisponiblesBonito({
       font-size: 12px;
       color: #1e40af;
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     thead th {
       background: #dbeafe;
       color: #1e3a8a;
-      font-size: 11px;
-      letter-spacing: 0.08em;
+      font-size: 10px;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
-      padding: 12px 16px;
+      padding: 11px 12px;
       text-align: left;
       border-bottom: 2px solid #93c5fd;
     }
     tbody td {
-      padding: 13px 16px;
+      padding: 11px 12px;
       border-bottom: 1px solid #bfdbfe;
       vertical-align: top;
-      font-size: 14px;
+      font-size: 13px;
       line-height: 1.4;
+      word-wrap: break-word;
     }
     tbody tr.par td { background: #fff; }
     tbody tr.impar td { background: #f8fbff; }
-    .col-nombre { width: 42%; }
     .col-nombre .num {
       display: inline-block;
-      min-width: 2.4rem;
-      margin-right: 8px;
+      min-width: 2.2rem;
+      margin-right: 6px;
       color: #3b82f6;
       font-weight: 700;
-      font-size: 13px;
+      font-size: 12px;
     }
-    .col-nombre strong {
-      color: #1e3a8a;
-      font-size: 15px;
-      font-weight: 700;
-    }
-    .col-melodia {
-      color: #1d4ed8;
-      font-style: italic;
-    }
+    .col-nombre strong { color: #1e3a8a; font-size: 14px; font-weight: 700; }
+    .col-melodia { color: #1d4ed8; font-style: italic; }
     .col-melodia .vacio { color: #93c5fd; font-style: normal; }
+    .col-num { text-align: center; }
+    .col-libres { color: #047857; background: #ecfdf5 !important; }
     .foot {
       padding: 12px 16px;
       background: #eff6ff;
@@ -413,11 +510,7 @@ export function exportTurnosDisponiblesBonito({
       color: #1e40af;
       font-weight: 600;
     }
-    .empty {
-      padding: 28px 16px;
-      text-align: center;
-      color: #64748b;
-    }
+    .empty { padding: 28px 16px; text-align: center; color: #64748b; }
     @media print {
       .toolbar { display: none !important; }
       .sheet { box-shadow: none; border-radius: 0; }
@@ -443,12 +536,7 @@ export function exportTurnosDisponiblesBonito({
     ${
       lista.length
         ? `<table>
-      <thead>
-        <tr>
-          <th>Nombre del turno</th>
-          <th>Melodía</th>
-        </tr>
-      </thead>
+      <thead><tr>${headCells}</tr></thead>
       <tbody>${rows}</tbody>
     </table>
     <footer class="foot">${lista.length} turnos disponibles</footer>`

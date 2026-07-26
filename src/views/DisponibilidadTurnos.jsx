@@ -12,6 +12,12 @@ import {
   exportDisponibilidadExcel,
   exportDisponibilidadPdf,
   exportTurnosDisponiblesBonito,
+  COLUMNAS_REPORTE_DISPONIBLES,
+  COLUMNAS_REPORTE_DEFAULT,
+  cargarColumnasReporteGuardadas,
+  guardarColumnasReporte,
+  columnasActivasOrdenadas,
+  celdaReporteDisponible,
 } from '../utils/disponibilidadTurnosUtils';
 import {
   resolverCortejoInicial,
@@ -29,6 +35,7 @@ export default function DisponibilidadTurnos() {
   const [filtroTipo, setFiltroTipo] = useState('all');
   const [filtroNumero, setFiltroNumero] = useState('');
   const [soloConDisponibles, setSoloConDisponibles] = useState(false);
+  const [columnas, setColumnas] = useState(() => cargarColumnasReporteGuardadas());
 
   const cargarCortejos = useCallback(async () => {
     try {
@@ -64,6 +71,10 @@ export default function DisponibilidadTurnos() {
     return subscribeData(organizacionId, cargarTurnos, 2000);
   }, [organizacionId, cargarTurnos]);
 
+  useEffect(() => {
+    guardarColumnasReporte(columnas);
+  }, [columnas]);
+
   const cortejoSel = useMemo(
     () => cortejos.find((c) => c.id === cortejoId) || null,
     [cortejos, cortejoId]
@@ -87,6 +98,13 @@ export default function DisponibilidadTurnos() {
     () => filas.filter((f) => f.disponibles > 0),
     [filas]
   );
+
+  const columnasActivas = useMemo(() => columnasActivasOrdenadas(columnas), [columnas]);
+  const hayColumnas = columnasActivas.length > 0;
+
+  const toggleColumna = (id) => {
+    setColumnas((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const limpiarFiltros = () => {
     setFiltroTipo('all');
@@ -173,6 +191,46 @@ export default function DisponibilidadTurnos() {
           >
             PDF completo
           </button>
+        </div>
+      </section>
+
+      <section className="panel disponibilidad-columnas">
+        <h3 className="panel__title">Columnas del reporte «Turnos disponibles»</h3>
+        <p className="text-muted config-hint">
+          Marque o desmarque qué información quiere ver e imprimir. La selección se guarda en este
+          navegador.
+        </p>
+        <div className="disponibilidad-columnas__grid">
+          {COLUMNAS_REPORTE_DISPONIBLES.map((col) => (
+            <label key={col.id} className="listado-turnos__check disponibilidad-columnas__item">
+              <input
+                type="checkbox"
+                checked={Boolean(columnas[col.id])}
+                onChange={() => toggleColumna(col.id)}
+              />
+              {col.label}
+            </label>
+          ))}
+        </div>
+        <div className="listado-turnos__acciones">
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={() => setColumnas({ ...COLUMNAS_REPORTE_DEFAULT })}
+          >
+            Solo nombre y melodía
+          </button>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={() =>
+              setColumnas(
+                Object.fromEntries(COLUMNAS_REPORTE_DISPONIBLES.map((c) => [c.id, true]))
+              )
+            }
+          >
+            Todas las columnas
+          </button>
           <button
             type="button"
             className="btn btn--primary btn--sm"
@@ -180,13 +238,19 @@ export default function DisponibilidadTurnos() {
               exportTurnosDisponiblesBonito({
                 ...exportarBase(),
                 soloConLibres: true,
+                columnas,
               })
             }
-            disabled={!filas.some((f) => f.disponibles > 0)}
+            disabled={!filasDisponibles.length || !hayColumnas}
           >
             Imprimir turnos disponibles
           </button>
         </div>
+        {!hayColumnas && (
+          <p className="alert alert--warning" style={{ marginTop: '0.75rem' }}>
+            Seleccione al menos una columna para poder imprimir.
+          </p>
+        )}
       </section>
 
       {error && <div className="alert alert--error">{error}</div>}
@@ -228,7 +292,7 @@ export default function DisponibilidadTurnos() {
         </section>
       ) : (
         <>
-          {filasDisponibles.length > 0 && (
+          {filasDisponibles.length > 0 && hayColumnas && (
             <section className="panel turnos-disponibles-cuadro">
               <header className="turnos-disponibles-cuadro__head">
                 <p className="turnos-disponibles-cuadro__eyebrow">
@@ -243,20 +307,35 @@ export default function DisponibilidadTurnos() {
                 <table className="turnos-disponibles-cuadro__tabla">
                   <thead>
                     <tr>
-                      <th>Nombre del turno</th>
-                      <th>Melodía</th>
+                      {columnasActivas.map((col) => (
+                        <th key={col.id}>{col.label}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
                     {filasDisponibles.map((f) => (
                       <tr key={`disp-${f.turno.id}`}>
-                        <td>
-                          <span className="turnos-disponibles-cuadro__num">#{f.numero}</span>
-                          <strong>{f.nombre}</strong>
-                        </td>
-                        <td className="turnos-disponibles-cuadro__melodia">
-                          {f.melodias === '—' ? '—' : f.melodias}
-                        </td>
+                        {columnasActivas.map((col) => {
+                          const valor = celdaReporteDisponible(f, col.id);
+                          if (col.id === 'nombre') {
+                            return (
+                              <td key={col.id}>
+                                {!columnas.numero && (
+                                  <span className="turnos-disponibles-cuadro__num">#{f.numero}</span>
+                                )}
+                                <strong>{valor}</strong>
+                              </td>
+                            );
+                          }
+                          if (col.id === 'melodia') {
+                            return (
+                              <td key={col.id} className="turnos-disponibles-cuadro__melodia">
+                                {valor || '—'}
+                              </td>
+                            );
+                          }
+                          return <td key={col.id}>{valor || '—'}</td>;
+                        })}
                       </tr>
                     ))}
                   </tbody>
