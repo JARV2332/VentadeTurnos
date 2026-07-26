@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import Loader from '../components/Loader';
 import { useAuth } from '../context/AuthContext';
-import { getCortejosByOrg, getTurnosAgrupados, subscribeData } from '../services/dataService';
+import { getCortejosByOrg, getTurnosAgrupadosDisponibilidad } from '../services/dataService';
 import { labelTipoTurno } from '../utils/cajaReportUtils';
 import {
   construirReporteDisponibilidad,
@@ -26,15 +26,17 @@ import {
 
 export default function DisponibilidadTurnos() {
   const { organizacionId, organizacion } = useAuth();
+  const cargarSeqRef = useRef(0);
   const [cortejos, setCortejos] = useState([]);
   const [cortejoId, setCortejoId] = useState('');
   const [turnosAgrupados, setTurnosAgrupados] = useState([]);
-  const [cargando, setCargando] = useState(true);
+  const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
+  const [reporteGenerado, setReporteGenerado] = useState(false);
 
   const [filtroTipo, setFiltroTipo] = useState('all');
   const [filtroNumero, setFiltroNumero] = useState('');
-  const [soloConDisponibles, setSoloConDisponibles] = useState(false);
+  const [soloConDisponibles, setSoloConDisponibles] = useState(true);
   const [columnas, setColumnas] = useState(() => cargarColumnasReporteGuardadas());
 
   const cargarCortejos = useCallback(async () => {
@@ -47,33 +49,40 @@ export default function DisponibilidadTurnos() {
     }
   }, [organizacionId]);
 
-  const cargarTurnos = useCallback(async () => {
-    if (!cortejoId) return;
-    setCargando(true);
-    setError('');
-    try {
-      const turnos = await getTurnosAgrupados(cortejoId, organizacionId);
-      setTurnosAgrupados(turnos || []);
-    } catch (err) {
-      setError(err.message || 'No se pudo cargar la disponibilidad.');
-      setTurnosAgrupados([]);
-    } finally {
-      setCargando(false);
-    }
-  }, [cortejoId, organizacionId]);
-
   useEffect(() => {
     cargarCortejos();
   }, [cargarCortejos]);
 
   useEffect(() => {
-    cargarTurnos();
-    return subscribeData(organizacionId, cargarTurnos, 2000);
-  }, [organizacionId, cargarTurnos]);
+    setReporteGenerado(false);
+    setTurnosAgrupados([]);
+    setError('');
+  }, [cortejoId]);
 
   useEffect(() => {
     guardarColumnasReporte(columnas);
   }, [columnas]);
+
+  const generarReporte = useCallback(async () => {
+    if (!cortejoId || !organizacionId) return;
+    const seq = ++cargarSeqRef.current;
+    setCargando(true);
+    setError('');
+    setReporteGenerado(false);
+    try {
+      const turnos = await getTurnosAgrupadosDisponibilidad(cortejoId, organizacionId);
+      if (seq !== cargarSeqRef.current) return;
+      setTurnosAgrupados(turnos || []);
+      setReporteGenerado(true);
+    } catch (err) {
+      if (seq !== cargarSeqRef.current) return;
+      setError(err.message || 'No se pudo generar el reporte de disponibilidad.');
+      setTurnosAgrupados([]);
+      setReporteGenerado(false);
+    } finally {
+      if (seq === cargarSeqRef.current) setCargando(false);
+    }
+  }, [cortejoId, organizacionId]);
 
   const cortejoSel = useMemo(
     () => cortejos.find((c) => c.id === cortejoId) || null,
@@ -92,15 +101,15 @@ export default function DisponibilidadTurnos() {
     [turnosAgrupados, filtroTipo, filtroNumero, soloConDisponibles]
   );
 
-  const resumen = useMemo(() => resumenDisponibilidad(filas), [filas]);
+  const filasDisponiblesReporte = useMemo(
+    () =>
+      construirReporteDisponibilidad(turnosAgrupados, {
+        soloConDisponibles: true,
+      }),
+    [turnosAgrupados]
+  );
 
-  // Todos los turnos con libres (sin filtro de tipo/número) para no ocultar casos como el #55.
-  const filasDisponiblesReporte = useMemo(() => {
-    const base = construirReporteDisponibilidad(turnosAgrupados, {
-      soloConDisponibles: true,
-    });
-    return base;
-  }, [turnosAgrupados]);
+  const resumen = useMemo(() => resumenDisponibilidad(filasDisponiblesReporte), [filasDisponiblesReporte]);
 
   const columnasActivas = useMemo(() => columnasActivasOrdenadas(columnas), [columnas]);
   const hayColumnas = columnasActivas.length > 0;
@@ -112,23 +121,23 @@ export default function DisponibilidadTurnos() {
   const limpiarFiltros = () => {
     setFiltroTipo('all');
     setFiltroNumero('');
-    setSoloConDisponibles(false);
+    setSoloConDisponibles(true);
   };
 
   const exportarBase = () => ({
     filas,
     cortejoNombre: cortejoSel?.nombre_evento,
     orgNombre: organizacion?.nombre_oficial,
-    resumen,
+    resumen: resumenDisponibilidad(filas),
   });
 
   return (
     <Layout
       title="Disponibilidad de turnos"
-      subtitle="Turnos con brazos libres y resumen de ocupación por procesión"
+      subtitle="Elija procesión y columnas, luego pulse Generar reporte"
     >
       <section className="panel listado-turnos__filtros">
-        <h3 className="panel__title">Filtros</h3>
+        <h3 className="panel__title">1. Procesión y columnas</h3>
         <div className="listado-turnos__filtros-grid">
           <label>
             Procesión
@@ -144,64 +153,10 @@ export default function DisponibilidadTurnos() {
               ))}
             </select>
           </label>
-          <label>
-            Tipo de turno
-            <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)}>
-              <option value="all">Todos</option>
-              {tiposTurno.map((t) => (
-                <option key={t} value={t}>
-                  {labelTipoTurno(t)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            N.º turno
-            <input
-              type="number"
-              min="1"
-              value={filtroNumero}
-              onChange={(e) => setFiltroNumero(e.target.value)}
-              placeholder="Todos"
-            />
-          </label>
         </div>
-        <div className="listado-turnos__acciones">
-          <label className="listado-turnos__check">
-            <input
-              type="checkbox"
-              checked={soloConDisponibles}
-              onChange={(e) => setSoloConDisponibles(e.target.checked)}
-            />
-            Solo turnos con brazos libres
-          </label>
-          <button type="button" className="btn btn--ghost btn--sm" onClick={limpiarFiltros}>
-            Limpiar filtros
-          </button>
-          <button
-            type="button"
-            className="btn btn--ghost btn--sm"
-            onClick={() => exportDisponibilidadExcel(exportarBase())}
-            disabled={!filas.length}
-          >
-            Exportar Excel
-          </button>
-          <button
-            type="button"
-            className="btn btn--ghost btn--sm"
-            onClick={() => exportDisponibilidadPdf(exportarBase())}
-            disabled={!filas.length}
-          >
-            PDF completo
-          </button>
-        </div>
-      </section>
 
-      <section className="panel disponibilidad-columnas">
-        <h3 className="panel__title">Columnas del reporte «Turnos disponibles»</h3>
-        <p className="text-muted config-hint">
-          Marque o desmarque qué información quiere ver e imprimir. La selección se guarda en este
-          navegador.
+        <p className="text-muted config-hint" style={{ marginTop: '0.85rem' }}>
+          Columnas del reporte (marque solo lo que quiere imprimir):
         </p>
         <div className="disponibilidad-columnas__grid">
           {COLUMNAS_REPORTE_DISPONIBLES.map((col) => (
@@ -236,72 +191,56 @@ export default function DisponibilidadTurnos() {
           </button>
           <button
             type="button"
-            className="btn btn--primary btn--sm"
-            onClick={() =>
-              exportTurnosDisponiblesBonito({
-                filas: filasDisponiblesReporte,
-                cortejoNombre: cortejoSel?.nombre_evento,
-                orgNombre: organizacion?.nombre_oficial,
-                soloConLibres: false,
-                columnas,
-              })
-            }
-            disabled={!filasDisponiblesReporte.length || !hayColumnas}
+            className="btn btn--primary"
+            onClick={generarReporte}
+            disabled={!cortejoId || cargando || !hayColumnas}
           >
-            Imprimir turnos disponibles
+            {cargando ? 'Generando…' : 'Generar reporte'}
           </button>
         </div>
         {!hayColumnas && (
           <p className="alert alert--warning" style={{ marginTop: '0.75rem' }}>
-            Seleccione al menos una columna para poder imprimir.
+            Seleccione al menos una columna.
           </p>
         )}
-        <p className="text-muted config-hint" style={{ marginTop: '0.5rem' }}>
-          El cuadro e impresión incluyen todos los turnos de la procesión con al menos un brazo
-          libre (incluye reservas de taquilla vencidas).
-        </p>
       </section>
 
       {error && <div className="alert alert--error">{error}</div>}
 
-      {!cargando && filas.length > 0 && (
-        <div className="metrics-grid metrics-grid--5 disponibilidad-turnos__kpis">
-          <div className="metric-card">
-            <span className="metric-card__label">Turnos en reporte</span>
-            <strong className="metric-card__value">{resumen.turnos}</strong>
-          </div>
-          <div className="metric-card metric-card--primary">
-            <span className="metric-card__label">Brazos libres</span>
-            <strong className="metric-card__value">{resumen.brazosLibres}</strong>
-            <small>de {resumen.brazosTotal} totales</small>
-          </div>
-          <div className="metric-card">
-            <span className="metric-card__label">Turnos con libres</span>
-            <strong className="metric-card__value">{resumen.turnosConLibres}</strong>
-          </div>
-          <div className="metric-card">
-            <span className="metric-card__label">Brazos ocupados</span>
-            <strong className="metric-card__value">{resumen.brazosOcupados}</strong>
-          </div>
-          <div className="metric-card">
-            <span className="metric-card__label">Turnos llenos</span>
-            <strong className="metric-card__value">{resumen.turnosLlenos}</strong>
-          </div>
-        </div>
-      )}
+      {cargando && <Loader text="Cargando todos los brazos de la procesión…" />}
 
-      {cargando ? (
-        <Loader text="Cargando disponibilidad…" />
-      ) : !filas.length ? (
+      {!cargando && !reporteGenerado && (
         <section className="panel">
           <p className="text-muted">
-            No hay turnos que coincidan con los filtros. Pruebe desmarcar «Solo turnos con brazos
-            libres».
+            Pulse <strong>Generar reporte</strong> para ver los turnos con brazos libres. El reporte
+            no se recarga solo: solo cuando usted lo genere.
           </p>
         </section>
-      ) : (
+      )}
+
+      {!cargando && reporteGenerado && (
         <>
-          {filasDisponiblesReporte.length > 0 && hayColumnas && (
+          <div className="metrics-grid metrics-grid--4 disponibilidad-turnos__kpis">
+            <div className="metric-card">
+              <span className="metric-card__label">Turnos con libres</span>
+              <strong className="metric-card__value">{resumen.turnosConLibres}</strong>
+            </div>
+            <div className="metric-card metric-card--primary">
+              <span className="metric-card__label">Brazos libres</span>
+              <strong className="metric-card__value">{resumen.brazosLibres}</strong>
+              <small>de {resumen.brazosTotal} totales</small>
+            </div>
+            <div className="metric-card">
+              <span className="metric-card__label">Brazos ocupados</span>
+              <strong className="metric-card__value">{resumen.brazosOcupados}</strong>
+            </div>
+            <div className="metric-card">
+              <span className="metric-card__label">Turnos llenos</span>
+              <strong className="metric-card__value">{resumen.turnosLlenos}</strong>
+            </div>
+          </div>
+
+          {filasDisponiblesReporte.length > 0 && hayColumnas ? (
             <section className="panel turnos-disponibles-cuadro">
               <header className="turnos-disponibles-cuadro__head">
                 <p className="turnos-disponibles-cuadro__eyebrow">
@@ -355,80 +294,159 @@ export default function DisponibilidadTurnos() {
                 {filasDisponiblesReporte.length === 1 ? '' : 's'} con espacio libre
               </p>
             </section>
+          ) : (
+            <section className="panel">
+              <p className="text-muted">No hay turnos con brazos libres en esta procesión.</p>
+            </section>
           )}
 
-          <section className="panel">
-            <h3 className="panel__title">
-              {cortejoSel?.nombre_evento || 'Procesión'} — detalle completo ({filas.length} turno
-              {filas.length === 1 ? '' : 's'})
-            </h3>
-            <div className="table-wrap">
-              <table className="data-table data-table--compact disponibilidad-turnos__tabla">
-                <thead>
-                  <tr>
-                    <th>Turno</th>
-                    <th>Nombre</th>
-                    <th>Melodías / son</th>
-                    <th>Hora</th>
-                    <th>Precio</th>
-                    <th>Total</th>
-                    <th>Libres</th>
-                    <th>Vendidos</th>
-                    <th>Apartados</th>
-                    <th>Res. taquilla</th>
-                    <th>% libre</th>
-                    <th className="no-print">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filas.map((f) => (
-                    <tr
-                      key={f.turno.id}
-                      className={f.disponibles === 0 ? 'disponibilidad-turnos__fila-llena' : ''}
-                    >
-                      <td>
-                        <strong>#{f.numero}</strong>
-                      </td>
-                      <td>{f.nombre}</td>
-                      <td>
-                        <span className="disponibilidad-turnos__melodias">{f.melodias}</span>
-                      </td>
-                      <td>{f.hora}</td>
-                      <td>{f.precio}</td>
-                      <td>{f.total}</td>
-                      <td className={f.disponibles > 0 ? 'disponibilidad-turnos__celda-libres' : undefined}>
-                        <strong
-                          className={
-                            f.disponibles > 0
-                              ? 'disponibilidad-turnos__libres'
-                              : 'text-muted'
-                          }
-                        >
-                          {f.disponibles}
-                        </strong>
-                      </td>
-                      <td>{f.vendidos}</td>
-                      <td>{f.apartados}</td>
-                      <td>{f.reservaTaquilla}</td>
-                      <td>{f.pctLibre}%</td>
-                      <td className="no-print">
-                        {f.disponibles > 0 ? (
-                          <Link
-                            to={`/taquilla?cortejo=${encodeURIComponent(cortejoId)}&turno=${f.numero}`}
-                            className="btn btn--primary btn--sm"
-                          >
-                            Vender en Taquilla
-                          </Link>
-                        ) : (
-                          <span className="text-muted">Lleno</span>
-                        )}
-                      </td>
-                    </tr>
+          <section className="panel listado-turnos__filtros">
+            <h3 className="panel__title">2. Imprimir / filtrar detalle</h3>
+            <div className="listado-turnos__filtros-grid">
+              <label>
+                Tipo de turno
+                <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)}>
+                  <option value="all">Todos</option>
+                  {tiposTurno.map((t) => (
+                    <option key={t} value={t}>
+                      {labelTipoTurno(t)}
+                    </option>
                   ))}
-                </tbody>
-              </table>
+                </select>
+              </label>
+              <label>
+                N.º turno
+                <input
+                  type="number"
+                  min="1"
+                  value={filtroNumero}
+                  onChange={(e) => setFiltroNumero(e.target.value)}
+                  placeholder="Todos"
+                />
+              </label>
+            </div>
+            <div className="listado-turnos__acciones">
+              <label className="listado-turnos__check">
+                <input
+                  type="checkbox"
+                  checked={soloConDisponibles}
+                  onChange={(e) => setSoloConDisponibles(e.target.checked)}
+                />
+                Solo turnos con brazos libres
+              </label>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={limpiarFiltros}>
+                Limpiar filtros
+              </button>
+              <button
+                type="button"
+                className="btn btn--primary btn--sm"
+                onClick={() =>
+                  exportTurnosDisponiblesBonito({
+                    filas: filasDisponiblesReporte,
+                    cortejoNombre: cortejoSel?.nombre_evento,
+                    orgNombre: organizacion?.nombre_oficial,
+                    soloConLibres: false,
+                    columnas,
+                  })
+                }
+                disabled={!filasDisponiblesReporte.length || !hayColumnas}
+              >
+                Imprimir turnos disponibles
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={() => exportDisponibilidadExcel(exportarBase())}
+                disabled={!filas.length}
+              >
+                Excel detalle
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={() => exportDisponibilidadPdf(exportarBase())}
+                disabled={!filas.length}
+              >
+                PDF detalle
+              </button>
             </div>
           </section>
+
+          {filas.length > 0 && (
+            <section className="panel">
+              <h3 className="panel__title">
+                Detalle ({filas.length} turno{filas.length === 1 ? '' : 's'})
+              </h3>
+              <div className="table-wrap">
+                <table className="data-table data-table--compact disponibilidad-turnos__tabla">
+                  <thead>
+                    <tr>
+                      <th>Turno</th>
+                      <th>Nombre</th>
+                      <th>Melodías / son</th>
+                      <th>Hora</th>
+                      <th>Precio</th>
+                      <th>Total</th>
+                      <th>Libres</th>
+                      <th>Vendidos</th>
+                      <th>Apartados</th>
+                      <th>Res. taquilla</th>
+                      <th>% libre</th>
+                      <th className="no-print">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filas.map((f) => (
+                      <tr
+                        key={f.turno.id}
+                        className={f.disponibles === 0 ? 'disponibilidad-turnos__fila-llena' : ''}
+                      >
+                        <td>
+                          <strong>#{f.numero}</strong>
+                        </td>
+                        <td>{f.nombre}</td>
+                        <td>
+                          <span className="disponibilidad-turnos__melodias">{f.melodias}</span>
+                        </td>
+                        <td>{f.hora}</td>
+                        <td>{f.precio}</td>
+                        <td>{f.total}</td>
+                        <td
+                          className={
+                            f.disponibles > 0 ? 'disponibilidad-turnos__celda-libres' : undefined
+                          }
+                        >
+                          <strong
+                            className={
+                              f.disponibles > 0 ? 'disponibilidad-turnos__libres' : 'text-muted'
+                            }
+                          >
+                            {f.disponibles}
+                          </strong>
+                        </td>
+                        <td>{f.vendidos}</td>
+                        <td>{f.apartados}</td>
+                        <td>{f.reservaTaquilla}</td>
+                        <td>{f.pctLibre}%</td>
+                        <td className="no-print">
+                          {f.disponibles > 0 ? (
+                            <Link
+                              to={`/taquilla?cortejo=${encodeURIComponent(cortejoId)}&turno=${f.numero}`}
+                              className="btn btn--primary btn--sm"
+                            >
+                              Vender en Taquilla
+                            </Link>
+                          ) : (
+                            <span className="text-muted">Lleno</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
         </>
       )}
     </Layout>

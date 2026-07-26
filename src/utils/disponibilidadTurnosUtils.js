@@ -2,34 +2,36 @@ import * as XLSX from 'xlsx';
 import { labelTipoTurno, formatQ } from './cajaReportUtils';
 import { formatHoraDisplay } from './turnoHorarioUtils';
 import { etiquetaHonorTurno, textoMelodiaTurno } from './turnoUtils';
-import { esReservaTaquillaExpirada } from './reservasTaquillaUtils';
+import { esReservaTaquillaExpirada, esReservaTaquillaColgada } from './reservasTaquillaUtils';
 
 function brazosDeTurno(turno) {
   return [...(turno?.izquierda || []), ...(turno?.derecha || [])];
 }
 
-/** Libre para venta: disponible o reserva de taquilla ya vencida (igual que Taquilla). */
+/** Libre para venta: disponible, reserva vencida o reserva colgada (igual criterio práctico que Taquilla). */
 export function esBrazoLibreParaVenta(brazo) {
   if (!brazo) return false;
   if (brazo.estado === 'disponible') return true;
-  return esReservaTaquillaExpirada(brazo);
+  if (brazo.estado === 'vendido') return false;
+  if (brazo.reserva_apartado) return false;
+  if (brazo.estado !== 'reservado') return false;
+  return esReservaTaquillaExpirada(brazo) || esReservaTaquillaColgada(brazo);
 }
 
 export function contarBrazosTurno(turno) {
   const brazos = brazosDeTurno(turno);
-  const disponibles = brazos.filter(esBrazoLibreParaVenta);
+  const libresRows = brazos.filter(esBrazoLibreParaVenta);
   const vendidos = brazos.filter((b) => b.estado === 'vendido');
   const apartados = brazos.filter((b) => b.estado === 'reservado' && b.reserva_apartado);
   const reservaTaquilla = brazos.filter(
-    (b) => b.estado === 'reservado' && !b.reserva_apartado && !esReservaTaquillaExpirada(b)
+    (b) => b.estado === 'reservado' && !b.reserva_apartado && !esBrazoLibreParaVenta(b)
   );
 
-  // Si faltan filas de brazos vs total_brazos, esos huecos también son libres.
   const totalConfigurado = Number(turno?.total_brazos) || 0;
   const total = Math.max(brazos.length, totalConfigurado);
-  const ocupadosContados = vendidos.length + apartados.length + reservaTaquilla.length;
-  const libresPorHuecos = Math.max(0, total - ocupadosContados);
-  const libres = Math.max(disponibles.length, libresPorHuecos);
+  const ocupadosFijos = vendidos.length + apartados.length + reservaTaquilla.length;
+  const libresPorHuecos = Math.max(0, total - ocupadosFijos);
+  const libres = Math.max(libresRows.length, libresPorHuecos);
 
   return {
     total,

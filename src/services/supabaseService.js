@@ -235,18 +235,44 @@ async function fetchBrazosCortejoRpc(cortejoId, organizacionId) {
 
 async function fetchBrazosByTurnoIdsRest(organizacionId, turnoIds, selectFields) {
   const TURNO_BATCH = 4;
+  const PAGE = 1000;
   const all = [];
   for (let i = 0; i < turnoIds.length; i += TURNO_BATCH) {
     const batch = turnoIds.slice(i, i + TURNO_BATCH);
-    const { data, error } = await supabase
-      .from('brazos')
-      .select(selectFields)
-      .eq('organizacion_id', organizacionId)
-      .in('turno_id', batch);
-    if (error) throw error;
-    if (data?.length) all.push(...data);
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from('brazos')
+        .select(selectFields)
+        .eq('organizacion_id', organizacionId)
+        .in('turno_id', batch)
+        .range(from, from + PAGE - 1);
+      if (error) throw error;
+      if (!data?.length) break;
+      all.push(...data);
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
   }
   return all;
+}
+
+/**
+ * Disponibilidad: carga completa por REST paginado (evita truncar RPC a 1000 filas,
+ * que omitía brazos libres de turnos altos como el #55).
+ */
+export async function getTurnosAgrupadosDisponibilidad(cortejoId, organizacionId) {
+  if (!cortejoId || !organizacionId) return [];
+  const turnos = await getTurnosByCortejo(cortejoId);
+  const turnoIds = turnos.map((t) => t.id);
+  if (!turnoIds.length) return [];
+
+  const brazos = await fetchBrazosByTurnoIdsRest(
+    organizacionId,
+    turnoIds,
+    BRAZO_LIST_FIELDS
+  );
+  return agruparTurnosConBrazos(turnos, brazos);
 }
 
 function mapBrazosTaquillaRpc(brazos) {
