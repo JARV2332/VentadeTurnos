@@ -3621,6 +3621,36 @@ html {
   margin-bottom: 0.5rem;
 }
 
+.correo-historial__head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.correo-historial__acciones-fila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+  min-width: 7rem;
+}
+
+.correo-pendientes__controles--en-historial {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(202, 138, 4, 0.06);
+}
+
+.correo-pendientes__resumen--inline {
+  margin: 0;
+  align-self: flex-end;
+  padding-bottom: 0.35rem;
+  font-size: 0.85rem;
+}
+
 .correo-historial__hint {
   margin-bottom: 1rem;
 }

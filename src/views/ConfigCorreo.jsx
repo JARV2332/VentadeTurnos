@@ -40,7 +40,7 @@ import {
   ESTADOS_CORREO,
   ESTADOS_PENDIENTES_REENVIO,
 } from '../utils/correoHistorialUtils';
-import { ejecutarReenvioPendientes } from '../services/reenvioPendientesService';
+import { ejecutarReenvioPendientes, reenviarCorreoPendienteApi } from '../services/reenvioPendientesService';
 import {
   DELAY_DEFAULT_SEG,
   DELAY_OPCIONES_SEG,
@@ -136,6 +136,7 @@ export default function ConfigCorreo() {
   const [reenviandoPendientes, setReenviandoPendientes] = useState(false);
   const [progresoPendientes, setProgresoPendientes] = useState(null);
   const [resultadoPendientes, setResultadoPendientes] = useState(null);
+  const [reenviandoUno, setReenviandoUno] = useState(null);
   const cancelPendientesRef = useRef({ cancelled: false });
 
   const [okMsg, setOkMsg] = useState('');
@@ -247,6 +248,21 @@ export default function ConfigCorreo() {
 
   const handleCancelarPendientes = () => {
     cancelPendientesRef.current.cancelled = true;
+  };
+
+  const handleReenviarUno = async (row) => {
+    if (!row?.id || reenviandoPendientes || reenviandoUno) return;
+    setReenviandoUno(row.id);
+    setError('');
+    setOkMsg('');
+    const res = await reenviarCorreoPendienteApi(organizacionId, row.id);
+    setReenviandoUno(null);
+    if (res.ok) {
+      setOkMsg(`Correo reenviado a ${res.destinatario || row.destinatario}`);
+      await refresh();
+    } else {
+      setError(res.error || 'No se pudo reenviar');
+    }
   };
 
   const handleMarcarRebotado = async (row) => {
@@ -706,15 +722,45 @@ export default function ConfigCorreo() {
 
 
       <section className="card" style={{ marginTop: '1.25rem' }}>
+
         <div className="correo-historial__head">
-          <h3 className="panel__title">Correos no enviados</h3>
+          <h3 className="panel__title">Historial de envíos</h3>
+          <div className="correo-historial__head-actions">
+            {conteoPendientesTotal > 0 && !reenviandoPendientes && (
+              <button
+                type="button"
+                className="btn btn--primary btn--sm"
+                disabled={!pendientesDesde.length || MOCK_MODE}
+                onClick={handleReenviarPendientes}
+                title={
+                  MOCK_MODE
+                    ? 'No disponible en modo demo'
+                    : `Reenviar ${pendientesDesde.length} desde ${pendienteHora}`
+                }
+              >
+                Reenviar pendientes ({pendientesDesde.length})
+              </button>
+            )}
+            {reenviandoPendientes && (
+              <button type="button" className="btn btn--ghost btn--sm" onClick={handleCancelarPendientes}>
+                Detener reenvío
+              </button>
+            )}
+            {conteoProblemas > 0 && (
+              <button type="button" className="btn btn--ghost btn--sm" onClick={handleExportarProblemas}>
+                Exportar problemas (CSV)
+              </button>
+            )}
+          </div>
         </div>
+
         <p className="text-muted config-hint correo-historial__hint">
-          Si Gmail bloqueó el envío (límite diario ~12:30), filtre desde esa hora y reenvíe con
-          pausa entre correos para no volver a saturar la cuenta.
+          Si Gmail cortó el envío (límite diario), use <strong>fecha + hora desde</strong> y
+          pulse <strong>Reenviar pendientes</strong>. Los rebotes (correo mal escrito) llegan a
+          Gmail como &quot;No entregado&quot;; márquelos aquí para llevar control.
         </p>
 
-        <div className="correo-pendientes__controles">
+        <div className="correo-pendientes__controles correo-pendientes__controles--en-historial">
           <label>
             Fecha
             <input
@@ -747,77 +793,18 @@ export default function ConfigCorreo() {
               ))}
             </select>
           </label>
-        </div>
-
-        <p className="correo-pendientes__resumen">
-          {pendientesDesde.length === 0
-            ? conteoPendientesTotal === 0
-              ? 'No hay correos pendientes ni con error.'
-              : 'No hay pendientes desde esa fecha/hora (ajuste el filtro).'
-            : (
-              <>
-                <strong>{pendientesDesde.length}</strong> pendiente(s) desde{' '}
-                {pendienteHora || '00:00'}
-                {' · '}
-                estimado {formatearDuracionEstimada(pendientesDesde.length, pendienteDelay)}
-              </>
-            )}
-        </p>
-
-        {pendientesDesde.length > 0 && (
-          <div className="table-wrap correo-pendientes__tabla">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Devoto(a)</th>
-                  <th>Correo</th>
-                  <th>Boleta</th>
-                  <th>Estado</th>
-                  <th>Detalle</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendientesDesde.slice(0, 40).map((row) => (
-                  <tr key={row.id} className="correo-historial__fila--problema">
-                    <td>{new Date(row.created_at).toLocaleString('es-GT')}</td>
-                    <td>{row.metadata?.cargador_nombre || '—'}</td>
-                    <td>{row.destinatario}</td>
-                    <td>{row.codigo_boleta || '—'}</td>
-                    <td>
-                      <span className={`correo-estado ${ESTADOS_CORREO[row.estado]?.clase || ''}`}>
-                        {etiquetaEstadoCorreo(row.estado)}
-                      </span>
-                    </td>
-                    <td className="correo-historial__detalle">
-                      {row.metadata?.error || '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {pendientesDesde.length > 40 && (
-              <p className="text-muted">Mostrando 40 de {pendientesDesde.length}. El reenvío incluye todos.</p>
-            )}
-          </div>
-        )}
-
-        <div className="correo-pendientes__acciones">
-          {!reenviandoPendientes ? (
-            <button
-              type="button"
-              className="btn btn--primary"
-              disabled={!pendientesDesde.length || MOCK_MODE}
-              onClick={handleReenviarPendientes}
-              title={MOCK_MODE ? 'No disponible en modo demo' : undefined}
-            >
-              Reenviar pendientes
-            </button>
-          ) : (
-            <button type="button" className="btn btn--ghost" onClick={handleCancelarPendientes}>
-              Detener reenvío
-            </button>
-          )}
+          <p className="correo-pendientes__resumen correo-pendientes__resumen--inline">
+            {pendientesDesde.length === 0
+              ? conteoPendientesTotal === 0
+                ? 'Sin pendientes ni errores.'
+                : 'No hay errores desde esa hora (ajuste el filtro).'
+              : (
+                <>
+                  <strong>{pendientesDesde.length}</strong> para reenviar · estimado{' '}
+                  {formatearDuracionEstimada(pendientesDesde.length, pendienteDelay)}
+                </>
+              )}
+          </p>
         </div>
 
         {reenviandoPendientes && progresoPendientes && (
@@ -831,39 +818,20 @@ export default function ConfigCorreo() {
         {resultadoPendientes && !reenviandoPendientes && (
           <div className="correo-pendientes__resultado">
             <p>
-              <strong>{resultadoPendientes.ok.length}</strong> enviado(s)
+              <strong>{resultadoPendientes.ok.length}</strong> reenviado(s)
               {resultadoPendientes.error.length > 0 && (
-                <> · <span className="correo-pendientes__fallos">{resultadoPendientes.error.length} fallido(s)</span></>
+                <>
+                  {' '}
+                  ·{' '}
+                  <span className="correo-pendientes__fallos">
+                    {resultadoPendientes.error.length} fallido(s)
+                  </span>
+                </>
               )}
-              {resultadoPendientes.cancelado && ' · detenido por el usuario'}
+              {resultadoPendientes.cancelado && ' · detenido'}
             </p>
-            {resultadoPendientes.error.length > 0 && (
-              <ul className="correo-pendientes__errores">
-                {resultadoPendientes.error.slice(0, 10).map((e) => (
-                  <li key={e.id}>{e.etiqueta}: {e.error}</li>
-                ))}
-              </ul>
-            )}
           </div>
         )}
-      </section>
-
-      <section className="card" style={{ marginTop: '1.25rem' }}>
-
-        <div className="correo-historial__head">
-          <h3 className="panel__title">Historial de envíos</h3>
-          {conteoProblemas > 0 && (
-            <button type="button" className="btn btn--ghost btn--sm" onClick={handleExportarProblemas}>
-              Exportar problemas (CSV)
-            </button>
-          )}
-        </div>
-
-        <p className="text-muted config-hint correo-historial__hint">
-          Los <strong>rebotes</strong> (correo mal escrito o buzón inexistente) suelen llegar minutos
-          después a la bandeja del Gmail remitente como &quot;No entregado&quot; o &quot;Mail Delivery
-          Subsystem&quot;. Revise esa cuenta, luego marque aquí los que rebotaron para llevar control.
-        </p>
 
         {historial.length === 0 ? (
 
@@ -920,7 +888,7 @@ export default function ConfigCorreo() {
 
                 {historialFiltrado.map((row) => (
 
-                  <tr key={row.id} className={row.estado === 'error' || row.estado === 'rebotado' ? 'correo-historial__fila--problema' : ''}>
+                  <tr key={row.id} className={row.estado === 'error' || row.estado === 'rebotado' || row.estado === 'encolado' ? 'correo-historial__fila--problema' : ''}>
 
                     <td>{new Date(row.created_at).toLocaleString('es-GT')}</td>
 
@@ -940,7 +908,17 @@ export default function ConfigCorreo() {
                       {row.metadata?.error || (row.estado === 'rebotado' ? 'Marcado como rebotado' : '—')}
                     </td>
 
-                    <td>
+                    <td className="correo-historial__acciones-fila">
+                      {ESTADOS_PENDIENTES_REENVIO.includes(row.estado) && (
+                        <button
+                          type="button"
+                          className="btn btn--primary btn--sm"
+                          disabled={reenviandoPendientes || reenviandoUno === row.id || MOCK_MODE}
+                          onClick={() => handleReenviarUno(row)}
+                        >
+                          {reenviandoUno === row.id ? '…' : 'Reenviar'}
+                        </button>
+                      )}
                       {row.estado === 'enviado' && (
                         <button
                           type="button"
