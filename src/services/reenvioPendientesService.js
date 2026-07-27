@@ -2,7 +2,7 @@
  * Reenvío de correos pendientes (error / encolado) vía API, uno a uno con pausa.
  */
 import { supabase } from '../config/supabaseClient';
-import { dormir } from './reenvioMasivoUtils';
+import { dormir } from '../utils/reenvioMasivoUtils';
 
 const EMAIL_API =
   process.env.REACT_APP_EMAIL_WEBHOOK_URL ||
