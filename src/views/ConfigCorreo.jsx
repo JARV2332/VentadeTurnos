@@ -192,6 +192,21 @@ export default function ConfigCorreo() {
 
   }, [organizacionId, refresh]);
 
+  // Errores de otro día (límite Gmail): autoelegir esa fecha para el reenvío.
+  useEffect(() => {
+    const pendientes = historial.filter((r) => ESTADOS_PENDIENTES_REENVIO.includes(r.estado));
+    if (!pendientes.length) return;
+    const masAntiguo = pendientes.reduce((a, b) =>
+      new Date(a.created_at) < new Date(b.created_at) ? a : b
+    );
+    const d = new Date(masAntiguo.created_at);
+    if (Number.isNaN(d.getTime())) return;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    setPendienteFecha(`${y}-${m}-${day}`);
+  }, [historial.length]);
+
   const historialFiltrado = useMemo(
     () => filtrarHistorialCorreos(historial, filtroHistorial),
     [historial, filtroHistorial]
