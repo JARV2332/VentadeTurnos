@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 import { Link } from 'react-router-dom';
 
@@ -35,10 +35,27 @@ import {
   etiquetaEstadoCorreo,
   exportarErroresCsv,
   filtrarHistorialCorreos,
+  filtrarPendientesDesde,
+  construirDesdeLocal,
   ESTADOS_CORREO,
+  ESTADOS_PENDIENTES_REENVIO,
 } from '../utils/correoHistorialUtils';
+import { ejecutarReenvioPendientes } from '../services/reenvioPendientesService';
+import {
+  DELAY_DEFAULT_SEG,
+  DELAY_OPCIONES_SEG,
+  formatearDuracionEstimada,
+} from '../utils/reenvioMasivoUtils';
 
 import { DEMO_NOMBRE_ORGANIZACION } from '../data/mockData';
+
+function hoyLocalYYYYMMDD() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 
 
@@ -113,6 +130,13 @@ export default function ConfigCorreo() {
   const [historial, setHistorial] = useState([]);
   const [filtroHistorial, setFiltroHistorial] = useState('todos');
   const [marcandoRebote, setMarcandoRebote] = useState(null);
+  const [pendienteFecha, setPendienteFecha] = useState(hoyLocalYYYYMMDD);
+  const [pendienteHora, setPendienteHora] = useState('12:30');
+  const [pendienteDelay, setPendienteDelay] = useState(DELAY_DEFAULT_SEG);
+  const [reenviandoPendientes, setReenviandoPendientes] = useState(false);
+  const [progresoPendientes, setProgresoPendientes] = useState(null);
+  const [resultadoPendientes, setResultadoPendientes] = useState(null);
+  const cancelPendientesRef = useRef({ cancelled: false });
 
   const [okMsg, setOkMsg] = useState('');
 
@@ -176,6 +200,54 @@ export default function ConfigCorreo() {
     () => historial.filter((r) => r.estado === 'error' || r.estado === 'rebotado').length,
     [historial]
   );
+
+  const conteoPendientesTotal = useMemo(
+    () => historial.filter((r) => ESTADOS_PENDIENTES_REENVIO.includes(r.estado)).length,
+    [historial]
+  );
+
+  const desdePendientesIso = useMemo(
+    () => construirDesdeLocal(pendienteFecha, pendienteHora),
+    [pendienteFecha, pendienteHora]
+  );
+
+  const pendientesDesde = useMemo(
+    () => filtrarPendientesDesde(historial, desdePendientesIso),
+    [historial, desdePendientesIso]
+  );
+
+  const handleReenviarPendientes = async () => {
+    if (!pendientesDesde.length || reenviandoPendientes) return;
+    cancelPendientesRef.current = { cancelled: false };
+    setReenviandoPendientes(true);
+    setResultadoPendientes(null);
+    setProgresoPendientes({ fase: 'enviando', indice: 0, total: pendientesDesde.length });
+    setError('');
+    setOkMsg('');
+
+    const resultados = await ejecutarReenvioPendientes({
+      organizacionId,
+      filas: pendientesDesde,
+      delaySegundos: pendienteDelay,
+      signal: cancelPendientesRef.current,
+      onProgress: setProgresoPendientes,
+    });
+
+    setResultadoPendientes(resultados);
+    setReenviandoPendientes(false);
+    setProgresoPendientes((p) => (p ? { ...p, fase: 'fin' } : p));
+    await refresh();
+    if (resultados.ok.length && !resultados.cancelado) {
+      setOkMsg(
+        `Reenvío terminado: ${resultados.ok.length} enviado(s)` +
+          (resultados.error.length ? `, ${resultados.error.length} con error` : '')
+      );
+    }
+  };
+
+  const handleCancelarPendientes = () => {
+    cancelPendientesRef.current.cancelled = true;
+  };
 
   const handleMarcarRebotado = async (row) => {
     if (row.estado === 'rebotado') return;
@@ -634,6 +706,149 @@ export default function ConfigCorreo() {
 
 
       <section className="card" style={{ marginTop: '1.25rem' }}>
+        <div className="correo-historial__head">
+          <h3 className="panel__title">Correos no enviados</h3>
+        </div>
+        <p className="text-muted config-hint correo-historial__hint">
+          Si Gmail bloqueó el envío (límite diario ~12:30), filtre desde esa hora y reenvíe con
+          pausa entre correos para no volver a saturar la cuenta.
+        </p>
+
+        <div className="correo-pendientes__controles">
+          <label>
+            Fecha
+            <input
+              type="date"
+              value={pendienteFecha}
+              onChange={(e) => setPendienteFecha(e.target.value)}
+              disabled={reenviandoPendientes}
+            />
+          </label>
+          <label>
+            Desde la hora
+            <input
+              type="time"
+              value={pendienteHora}
+              onChange={(e) => setPendienteHora(e.target.value)}
+              disabled={reenviandoPendientes}
+            />
+          </label>
+          <label>
+            Pausa entre envíos
+            <select
+              value={pendienteDelay}
+              onChange={(e) => setPendienteDelay(Number(e.target.value))}
+              disabled={reenviandoPendientes}
+            >
+              {DELAY_OPCIONES_SEG.map((op) => (
+                <option key={op.value} value={op.value}>
+                  {op.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <p className="correo-pendientes__resumen">
+          {pendientesDesde.length === 0
+            ? conteoPendientesTotal === 0
+              ? 'No hay correos pendientes ni con error.'
+              : 'No hay pendientes desde esa fecha/hora (ajuste el filtro).'
+            : (
+              <>
+                <strong>{pendientesDesde.length}</strong> pendiente(s) desde{' '}
+                {pendienteHora || '00:00'}
+                {' · '}
+                estimado {formatearDuracionEstimada(pendientesDesde.length, pendienteDelay)}
+              </>
+            )}
+        </p>
+
+        {pendientesDesde.length > 0 && (
+          <div className="table-wrap correo-pendientes__tabla">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Devoto(a)</th>
+                  <th>Correo</th>
+                  <th>Boleta</th>
+                  <th>Estado</th>
+                  <th>Detalle</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendientesDesde.slice(0, 40).map((row) => (
+                  <tr key={row.id} className="correo-historial__fila--problema">
+                    <td>{new Date(row.created_at).toLocaleString('es-GT')}</td>
+                    <td>{row.metadata?.cargador_nombre || '—'}</td>
+                    <td>{row.destinatario}</td>
+                    <td>{row.codigo_boleta || '—'}</td>
+                    <td>
+                      <span className={`correo-estado ${ESTADOS_CORREO[row.estado]?.clase || ''}`}>
+                        {etiquetaEstadoCorreo(row.estado)}
+                      </span>
+                    </td>
+                    <td className="correo-historial__detalle">
+                      {row.metadata?.error || '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {pendientesDesde.length > 40 && (
+              <p className="text-muted">Mostrando 40 de {pendientesDesde.length}. El reenvío incluye todos.</p>
+            )}
+          </div>
+        )}
+
+        <div className="correo-pendientes__acciones">
+          {!reenviandoPendientes ? (
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={!pendientesDesde.length || MOCK_MODE}
+              onClick={handleReenviarPendientes}
+              title={MOCK_MODE ? 'No disponible en modo demo' : undefined}
+            >
+              Reenviar pendientes
+            </button>
+          ) : (
+            <button type="button" className="btn btn--ghost" onClick={handleCancelarPendientes}>
+              Detener reenvío
+            </button>
+          )}
+        </div>
+
+        {reenviandoPendientes && progresoPendientes && (
+          <p className="correo-pendientes__progreso">
+            {progresoPendientes.fase === 'espera'
+              ? `Esperando pausa… (${progresoPendientes.indice}/${progresoPendientes.total})`
+              : `Enviando ${progresoPendientes.indice}/${progresoPendientes.total}: ${progresoPendientes.etiqueta || ''}`}
+          </p>
+        )}
+
+        {resultadoPendientes && !reenviandoPendientes && (
+          <div className="correo-pendientes__resultado">
+            <p>
+              <strong>{resultadoPendientes.ok.length}</strong> enviado(s)
+              {resultadoPendientes.error.length > 0 && (
+                <> · <span className="correo-pendientes__fallos">{resultadoPendientes.error.length} fallido(s)</span></>
+              )}
+              {resultadoPendientes.cancelado && ' · detenido por el usuario'}
+            </p>
+            {resultadoPendientes.error.length > 0 && (
+              <ul className="correo-pendientes__errores">
+                {resultadoPendientes.error.slice(0, 10).map((e) => (
+                  <li key={e.id}>{e.etiqueta}: {e.error}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </section>
+
+      <section className="card" style={{ marginTop: '1.25rem' }}>
 
         <div className="correo-historial__head">
           <h3 className="panel__title">Historial de envíos</h3>
@@ -663,7 +878,9 @@ export default function ConfigCorreo() {
                 <select value={filtroHistorial} onChange={(e) => setFiltroHistorial(e.target.value)}>
                   <option value="todos">Todos ({historial.length})</option>
                   <option value="enviado">Enviados</option>
+                  <option value="pendientes">Pendientes / error ({conteoPendientesTotal})</option>
                   <option value="error">Error al enviar</option>
+                  <option value="encolado">En cola</option>
                   <option value="rebotado">Rebotados</option>
                   <option value="problemas">Con problemas ({conteoProblemas})</option>
                 </select>

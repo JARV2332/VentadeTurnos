@@ -1,16 +1,19 @@
 /**
  * Envío de boletas por Gmail SMTP — credenciales por organización o fallback en Vercel.
+ * También: action=reenviar-pendiente (correoId) para reintentar error/encolado.
  */
 import { verifyOrgMember } from './_lib/verifyOrgMember.js';
 import { buildBoletaEmailContent } from './_lib/emailBoletaContent.js';
 import { buildEntregaEmailContent } from './_lib/emailEntregaContent.js';
 import { createTransporter, obtenerCredencialesSmtp } from './_lib/emailSmtp.js';
+import { reenviarCorreoPendiente } from './_lib/reenviarCorreoPendiente.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido' });
   }
 
+  const body = req.body || {};
   const {
     organizacionId,
     from,
@@ -23,7 +26,9 @@ export default async function handler(req, res) {
     enlace_boleta,
     tipo,
     entrega,
-  } = req.body || {};
+    action,
+    correoId,
+  } = body;
 
   if (!organizacionId) {
     return res.status(400).json({ error: 'organizacionId es obligatorio' });
@@ -32,6 +37,14 @@ export default async function handler(req, res) {
   const member = await verifyOrgMember(req, organizacionId);
   if (member.error) {
     return res.status(member.status).json({ error: member.error });
+  }
+
+  if (action === 'reenviar-pendiente') {
+    const result = await reenviarCorreoPendiente(member.admin, organizacionId, correoId);
+    if (!result.ok) {
+      return res.status(400).json({ error: result.error || 'No se pudo reenviar' });
+    }
+    return res.status(200).json(result);
   }
 
   const creds = await obtenerCredencialesSmtp(member.admin, organizacionId);
