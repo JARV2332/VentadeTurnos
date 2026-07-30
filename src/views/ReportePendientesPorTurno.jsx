@@ -88,6 +88,16 @@ export default function ReportePendientesPorTurno() {
   );
   const totalPendientes = detallePendientes.length;
   const cortejoSeleccionado = cortejos.find((c) => c.id === cortejoId);
+  const resumenPorProcesion = useMemo(
+    () =>
+      resumen.reduce((grupos, fila) => {
+        const nombre = fila.procesion || 'Sin procesión';
+        if (!grupos[nombre]) grupos[nombre] = [];
+        grupos[nombre].push(fila);
+        return grupos;
+      }, {}),
+    [resumen]
+  );
 
   return (
     <Layout
@@ -172,30 +182,33 @@ export default function ReportePendientesPorTurno() {
             {!resumen.length ? (
               <p className="text-muted">No hay turnos pendientes de entrega con este filtro.</p>
             ) : (
-              <div className="table-wrap">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Procesión</th>
-                      <th>Tipo de turno</th>
-                      <th>Número de turno</th>
-                      <th>Honor</th>
-                      <th>Pendientes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {resumen.map((fila) => (
-                      <tr key={`${fila.tipoTurno}-${fila.numeroTurno}-${fila.procesion}`}>
-                        <td>{fila.procesion}</td>
-                        <td><strong>{fila.tipoTurno}</strong></td>
-                        <td>#{fila.numeroTurno}</td>
-                        <td>{fila.honor}</td>
-                        <td><strong>{fila.pendientes}</strong></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              Object.entries(resumenPorProcesion).map(([procesion, filasProcesion]) => (
+                <div key={procesion} className="reporte-pendientes-turno__procesion">
+                  <h4 className="panel__subtitle">{procesion}</h4>
+                  <div className="table-wrap">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Tipo de turno</th>
+                          <th>Número de turno</th>
+                          <th>Honor</th>
+                          <th>Pendientes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filasProcesion.map((fila) => (
+                          <tr key={`${fila.tipoTurno}-${fila.numeroTurno}`}>
+                            <td><strong>{fila.tipoTurno}</strong></td>
+                            <td>#{fila.numeroTurno}</td>
+                            <td>{fila.honor}</td>
+                            <td><strong>{fila.pendientes}</strong></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))
             )}
           </section>
         </>

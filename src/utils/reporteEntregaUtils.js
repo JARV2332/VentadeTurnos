@@ -196,25 +196,22 @@ export function resumirPendientesPorTipoYTurno(filas = []) {
   filas
     .filter((fila) => fila.estadoEntrega === 'pendiente')
     .forEach((fila) => {
-      const key = `${fila.tipoTurno}|${fila.numeroTurno}`;
+      const key = `${fila.procesion}|${fila.tipoTurno}|${fila.numeroTurno}`;
       const actual = grupos.get(key) || {
+        procesion: fila.procesion,
         tipoTurno: fila.tipoTurno || 'Sin tipo',
         numeroTurno: fila.numeroTurno,
         honor: fila.honor || '—',
         pendientes: 0,
-        procesiones: new Set(),
       };
       actual.pendientes += 1;
-      actual.procesiones.add(fila.procesion);
       grupos.set(key, actual);
     });
 
   return [...grupos.values()]
-    .map((grupo) => ({
-      ...grupo,
-      procesion: [...grupo.procesiones].sort((a, b) => a.localeCompare(b, 'es')).join(', '),
-    }))
     .sort((a, b) => {
+      const procesion = a.procesion.localeCompare(b.procesion, 'es');
+      if (procesion !== 0) return procesion;
       const numeroA = Number(a.numeroTurno);
       const numeroB = Number(b.numeroTurno);
       if (!Number.isNaN(numeroA) && !Number.isNaN(numeroB) && numeroA !== numeroB) {
@@ -231,15 +228,31 @@ export function exportResumenPendientesPorTurnoPdf({
   cortejoLabel = 'Todas las procesiones',
 }) {
   const totalPendientes = filas.reduce((total, fila) => total + fila.pendientes, 0);
-  const filasHtml = filas
+  const porProcesion = filas.reduce((grupos, fila) => {
+    const nombre = fila.procesion || 'Sin procesión';
+    if (!grupos[nombre]) grupos[nombre] = [];
+    grupos[nombre].push(fila);
+    return grupos;
+  }, {});
+  const seccionesHtml = Object.entries(porProcesion)
     .map(
-      (fila) => `<tr>
-        <td>${escapeHtml(fila.procesion)}</td>
-        <td>${escapeHtml(fila.tipoTurno)}</td>
-        <td class="numero">#${escapeHtml(fila.numeroTurno)}</td>
-        <td>${escapeHtml(fila.honor)}</td>
-        <td class="numero"><strong>${escapeHtml(fila.pendientes)}</strong></td>
-      </tr>`
+      ([procesion, filasProcesion]) => `
+        <section class="procesion">
+          <h2>${escapeHtml(procesion)}</h2>
+          <table>
+            <thead><tr><th>Tipo de turno</th><th>Número</th><th>Honor</th><th>Pendientes</th></tr></thead>
+            <tbody>${filasProcesion
+              .map(
+                (fila) => `<tr>
+                  <td>${escapeHtml(fila.tipoTurno)}</td>
+                  <td class="numero">#${escapeHtml(fila.numeroTurno)}</td>
+                  <td>${escapeHtml(fila.honor)}</td>
+                  <td class="numero"><strong>${escapeHtml(fila.pendientes)}</strong></td>
+                </tr>`
+              )
+              .join('')}</tbody>
+          </table>
+        </section>`
     )
     .join('');
   const html = `<!doctype html>
@@ -250,6 +263,7 @@ export function exportResumenPendientesPorTurnoPdf({
   * { box-sizing: border-box; }
   body { margin: 0; color: #172033; font: 11px "Segoe UI", Arial, sans-serif; }
   h1 { margin: 0 0 4px; font-size: 18px; }
+  h2 { margin: 14px 0 5px; font-size: 13px; }
   .meta { margin: 0 0 14px; color: #526075; }
   .toolbar { margin-bottom: 12px; padding: 9px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; }
   button { margin-top: 5px; padding: 6px 11px; color: #fff; border: 0; border-radius: 4px; background: #2563eb; cursor: pointer; }
@@ -264,10 +278,7 @@ export function exportResumenPendientesPorTurnoPdf({
   </div>
   <h1>Pendientes de entrega por tipo y número de turno</h1>
   <p class="meta"><strong>${escapeHtml(orgNombre)}</strong> · ${escapeHtml(cortejoLabel)} · ${totalPendientes} pendiente(s) · Generado: ${escapeHtml(new Date().toLocaleString('es-GT'))}</p>
-  <table>
-    <thead><tr><th>Procesión</th><th>Tipo de turno</th><th>Número</th><th>Honor</th><th>Pendientes</th></tr></thead>
-    <tbody>${filasHtml || '<tr><td colspan="5">No hay pendientes.</td></tr>'}</tbody>
-  </table>
+  ${seccionesHtml || '<p>No hay pendientes.</p>'}
   <script>window.addEventListener('load', () => setTimeout(() => window.print(), 350));</script>
 </body></html>`;
   const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
