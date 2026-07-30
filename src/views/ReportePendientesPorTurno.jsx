@@ -10,6 +10,7 @@ import {
 } from '../services/dataService';
 import {
   construirReporteEntrega,
+  exportResumenPendientesPorTurnoPdf,
   resumirPendientesPorTipoYTurno,
 } from '../utils/reporteEntregaUtils';
 
@@ -125,6 +126,20 @@ export default function ReportePendientesPorTurno() {
             disabled={!resumen.length}
           >
             Exportar Excel
+          </button>
+          <button
+            type="button"
+            className="btn btn--primary btn--sm"
+            onClick={() =>
+              exportResumenPendientesPorTurnoPdf({
+                filas: resumen,
+                orgNombre: organizacion?.nombre_oficial,
+                cortejoLabel: cortejoSeleccionado?.nombre_evento || 'Todas las procesiones',
+              })
+            }
+            disabled={!resumen.length}
+          >
+            Imprimir / Guardar PDF
           </button>
         </div>
       </section>

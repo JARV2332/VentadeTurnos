@@ -215,10 +215,68 @@ export function resumirPendientesPorTipoYTurno(filas = []) {
       procesion: [...grupo.procesiones].sort((a, b) => a.localeCompare(b, 'es')).join(', '),
     }))
     .sort((a, b) => {
-      const tipo = a.tipoTurno.localeCompare(b.tipoTurno, 'es');
-      if (tipo !== 0) return tipo;
-      return Number(a.numeroTurno) - Number(b.numeroTurno);
+      const numeroA = Number(a.numeroTurno);
+      const numeroB = Number(b.numeroTurno);
+      if (!Number.isNaN(numeroA) && !Number.isNaN(numeroB) && numeroA !== numeroB) {
+        return numeroA - numeroB;
+      }
+      return a.tipoTurno.localeCompare(b.tipoTurno, 'es');
     });
+}
+
+/** Abre el resumen de pendientes por turno listo para imprimir o guardar como PDF. */
+export function exportResumenPendientesPorTurnoPdf({
+  filas = [],
+  orgNombre = '',
+  cortejoLabel = 'Todas las procesiones',
+}) {
+  const totalPendientes = filas.reduce((total, fila) => total + fila.pendientes, 0);
+  const filasHtml = filas
+    .map(
+      (fila) => `<tr>
+        <td>${escapeHtml(fila.procesion)}</td>
+        <td>${escapeHtml(fila.tipoTurno)}</td>
+        <td class="numero">#${escapeHtml(fila.numeroTurno)}</td>
+        <td>${escapeHtml(fila.honor)}</td>
+        <td class="numero"><strong>${escapeHtml(fila.pendientes)}</strong></td>
+      </tr>`
+    )
+    .join('');
+  const html = `<!doctype html>
+<html lang="es"><head><meta charset="utf-8" />
+<title>Pendientes por tipo y turno</title>
+<style>
+  @page { size: A4 portrait; margin: 14mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: #172033; font: 11px "Segoe UI", Arial, sans-serif; }
+  h1 { margin: 0 0 4px; font-size: 18px; }
+  .meta { margin: 0 0 14px; color: #526075; }
+  .toolbar { margin-bottom: 12px; padding: 9px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; }
+  button { margin-top: 5px; padding: 6px 11px; color: #fff; border: 0; border-radius: 4px; background: #2563eb; cursor: pointer; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 7px; text-align: left; border: 1px solid #cbd5e1; }
+  th { color: #334155; background: #e2e8f0; text-transform: uppercase; font-size: 9px; }
+  .numero { text-align: center; }
+  @media print { .toolbar { display: none; } }
+</style></head><body>
+  <div class="toolbar">Reporte listo. En la impresión seleccione <strong>Guardar como PDF</strong>.<br/>
+    <button onclick="window.print()">Imprimir / Guardar PDF</button>
+  </div>
+  <h1>Pendientes de entrega por tipo y número de turno</h1>
+  <p class="meta"><strong>${escapeHtml(orgNombre)}</strong> · ${escapeHtml(cortejoLabel)} · ${totalPendientes} pendiente(s) · Generado: ${escapeHtml(new Date().toLocaleString('es-GT'))}</p>
+  <table>
+    <thead><tr><th>Procesión</th><th>Tipo de turno</th><th>Número</th><th>Honor</th><th>Pendientes</th></tr></thead>
+    <tbody>${filasHtml || '<tr><td colspan="5">No hay pendientes.</td></tr>'}</tbody>
+  </table>
+  <script>window.addEventListener('load', () => setTimeout(() => window.print(), 350));</script>
+</body></html>`;
+  const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+  const ventana = window.open(url, '_blank');
+  if (ventana) {
+    setTimeout(() => URL.revokeObjectURL(url), 120000);
+  } else {
+    URL.revokeObjectURL(url);
+  }
 }
 
 export function exportReporteEntregaExcel({
