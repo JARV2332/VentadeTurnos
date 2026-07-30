@@ -14,6 +14,7 @@ import {
 import {
   construirReporteEntrega,
   exportReporteEntregaExcel,
+  exportPendientesEntregaPdf,
   mapaOperadoresEntrega,
   opcionesOperadoresEntrega,
   resumenReporteEntrega,
@@ -101,6 +102,10 @@ export default function ReporteEntrega() {
   );
 
   const resumen = useMemo(() => resumenReporteEntrega(filas), [filas]);
+  const pendientesParaPdf = useMemo(
+    () => filas.filter((fila) => fila.estadoEntrega === 'pendiente'),
+    [filas]
+  );
 
   const cortejoSel = cortejos.find((c) => c.id === filtros.cortejoId);
   const operadorSel = operadoresOpts.find((o) => o.id === filtros.entregadoPor);
@@ -258,6 +263,21 @@ export default function ReporteEntrega() {
             disabled={!filas.length}
           >
             Exportar Excel
+          </button>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={() =>
+              exportPendientesEntregaPdf({
+                filas,
+                orgNombre: organizacion?.nombre_oficial,
+                cortejoLabel: cortejoSel?.nombre_evento || 'Todas las procesiones',
+              })
+            }
+            disabled={!pendientesParaPdf.length}
+            title="Agrupa todos los turnos pendientes de cada devoto"
+          >
+            PDF pendientes agrupado ({pendientesParaPdf.length})
           </button>
           <Link to="/entrega" className="btn btn--primary btn--sm">
             Ir a Entrega

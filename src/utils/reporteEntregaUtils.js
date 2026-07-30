@@ -131,6 +131,7 @@ export function construirReporteEntrega({
       nombre: nombreAsignado(brazo, cargador),
       dpi: cargador?.cui_o_identificacion || '—',
       whatsapp: cargador?.whatsapp || '—',
+      correo: cargador?.correo || '—',
       estadoEntrega: entregado ? 'entregado' : 'pendiente',
       estadoLabel: entregado ? 'Entregado' : 'Pendiente',
       entregadoEn: formatFechaHora(brazo.entregado_en),
@@ -230,4 +231,116 @@ export function exportReporteEntregaExcel({
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(meta), 'Resumen');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(datos), 'Entregas');
   XLSX.writeFile(wb, `reporte-entrega-turnos-${Date.now()}.xlsx`);
+}
+
+function escapeHtml(value) {
+  return String(value ?? '—')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * Abre una versión imprimible de turnos pendientes, agrupada por devoto.
+ * El navegador permite imprimirla o guardarla como PDF.
+ */
+export function exportPendientesEntregaPdf({
+  filas = [],
+  orgNombre = '',
+  cortejoLabel = 'Todas las procesiones',
+}) {
+  const pendientes = filas.filter((f) => f.estadoEntrega === 'pendiente');
+  const grupos = new Map();
+
+  pendientes.forEach((fila) => {
+    const key = fila.cargador?.id || `nombre:${fila.nombre}|${fila.dpi}`;
+    const grupo = grupos.get(key) || {
+      nombre: fila.nombre,
+      dpi: fila.dpi,
+      whatsapp: fila.whatsapp,
+      correo: fila.correo,
+      items: [],
+    };
+    grupo.items.push(fila);
+    grupos.set(key, grupo);
+  });
+
+  const secciones = [...grupos.values()]
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+    .map(
+      (grupo) => `
+        <section class="devoto">
+          <header>
+            <div>
+              <h2>${escapeHtml(grupo.nombre)}</h2>
+              <p>DPI: ${escapeHtml(grupo.dpi)} · WhatsApp: ${escapeHtml(grupo.whatsapp)} · Correo: ${escapeHtml(grupo.correo)}</p>
+            </div>
+            <strong>${grupo.items.length} turno${grupo.items.length === 1 ? '' : 's'} pendiente${grupo.items.length === 1 ? '' : 's'}</strong>
+          </header>
+          <table>
+            <thead>
+              <tr>
+                <th>Procesión</th><th>Turno</th><th>Brazo</th><th>Honor</th><th>Código</th><th>Venta</th><th>Ofrenda</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${grupo.items
+                .map(
+                  (f) => `<tr>
+                    <td>${escapeHtml(f.procesion)}</td>
+                    <td>#${escapeHtml(f.numeroTurno)}</td>
+                    <td>${escapeHtml(f.brazoLabel)}</td>
+                    <td>${escapeHtml(f.honor)}</td>
+                    <td>${escapeHtml(f.codigo)}</td>
+                    <td>${escapeHtml(f.vendidoEn)}</td>
+                    <td>${escapeHtml(f.precio)}</td>
+                  </tr>`
+                )
+                .join('')}
+            </tbody>
+          </table>
+        </section>`
+    )
+    .join('');
+
+  const generado = new Date().toLocaleString('es-GT');
+  const html = `<!doctype html>
+<html lang="es"><head><meta charset="utf-8" />
+<title>Pendientes de entrega</title>
+<style>
+  @page { size: A4 portrait; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; font-size: 10px; color: #172033; }
+  h1 { margin: 0 0 4px; font-size: 17px; }
+  .meta { margin: 0 0 14px; color: #526075; }
+  .toolbar { margin-bottom: 12px; padding: 9px; border: 1px solid #bfdbfe; border-radius: 6px; background: #eff6ff; }
+  .toolbar button { margin-top: 5px; padding: 6px 10px; border: 0; border-radius: 4px; color: #fff; background: #2563eb; cursor: pointer; }
+  .devoto { margin: 0 0 12px; border: 1px solid #cbd5e1; border-radius: 6px; page-break-inside: avoid; overflow: hidden; }
+  .devoto header { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; background: #f8fafc; border-bottom: 1px solid #cbd5e1; }
+  h2 { margin: 0; font-size: 12px; }
+  p { margin: 3px 0 0; color: #526075; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 5px 6px; text-align: left; vertical-align: top; border-bottom: 1px solid #e2e8f0; }
+  th { font-size: 8px; color: #475569; text-transform: uppercase; background: #f8fafc; }
+  tr:last-child td { border-bottom: 0; }
+  @media print { .toolbar { display: none; } }
+</style></head>
+<body>
+  <div class="toolbar">Reporte listo. Use <strong>Guardar como PDF</strong> en la ventana de impresión.<br/>
+    <button onclick="window.print()">Imprimir / Guardar PDF</button>
+  </div>
+  <h1>Turnos pendientes de entrega</h1>
+  <p class="meta"><strong>${escapeHtml(orgNombre)}</strong> · ${escapeHtml(cortejoLabel)} · ${pendientes.length} turno(s) · ${grupos.size} devoto(s) · Generado: ${escapeHtml(generado)}</p>
+  ${secciones || '<p>No hay turnos pendientes con los filtros actuales.</p>'}
+  <script>window.addEventListener('load', () => setTimeout(() => window.print(), 350));</script>
+</body></html>`;
+
+  const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+  const ventana = window.open(url, '_blank');
+  if (ventana) {
+    setTimeout(() => URL.revokeObjectURL(url), 120000);
+  } else {
+    URL.revokeObjectURL(url);
+  }
 }
