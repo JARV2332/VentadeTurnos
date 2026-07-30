@@ -87,6 +87,14 @@ export const PANTALLAS = [
     grupo: 'Reportes',
     visibleConPermisos: ['entrega', 'ajuste_entrega', 'caja', 'dashboard', 'listado_turnos'],
   },
+  {
+    id: 'pendientes_por_turno',
+    label: 'Pendientes por turno',
+    path: '/pendientes-por-turno',
+    icon: '≡',
+    grupo: 'Reportes',
+    visibleConPermisos: ['reporte_entrega', 'entrega', 'ajuste_entrega', 'caja', 'dashboard'],
+  },
 ];
 
 /** Plantillas rápidas al crear roles (incluyen pantallas de reportes nuevas). */

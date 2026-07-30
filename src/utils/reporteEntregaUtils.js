@@ -125,6 +125,7 @@ export function construirReporteEntrega({
       cargador,
       procesion: cortejo?.nombre_evento || '—',
       numeroTurno: turno?.numero_turno ?? brazo.numero_turno ?? '—',
+      tipoTurno: labelTipoTurno(turno?.tipo_turno),
       honor: turno?.etiqueta || labelTipoTurno(turno?.tipo_turno),
       brazoLabel: `${brazo.numero_brazo ?? ''} ${brazo.lado?.[0] || ''}`.trim() || '—',
       codigo: brazo.codigo_boleta_qr || '—',
@@ -186,6 +187,38 @@ export function resumenReporteEntrega(filas = []) {
   const pendientes = total - entregados;
   const aTercero = filas.filter((f) => f.brazo?.entregado_a_tercero).length;
   return { total, entregados, pendientes, aTercero };
+}
+
+/** Resume solo los brazos pendientes por tipo y número de turno. */
+export function resumirPendientesPorTipoYTurno(filas = []) {
+  const grupos = new Map();
+
+  filas
+    .filter((fila) => fila.estadoEntrega === 'pendiente')
+    .forEach((fila) => {
+      const key = `${fila.tipoTurno}|${fila.numeroTurno}`;
+      const actual = grupos.get(key) || {
+        tipoTurno: fila.tipoTurno || 'Sin tipo',
+        numeroTurno: fila.numeroTurno,
+        honor: fila.honor || '—',
+        pendientes: 0,
+        procesiones: new Set(),
+      };
+      actual.pendientes += 1;
+      actual.procesiones.add(fila.procesion);
+      grupos.set(key, actual);
+    });
+
+  return [...grupos.values()]
+    .map((grupo) => ({
+      ...grupo,
+      procesion: [...grupo.procesiones].sort((a, b) => a.localeCompare(b, 'es')).join(', '),
+    }))
+    .sort((a, b) => {
+      const tipo = a.tipoTurno.localeCompare(b.tipoTurno, 'es');
+      if (tipo !== 0) return tipo;
+      return Number(a.numeroTurno) - Number(b.numeroTurno);
+    });
 }
 
 export function exportReporteEntregaExcel({
