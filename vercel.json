@@ -5,8 +5,8 @@
   "outputDirectory": "build",
   "env": {
     "REACT_APP_MOCK_MODE": "false",
-    "REACT_APP_SUPABASE_URL": "https://emmkatautioefhmvxejg.supabase.co",
-    "REACT_APP_SUPABASE_ANON_KEY": "sb_publishable_2eCHPUySC-tupIYgMoCa6g_Us8vUiQd",
+    "REACT_APP_SUPABASE_URL": "https://lhbalfmlctawmfbpccfo.supabase.co",
+    "REACT_APP_SUPABASE_ANON_KEY": "sb_publishable_SxcIq1Z0bZg9NX3yr4DDtg_tlSPXPk5",
     "REACT_APP_APP_URL": "https://ventade-turnos.vercel.app",
     "REACT_APP_EMAIL_WEBHOOK_URL": "/api/send-email",
     "DISABLE_ESLINT_PLUGIN": "true",

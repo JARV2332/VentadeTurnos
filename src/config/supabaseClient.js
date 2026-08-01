@@ -15,12 +15,12 @@ export const MOCK_MODE =
     : process.env.REACT_APP_MOCK_MODE !== 'false';
 
 const supabaseUrl =
-  process.env.REACT_APP_SUPABASE_URL || 'https://emmkatautioefhmvxejg.supabase.co';
+  process.env.REACT_APP_SUPABASE_URL || 'https://lhbalfmlctawmfbpccfo.supabase.co';
 
 /** Clave pública (publishable/anon). Fallback si Vercel no inyecta env en el build. */
 const supabaseAnonKey =
   process.env.REACT_APP_SUPABASE_ANON_KEY ||
-  'sb_publishable_2eCHPUySC-tupIYgMoCa6g_Us8vUiQd';
+  'sb_publishable_SxcIq1Z0bZg9NX3yr4DDtg_tlSPXPk5';
 
 if (!MOCK_MODE && !supabaseAnonKey) {
   throw new Error(
