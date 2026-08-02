@@ -28,6 +28,7 @@ import DisponibilidadTurnos from './views/DisponibilidadTurnos';
 import ApartadosPendientes from './views/ApartadosPendientes';
 import ReporteEntrega from './views/ReporteEntrega';
 import ReportePendientesPorTurno from './views/ReportePendientesPorTurno';
+import ReportePendientesEntregaDetalle from './views/ReportePendientesEntregaDetalle';
 
 function App() {
   return (
@@ -181,6 +182,14 @@ function App() {
             element={
               <PrivateRoute permission="reporte_entrega">
                 <ReportePendientesPorTurno />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/pendientes-entrega-detalle"
+            element={
+              <PrivateRoute permission="pendientes_entrega_detalle">
+                <ReportePendientesEntregaDetalle />
               </PrivateRoute>
             }
           />
