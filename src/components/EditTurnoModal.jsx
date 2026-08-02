@@ -210,6 +210,9 @@ export default function EditTurnoModal({
                   ? describirDistribucionBrazos(totalBrazos, medio ? ladoUnico : null)
                   : 'Entero mayor que 0 (par = ambos lados, impar = un lado)'}
               </small>
+              <small className="text-muted">
+                Si reduce el total, se quitan libres y apartados. Los vendidos no se eliminan.
+              </small>
             </label>
 
             <label>

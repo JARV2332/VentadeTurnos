@@ -353,8 +353,33 @@ export function referenciaPorTipoTurno(turnosExistentes, tipo) {
   };
 }
 
+/** Solo las ventas pagadas impiden borrar un brazo al reducir el turno. */
+function esBrazoVendido(brazo) {
+  return brazo?.estado === 'vendido';
+}
+
+/**
+ * Reduce brazos de un lado: quita libres/apartados/reservas; conserva vendidos.
+ * @returns {{ error?: string, eliminarIds?: string[] }}
+ */
+function planReducirLado(brazosLado, cupo) {
+  const lista = brazosLado || [];
+  const vendidos = lista.filter(esBrazoVendido);
+  if (vendidos.length > cupo) {
+    return {
+      error: `Hay ${vendidos.length} brazo(s) vendido(s); no puede dejar solo ${cupo}.`,
+    };
+  }
+  const liberables = lista
+    .filter((b) => !esBrazoVendido(b))
+    .sort((a, b) => (b.numero_brazo || 0) - (a.numero_brazo || 0));
+  const quitar = Math.max(0, lista.length - cupo);
+  return { eliminarIds: liberables.slice(0, quitar).map((b) => b.id) };
+}
+
 /**
  * Plan para aumentar o reducir brazos de un turno.
+ * Al reducir: se eliminan libres y apartados; solo se bloquean vendidos.
  * @returns {{ error?: string, agregar?: object[], eliminarIds?: string[] }}
  */
 export function planAjusteBrazos(
@@ -385,24 +410,39 @@ export function planAjusteBrazos(
 
   if (modoUnLado) {
     if (ladosPresentes.length > 1) {
-      const bloqueados = delTurno.filter(
-        (b) => b.estado !== 'disponible' || b.reserva_apartado || b.cargador_id
-      );
-      if (bloqueados.length > 0) {
+      // Pasar a medio turno: conservar vendidos del lado elegido; liberar/apartados del resto se borran.
+      const delLadoElegido = delTurno.filter((b) => b.lado === lado);
+      const delOtroLado = delTurno.filter((b) => b.lado !== lado);
+      const vendidosOtro = delOtroLado.filter(esBrazoVendido);
+      if (vendidosOtro.length > 0) {
         return {
           error:
-            'No se puede pasar a medio turno: hay espacios vendidos, apartados o reservados.',
+            `No se puede pasar a solo ${lado}: hay ${vendidosOtro.length} brazo(s) vendido(s) en el otro lado.`,
         };
       }
+      const reduccion = planReducirLado(delLadoElegido, total);
+      if (reduccion.error) return reduccion;
+      if (delLadoElegido.length >= total) {
+        return {
+          agregar: [],
+          eliminarIds: [...delOtroLado.map((b) => b.id), ...(reduccion.eliminarIds || [])],
+        };
+      }
+      const agregar = [];
+      const maxNum = delLadoElegido.reduce((m, b) => Math.max(m, Number(b.numero_brazo) || 0), 0);
+      for (let n = maxNum + 1; n <= maxNum + (total - delLadoElegido.length); n += 1) {
+        agregar.push({
+          organizacion_id: organizacionId,
+          turno_id: turnoId,
+          numero_turno: numeroTurno,
+          numero_brazo: n,
+          lado,
+          estado: 'disponible',
+        });
+      }
       return {
-        eliminarIds: delTurno.map((b) => b.id),
-        agregar: crearBrazosParaTurno({
-          turnoId,
-          numeroTurno,
-          totalBrazos: total,
-          organizacionId,
-          ladoUnico: lado,
-        }).map(({ id, ...b }) => b),
+        agregar,
+        eliminarIds: delOtroLado.map((b) => b.id),
       };
     }
 
@@ -421,7 +461,8 @@ export function planAjusteBrazos(
 
     if (total > actualTotal) {
       const agregar = [];
-      for (let n = actualTotal + 1; n <= total; n += 1) {
+      const maxNum = delTurno.reduce((m, b) => Math.max(m, Number(b.numero_brazo) || 0), 0);
+      for (let n = maxNum + 1; n <= maxNum + (total - actualTotal); n += 1) {
         agregar.push({
           organizacion_id: organizacionId,
           turno_id: turnoId,
@@ -434,17 +475,9 @@ export function planAjusteBrazos(
       return { agregar, eliminarIds: [] };
     }
 
-    const aEliminar = delTurno.filter((b) => b.numero_brazo > total);
-    const bloqueados = aEliminar.filter(
-      (b) => b.estado !== 'disponible' || b.reserva_apartado || b.cargador_id
-    );
-    if (bloqueados.length > 0) {
-      return {
-        error:
-          'No se puede reducir brazos: hay espacios vendidos, apartados o reservados en los brazos que se quitarían.',
-      };
-    }
-    return { agregar: [], eliminarIds: aEliminar.map((b) => b.id) };
+    const reduccion = planReducirLado(delTurno, total);
+    if (reduccion.error) return reduccion;
+    return { agregar: [], eliminarIds: reduccion.eliminarIds || [] };
   }
 
   if (!validarBrazosPares(total)) {
@@ -462,11 +495,18 @@ export function planAjusteBrazos(
       return { agregar: creados, eliminarIds: [] };
     }
 
-    const actualPorLado = actualTotal / 2;
+    const actualPorLado = Math.max(
+      ...LADOS_BRAZO.map((l) => delTurno.filter((b) => b.lado === l).length),
+      0
+    );
     const nuevoPorLado = total / 2;
     const agregar = [];
     for (let n = actualPorLado + 1; n <= nuevoPorLado; n += 1) {
       LADOS_BRAZO.forEach((ladoBrazo) => {
+        const yaExiste = delTurno.some(
+          (b) => b.lado === ladoBrazo && Number(b.numero_brazo) === n
+        );
+        if (yaExiste) return;
         agregar.push({
           organizacion_id: organizacionId,
           turno_id: turnoId,
@@ -481,15 +521,14 @@ export function planAjusteBrazos(
   }
 
   const nuevoPorLado = total / 2;
-  const aEliminar = delTurno.filter((b) => b.numero_brazo > nuevoPorLado);
-  const bloqueados = aEliminar.filter(
-    (b) => b.estado !== 'disponible' || b.reserva_apartado || b.cargador_id
-  );
-  if (bloqueados.length > 0) {
-    return {
-      error:
-        'No se puede reducir brazos: hay espacios vendidos, apartados o reservados en los brazos que se quitarían.',
-    };
+  const eliminarIds = [];
+  for (const ladoBrazo of LADOS_BRAZO) {
+    const delLado = delTurno.filter((b) => b.lado === ladoBrazo);
+    const reduccion = planReducirLado(delLado, nuevoPorLado);
+    if (reduccion.error) {
+      return { error: `${ladoBrazo}: ${reduccion.error}` };
+    }
+    eliminarIds.push(...(reduccion.eliminarIds || []));
   }
-  return { agregar: [], eliminarIds: aEliminar.map((b) => b.id) };
+  return { agregar: [], eliminarIds };
 }
