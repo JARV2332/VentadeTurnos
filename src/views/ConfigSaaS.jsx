@@ -520,8 +520,9 @@ export default function ConfigSaaS() {
         setError(res.error);
         return;
       }
+      const numeroFinal = res.data?.numero_turno ?? datos.numero_turno ?? turnoEditando.numero_turno;
       setTurnoEditando(null);
-      setOkMsg(`Turno #${turnoEditando.numero_turno} actualizado.`);
+      setOkMsg(`Turno #${numeroFinal} actualizado.`);
       await refreshLista();
     } finally {
       setGuardandoTurno(false);

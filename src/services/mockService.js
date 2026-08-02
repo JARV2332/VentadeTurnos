@@ -303,15 +303,30 @@ export function updateTurnoMock(organizacionId, turnoId, datos) {
   if (idx === -1) return { error: 'Turno no encontrado.' };
 
   const turnoActual = store.turnos[idx];
+  const hermanos = getTurnosByCortejo(turnoActual.cortejo_id);
+  let numeroDestino = turnoActual.numero_turno;
+  if (datos.numero_turno !== undefined) {
+    const n = Number(datos.numero_turno);
+    if (!Number.isInteger(n) || n < 1) {
+      return { error: 'El número de turno debe ser un entero mayor o igual a 1.' };
+    }
+    if ((hermanos || []).some((t) => t.id !== turnoId && Number(t.numero_turno) === n)) {
+      return { error: `Ya existe otro turno #${n} en esta procesión.` };
+    }
+    numeroDestino = n;
+  }
+
+  const maxNum = Math.max(
+    maxNumeroTurno((hermanos || []).filter((t) => t.id !== turnoId)),
+    Number(numeroDestino) || 0
+  );
 
   if (datos.tipo_turno !== undefined) {
-    const hermanos = getTurnosByCortejo(turnoActual.cortejo_id);
-    const maxNum = maxNumeroTurno(hermanos);
-    const permitidos = tiposTurnoEditables(turnoActual.numero_turno, maxNum);
+    const permitidos = tiposTurnoEditables(numeroDestino, maxNum);
     const tipo = String(datos.tipo_turno).trim();
     if (!permitidos.includes(tipo)) {
       return {
-        error: `El turno #${turnoActual.numero_turno} solo puede ser: ${permitidos.join(' o ')}.`,
+        error: `El turno #${numeroDestino} solo puede ser: ${permitidos.join(' o ')}.`,
       };
     }
   }
@@ -327,7 +342,7 @@ export function updateTurnoMock(organizacionId, turnoId, datos) {
     );
     const plan = planAjusteBrazos(brazosDelTurno, {
       turnoId,
-      numeroTurno: turnoActual.numero_turno,
+      numeroTurno: numeroDestino,
       organizacionId,
       nuevoTotal,
     });
@@ -353,6 +368,9 @@ export function updateTurnoMock(organizacionId, turnoId, datos) {
     son: datos.son?.trim() || null,
     alabado: datos.alabado?.trim() || null,
   };
+  if (datos.numero_turno !== undefined) {
+    actualizado.numero_turno = numeroDestino;
+  }
   if (datos.tipo_turno !== undefined) {
     actualizado.tipo_turno = String(datos.tipo_turno).trim();
   }
@@ -366,6 +384,13 @@ export function updateTurnoMock(organizacionId, turnoId, datos) {
     actualizado.hora_estimada = normalizarHoraInput(datos.hora_estimada);
   }
   store.turnos[idx] = actualizado;
+  if (Number(numeroDestino) !== Number(turnoActual.numero_turno)) {
+    store.brazos = store.brazos.map((b) =>
+      b.turno_id === turnoId && b.organizacion_id === organizacionId
+        ? { ...b, numero_turno: numeroDestino }
+        : b
+    );
+  }
   emit('turno:actualizado', { turno: actualizado });
   return { data: actualizado };
 }

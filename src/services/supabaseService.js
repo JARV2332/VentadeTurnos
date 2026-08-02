@@ -619,14 +619,33 @@ export async function updateTurno(organizacionId, turnoId, datos) {
   if (fetchErr) return err(fetchErr);
   if (!turnoActual) return { error: 'Turno no encontrado.' };
 
+  const hermanos = await getTurnosByCortejo(turnoActual.cortejo_id);
+  let numeroDestino = turnoActual.numero_turno;
+  if (datos.numero_turno !== undefined) {
+    const n = Number(datos.numero_turno);
+    if (!Number.isInteger(n) || n < 1) {
+      return { error: 'El número de turno debe ser un entero mayor o igual a 1.' };
+    }
+    const ocupado = (hermanos || []).some(
+      (t) => t.id !== turnoId && Number(t.numero_turno) === n
+    );
+    if (ocupado) {
+      return { error: `Ya existe otro turno #${n} en esta procesión.` };
+    }
+    numeroDestino = n;
+  }
+
+  const maxNum = Math.max(
+    maxNumeroTurno((hermanos || []).filter((t) => t.id !== turnoId)),
+    Number(numeroDestino) || 0
+  );
+
   if (datos.tipo_turno !== undefined) {
-    const hermanos = await getTurnosByCortejo(turnoActual.cortejo_id);
-    const maxNum = maxNumeroTurno(hermanos);
-    const permitidos = tiposTurnoEditables(turnoActual.numero_turno, maxNum);
+    const permitidos = tiposTurnoEditables(numeroDestino, maxNum);
     const tipo = String(datos.tipo_turno).trim();
     if (!permitidos.includes(tipo)) {
       return {
-        error: `El turno #${turnoActual.numero_turno} solo puede ser: ${permitidos.join(' o ')}.`,
+        error: `El turno #${numeroDestino} solo puede ser: ${permitidos.join(' o ')}.`,
       };
     }
   }
@@ -636,6 +655,7 @@ export async function updateTurno(organizacionId, turnoId, datos) {
     son: datos.son?.trim() || null,
     alabado: datos.alabado?.trim() || null,
   };
+  if (datos.numero_turno !== undefined) payload.numero_turno = numeroDestino;
   if (datos.tipo_turno !== undefined) payload.tipo_turno = String(datos.tipo_turno).trim();
   if (datos.precio !== undefined) payload.precio = Number(datos.precio) || 0;
   if (datos.total_brazos !== undefined) {
@@ -656,7 +676,7 @@ export async function updateTurno(organizacionId, turnoId, datos) {
 
     const plan = planAjusteBrazos(brazos || [], {
       turnoId,
-      numeroTurno: turnoActual.numero_turno,
+      numeroTurno: numeroDestino,
       organizacionId,
       nuevoTotal,
     });
@@ -694,6 +714,19 @@ export async function updateTurno(organizacionId, turnoId, datos) {
   }
 
   if (error) return err(error);
+
+  if (
+    datos.numero_turno !== undefined &&
+    Number(numeroDestino) !== Number(turnoActual.numero_turno)
+  ) {
+    const { error: syncErr } = await supabase
+      .from('brazos')
+      .update({ numero_turno: numeroDestino })
+      .eq('turno_id', turnoId)
+      .eq('organizacion_id', organizacionId);
+    if (syncErr) return err(syncErr);
+  }
+
   return { data };
 }
 

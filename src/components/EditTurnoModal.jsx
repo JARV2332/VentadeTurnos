@@ -21,6 +21,7 @@ export default function EditTurnoModal({
   onGuardar,
   onCerrar,
 }) {
+  const [numeroTurno, setNumeroTurno] = useState(1);
   const [tipoTurno, setTipoTurno] = useState('Ordinario');
   const [etiqueta, setEtiqueta] = useState('');
   const [precio, setPrecio] = useState(0);
@@ -28,22 +29,33 @@ export default function EditTurnoModal({
   const [son, setSon] = useState('');
   const [alabado, setAlabado] = useState('');
   const [horaEstimada, setHoraEstimada] = useState('');
+  const [errorLocal, setErrorLocal] = useState('');
 
-  const maxNum = useMemo(
-    () => maxNumeroTurno(turnosExistentes.length ? turnosExistentes : turno ? [turno] : []),
-    [turnosExistentes, turno]
-  );
+  const maxEfectivo = useMemo(() => {
+    const otros = (turnosExistentes || []).filter((t) => t.id !== turno?.id);
+    const maxOtros = maxNumeroTurno(otros.length ? otros : []);
+    return Math.max(maxOtros, Number(numeroTurno) || 0);
+  }, [turnosExistentes, turno?.id, numeroTurno]);
 
   const tiposPermitidos = useMemo(
-    () => (turno ? tiposTurnoEditables(turno.numero_turno, maxNum) : []),
-    [turno, maxNum]
+    () => tiposTurnoEditables(numeroTurno, maxEfectivo),
+    [numeroTurno, maxEfectivo]
   );
 
   const tipoFijo = tiposPermitidos.length === 1;
   const parBrazos = validarBrazosPares(Number(totalBrazos) || 0);
 
+  const numeroOcupado = useMemo(() => {
+    const n = Number(numeroTurno);
+    if (!n || !turno) return false;
+    return (turnosExistentes || []).some(
+      (t) => t.id !== turno.id && Number(t.numero_turno) === n
+    );
+  }, [numeroTurno, turnosExistentes, turno]);
+
   useEffect(() => {
     if (!turno) return;
+    setNumeroTurno(Number(turno.numero_turno) || 1);
     setTipoTurno(turno.tipo_turno || 'Ordinario');
     setEtiqueta(turno.etiqueta || turno.tipo_turno || '');
     setPrecio(Number(turno.precio) || 0);
@@ -51,7 +63,14 @@ export default function EditTurnoModal({
     setSon(turno.son || '');
     setAlabado(turno.alabado || '');
     setHoraEstimada(horaParaInput(turno.hora_estimada));
+    setErrorLocal('');
   }, [turno]);
+
+  useEffect(() => {
+    if (!tiposPermitidos.includes(tipoTurno)) {
+      setTipoTurno(tiposPermitidos[0] || 'Ordinario');
+    }
+  }, [tiposPermitidos, tipoTurno]);
 
   useEffect(() => {
     if (!turno) return undefined;
@@ -66,8 +85,19 @@ export default function EditTurnoModal({
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setErrorLocal('');
     if (!parBrazos) return;
+    const n = Number(numeroTurno);
+    if (!Number.isInteger(n) || n < 1) {
+      setErrorLocal('El número de turno debe ser un entero mayor o igual a 1.');
+      return;
+    }
+    if (numeroOcupado) {
+      setErrorLocal(`Ya existe otro turno #${n} en esta procesión.`);
+      return;
+    }
     onGuardar({
+      numero_turno: n,
       etiqueta,
       tipo_turno: tipoTurno,
       precio: Number(precio),
@@ -94,20 +124,38 @@ export default function EditTurnoModal({
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="edit-turno-titulo" className="modal-edit-turno__titulo">
-          Editar turno #{turno.numero_turno}
+          Editar turno #{numeroTurno || turno.numero_turno}
         </h2>
         <p className="text-muted config-hint">
-          Cambios visibles en Taquilla, boletas y reportes. El número de turno no se modifica.
+          Cambios visibles en Taquilla, boletas y reportes.
           {tipoFijo && (
             <>
               {' '}
-              El turno {turno.numero_turno === 1 ? '1 (salida)' : 'final (entrada)'} mantiene su
-              tipo fijo.
+              El número {Number(numeroTurno) === 1 ? '1 (salida)' : 'final (entrada)'} fija el tipo
+              del turno.
             </>
           )}
         </p>
 
         <form className="config-form modal-edit-turno__form" onSubmit={handleSubmit}>
+          <label>
+            Número de turno
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={numeroTurno}
+              onChange={(e) => setNumeroTurno(Number(e.target.value))}
+              required
+              autoFocus
+            />
+            <small className={numeroOcupado ? 'hint-error' : 'text-muted'}>
+              {numeroOcupado
+                ? `El #${numeroTurno} ya está ocupado por otro turno.`
+                : 'Debe ser único dentro de la misma procesión.'}
+            </small>
+          </label>
+
           <label>
             Tipo de turno
             {tipoFijo ? (
@@ -137,8 +185,7 @@ export default function EditTurnoModal({
               type="text"
               value={etiqueta}
               onChange={(e) => setEtiqueta(e.target.value)}
-              placeholder={`Ej. Ordinario ${turno.numero_turno}, Extraordinario…`}
-              autoFocus={tipoFijo}
+              placeholder={`Ej. Ordinario ${numeroTurno || ''}, Extraordinario…`}
             />
           </label>
 
@@ -203,11 +250,17 @@ export default function EditTurnoModal({
             <small className="text-muted">Fecha del evento en la procesión; aquí solo la hora de paso.</small>
           </label>
 
+          {errorLocal && <div className="alert alert--error">{errorLocal}</div>}
+
           <div className="modal-edit-turno__actions">
             <button type="button" className="btn btn--ghost" disabled={guardando} onClick={onCerrar}>
               Cancelar
             </button>
-            <button type="submit" className="btn btn--primary" disabled={guardando || !parBrazos}>
+            <button
+              type="submit"
+              className="btn btn--primary"
+              disabled={guardando || !parBrazos || numeroOcupado}
+            >
               {guardando ? 'Guardando…' : 'Guardar cambios'}
             </button>
           </div>
