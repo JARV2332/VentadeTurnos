@@ -4,8 +4,10 @@ import { normalizarHoraInput } from '../utils/turnoHorarioUtils';
 import {
   tiposTurnoEditables,
   maxNumeroTurno,
-  validarBrazosPares,
-  brazosPorLado,
+  validarTotalBrazos,
+  esMedioTurno,
+  describirDistribucionBrazos,
+  LADOS_BRAZO,
 } from '../utils/turnoUtils';
 
 function horaParaInput(hora) {
@@ -26,6 +28,7 @@ export default function EditTurnoModal({
   const [etiqueta, setEtiqueta] = useState('');
   const [precio, setPrecio] = useState(0);
   const [totalBrazos, setTotalBrazos] = useState(20);
+  const [ladoUnico, setLadoUnico] = useState('Izquierda');
   const [son, setSon] = useState('');
   const [alabado, setAlabado] = useState('');
   const [horaEstimada, setHoraEstimada] = useState('');
@@ -43,7 +46,8 @@ export default function EditTurnoModal({
   );
 
   const tipoFijo = tiposPermitidos.length === 1;
-  const parBrazos = validarBrazosPares(Number(totalBrazos) || 0);
+  const totalOk = validarTotalBrazos(Number(totalBrazos) || 0);
+  const medio = esMedioTurno(Number(totalBrazos) || 0);
 
   const numeroOcupado = useMemo(() => {
     const n = Number(numeroTurno);
@@ -86,7 +90,7 @@ export default function EditTurnoModal({
   const handleSubmit = (e) => {
     e.preventDefault();
     setErrorLocal('');
-    if (!parBrazos) return;
+    if (!totalOk) return;
     const n = Number(numeroTurno);
     if (!Number.isInteger(n) || n < 1) {
       setErrorLocal('El número de turno debe ser un entero mayor o igual a 1.');
@@ -102,6 +106,7 @@ export default function EditTurnoModal({
       tipo_turno: tipoTurno,
       precio: Number(precio),
       total_brazos: Number(totalBrazos),
+      lado_unico: medio ? ladoUnico : null,
       son,
       alabado,
       hora_estimada: horaEstimada || null,
@@ -191,19 +196,19 @@ export default function EditTurnoModal({
 
           <div className="config-form__row">
             <label>
-              Total de brazos (par)
+              Total de brazos
               <input
                 type="number"
-                min={2}
-                step={2}
+                min={1}
+                step={1}
                 value={totalBrazos}
                 onChange={(e) => setTotalBrazos(Number(e.target.value))}
                 required
               />
-              <small className={parBrazos ? 'hint-ok' : 'hint-error'}>
-                {parBrazos
-                  ? `${brazosPorLado(totalBrazos)} Izq. + ${brazosPorLado(totalBrazos)} Der.`
-                  : 'Debe ser par (ej. 20)'}
+              <small className={totalOk ? 'hint-ok' : 'hint-error'}>
+                {totalOk
+                  ? describirDistribucionBrazos(totalBrazos, medio ? ladoUnico : null)
+                  : 'Entero mayor que 0 (par = ambos lados, impar = un lado)'}
               </small>
             </label>
 
@@ -219,6 +224,19 @@ export default function EditTurnoModal({
               />
             </label>
           </div>
+
+          {medio && (
+            <label>
+              Lado del medio turno
+              <select value={ladoUnico} onChange={(e) => setLadoUnico(e.target.value)}>
+                {LADOS_BRAZO.map((lado) => (
+                  <option key={lado} value={lado}>
+                    Solo {lado}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           <label>
             Son
@@ -259,7 +277,7 @@ export default function EditTurnoModal({
             <button
               type="submit"
               className="btn btn--primary"
-              disabled={guardando || !parBrazos || numeroOcupado}
+              disabled={guardando || !totalOk || numeroOcupado}
             >
               {guardando ? 'Guardando…' : 'Guardar cambios'}
             </button>

@@ -2,11 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   TIPOS_TURNO,
+  LADOS_BRAZO,
   huecosNumerosTurno,
   proximoNumeroTurno,
   sugerirDefaultsNuevoTurno,
-  validarBrazosPares,
-  brazosPorLado,
+  validarTotalBrazos,
+  esMedioTurno,
+  describirDistribucionBrazos,
 } from '../utils/turnoUtils';
 
 export default function AgregarTurnoModal({
@@ -23,6 +25,7 @@ export default function AgregarTurnoModal({
   const [tipoTurno, setTipoTurno] = useState('Ordinario');
   const [etiqueta, setEtiqueta] = useState('');
   const [totalBrazos, setTotalBrazos] = useState(20);
+  const [ladoUnico, setLadoUnico] = useState('Izquierda');
   const [precio, setPrecio] = useState(150);
   const [son, setSon] = useState('');
   const [alabado, setAlabado] = useState('');
@@ -46,7 +49,8 @@ export default function AgregarTurnoModal({
     };
   }, []);
 
-  const parBrazos = validarBrazosPares(Number(totalBrazos) || 0);
+  const totalOk = validarTotalBrazos(Number(totalBrazos) || 0);
+  const medio = esMedioTurno(Number(totalBrazos) || 0);
   const numsOcupados = useMemo(
     () => new Set((turnosExistentes || []).map((t) => t.numero_turno)),
     [turnosExistentes]
@@ -56,12 +60,13 @@ export default function AgregarTurnoModal({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (numeroDuplicado || !parBrazos) return;
+    if (numeroDuplicado || !totalOk) return;
     onGuardar({
       numero_turno: numero,
       tipo_turno: tipoTurno,
       etiqueta,
       total_brazos: Number(totalBrazos),
+      lado_unico: medio ? ladoUnico : null,
       precio: Number(precio),
       son,
       alabado,
@@ -90,7 +95,7 @@ export default function AgregarTurnoModal({
         </h2>
         <p className="text-muted config-hint">
           Use un número libre para rellenar un hueco (ej. falta el turno 7) o el siguiente al final.
-          Se crearán los brazos vacíos listos para vender.
+          Total par = ambos lados. Total impar (ej. 23) = medio turno de un solo lado.
         </p>
 
         {huecos.length > 0 && (
@@ -156,19 +161,19 @@ export default function AgregarTurnoModal({
 
           <div className="config-form__row">
             <label>
-              Total de brazos (par)
+              Total de brazos
               <input
                 type="number"
-                min={2}
-                step={2}
+                min={1}
+                step={1}
                 value={totalBrazos}
                 onChange={(e) => setTotalBrazos(Number(e.target.value))}
                 required
               />
-              <small className={parBrazos ? 'hint-ok' : 'hint-error'}>
-                {parBrazos
-                  ? `${brazosPorLado(totalBrazos)} Izq. + ${brazosPorLado(totalBrazos)} Der.`
-                  : 'Debe ser par (ej. 20)'}
+              <small className={totalOk ? 'hint-ok' : 'hint-error'}>
+                {totalOk
+                  ? describirDistribucionBrazos(totalBrazos, medio ? ladoUnico : null)
+                  : 'Debe ser un entero mayor que 0 (par = ambos lados, impar = un lado)'}
               </small>
             </label>
 
@@ -184,6 +189,22 @@ export default function AgregarTurnoModal({
               />
             </label>
           </div>
+
+          {medio && (
+            <label>
+              Lado del medio turno
+              <select value={ladoUnico} onChange={(e) => setLadoUnico(e.target.value)}>
+                {LADOS_BRAZO.map((lado) => (
+                  <option key={lado} value={lado}>
+                    Solo {lado}
+                  </option>
+                ))}
+              </select>
+              <small className="text-muted">
+                Se crearán {totalBrazos} espacios solo en ese lado.
+              </small>
+            </label>
+          )}
 
           <label>
             Son
@@ -212,7 +233,7 @@ export default function AgregarTurnoModal({
             <button
               type="submit"
               className="btn btn--primary"
-              disabled={guardando || numeroDuplicado || !parBrazos}
+              disabled={guardando || numeroDuplicado || !totalOk}
             >
               {guardando ? 'Creando…' : 'Agregar turno'}
             </button>

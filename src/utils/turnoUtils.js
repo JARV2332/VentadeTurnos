@@ -1,36 +1,68 @@
 /**
  * Utilidades para estructura real de turnos:
- * N brazos totales = N/2 Izquierda + N/2 Derecha (mismo número de brazo en cada lado).
+ * - Par: N/2 Izquierda + N/2 Derecha
+ * - Impar (medio turno): N brazos de un solo lado
  */
 
 export const TIPOS_TURNO = ['Entrada', 'Ordinario', 'Extraordinario', 'Salida'];
+export const LADOS_BRAZO = ['Izquierda', 'Derecha'];
 
 export function validarBrazosPares(total) {
   return total > 0 && total % 2 === 0;
+}
+
+/** Total válido: entero > 0 (par ambos lados, impar = medio turno). */
+export function validarTotalBrazos(total) {
+  const n = Number(total);
+  return Number.isInteger(n) && n > 0;
+}
+
+export function esMedioTurno(total) {
+  const n = Number(total);
+  return Number.isInteger(n) && n > 0 && n % 2 !== 0;
 }
 
 export function brazosPorLado(totalBrazos) {
   return totalBrazos / 2;
 }
 
-/** Genera registros de brazos: mitad izquierda + mitad derecha */
+export function describirDistribucionBrazos(totalBrazos, ladoUnico = null) {
+  const n = Number(totalBrazos) || 0;
+  if (!validarTotalBrazos(n)) return 'Indique un total mayor que 0';
+  if (ladoUnico || esMedioTurno(n)) {
+    return `${n} brazo(s) solo ${ladoUnico || 'Izquierda'} (medio turno)`;
+  }
+  return `${brazosPorLado(n)} Izq. + ${brazosPorLado(n)} Der.`;
+}
+
+/**
+ * Genera registros de brazos.
+ * @param {string|null} ladoUnico - Si se indica (o el total es impar), crea solo ese lado.
+ */
 export function crearBrazosParaTurno({
   turnoId,
   numeroTurno,
   totalBrazos,
   organizacionId,
   idPrefix = 'brazo',
+  ladoUnico = null,
   overrides = {},
 }) {
-  if (!validarBrazosPares(totalBrazos)) {
-    throw new Error('El total de brazos debe ser par (ej: 20 = 10 izquierda + 10 derecha)');
+  if (!validarTotalBrazos(totalBrazos)) {
+    throw new Error('El total de brazos debe ser un entero mayor que 0');
   }
 
-  const cantidadLado = brazosPorLado(totalBrazos);
-  const brazos = [];
+  const unLado = ladoUnico || (esMedioTurno(totalBrazos) ? 'Izquierda' : null);
+  if (esMedioTurno(totalBrazos) && !unLado) {
+    throw new Error('Medio turno: indique el lado (Izquierda o Derecha)');
+  }
 
-  for (let n = 1; n <= cantidadLado; n += 1) {
-    ['Izquierda', 'Derecha'].forEach((lado) => {
+  const brazos = [];
+  const lados = unLado ? [unLado] : LADOS_BRAZO;
+  const cantidadPorLado = unLado ? Number(totalBrazos) : brazosPorLado(totalBrazos);
+
+  for (let n = 1; n <= cantidadPorLado; n += 1) {
+    lados.forEach((lado) => {
       brazos.push({
         id: `${idPrefix}-${turnoId}-${lado[0]}-${n}`,
         organizacion_id: organizacionId,
@@ -325,17 +357,98 @@ export function referenciaPorTipoTurno(turnosExistentes, tipo) {
  * Plan para aumentar o reducir brazos de un turno.
  * @returns {{ error?: string, agregar?: object[], eliminarIds?: string[] }}
  */
-export function planAjusteBrazos(brazosDelTurno, { turnoId, numeroTurno, organizacionId, nuevoTotal }) {
+export function planAjusteBrazos(
+  brazosDelTurno,
+  { turnoId, numeroTurno, organizacionId, nuevoTotal, ladoUnico = null }
+) {
   const total = Number(nuevoTotal);
-  if (!validarBrazosPares(total)) {
-    return { error: 'El total de brazos debe ser par y mayor que 0.' };
+  if (!validarTotalBrazos(total)) {
+    return { error: 'El total de brazos debe ser un entero mayor que 0.' };
   }
 
   const delTurno = (brazosDelTurno || []).filter((b) => b.turno_id === turnoId);
   const actualTotal = delTurno.length;
+  const ladosPresentes = [...new Set(delTurno.map((b) => b.lado).filter(Boolean))];
+  const modoUnLado =
+    Boolean(ladoUnico) || esMedioTurno(total) || ladosPresentes.length === 1;
+  const lado =
+    ladoUnico ||
+    (ladosPresentes.length === 1 ? ladosPresentes[0] : null) ||
+    (esMedioTurno(total) ? 'Izquierda' : null);
 
-  if (total === actualTotal) {
+  if (total === actualTotal && !modoUnLado) {
     return { agregar: [], eliminarIds: [] };
+  }
+  if (total === actualTotal && modoUnLado && ladosPresentes.length === 1 && ladosPresentes[0] === lado) {
+    return { agregar: [], eliminarIds: [] };
+  }
+
+  if (modoUnLado) {
+    if (ladosPresentes.length > 1) {
+      const bloqueados = delTurno.filter(
+        (b) => b.estado !== 'disponible' || b.reserva_apartado || b.cargador_id
+      );
+      if (bloqueados.length > 0) {
+        return {
+          error:
+            'No se puede pasar a medio turno: hay espacios vendidos, apartados o reservados.',
+        };
+      }
+      return {
+        eliminarIds: delTurno.map((b) => b.id),
+        agregar: crearBrazosParaTurno({
+          turnoId,
+          numeroTurno,
+          totalBrazos: total,
+          organizacionId,
+          ladoUnico: lado,
+        }).map(({ id, ...b }) => b),
+      };
+    }
+
+    if (actualTotal === 0) {
+      return {
+        agregar: crearBrazosParaTurno({
+          turnoId,
+          numeroTurno,
+          totalBrazos: total,
+          organizacionId,
+          ladoUnico: lado,
+        }).map(({ id, ...b }) => b),
+        eliminarIds: [],
+      };
+    }
+
+    if (total > actualTotal) {
+      const agregar = [];
+      for (let n = actualTotal + 1; n <= total; n += 1) {
+        agregar.push({
+          organizacion_id: organizacionId,
+          turno_id: turnoId,
+          numero_turno: numeroTurno,
+          numero_brazo: n,
+          lado,
+          estado: 'disponible',
+        });
+      }
+      return { agregar, eliminarIds: [] };
+    }
+
+    const aEliminar = delTurno.filter((b) => b.numero_brazo > total);
+    const bloqueados = aEliminar.filter(
+      (b) => b.estado !== 'disponible' || b.reserva_apartado || b.cargador_id
+    );
+    if (bloqueados.length > 0) {
+      return {
+        error:
+          'No se puede reducir brazos: hay espacios vendidos, apartados o reservados en los brazos que se quitarían.',
+      };
+    }
+    return { agregar: [], eliminarIds: aEliminar.map((b) => b.id) };
+  }
+
+  if (!validarBrazosPares(total)) {
+    return { error: 'Para turno completo (ambos lados) el total debe ser par.' };
   }
 
   if (total > actualTotal) {
@@ -353,13 +466,13 @@ export function planAjusteBrazos(brazosDelTurno, { turnoId, numeroTurno, organiz
     const nuevoPorLado = total / 2;
     const agregar = [];
     for (let n = actualPorLado + 1; n <= nuevoPorLado; n += 1) {
-      ['Izquierda', 'Derecha'].forEach((lado) => {
+      LADOS_BRAZO.forEach((ladoBrazo) => {
         agregar.push({
           organizacion_id: organizacionId,
           turno_id: turnoId,
           numero_turno: numeroTurno,
           numero_brazo: n,
-          lado,
+          lado: ladoBrazo,
           estado: 'disponible',
         });
       });

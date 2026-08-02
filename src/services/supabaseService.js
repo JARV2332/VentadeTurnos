@@ -6,7 +6,6 @@ import {
   agruparTurnosConBrazos,
   construirTurnosConfig,
   crearBrazosParaTurno,
-  validarBrazosPares,
   planAjusteBrazos,
   tiposTurnoEditables,
   maxNumeroTurno,
@@ -674,11 +673,16 @@ export async function updateTurno(organizacionId, turnoId, datos) {
       .eq('organizacion_id', organizacionId);
     if (brazosErr) return err(brazosErr);
 
+    const ladoUnico =
+      datos.lado_unico === 'Izquierda' || datos.lado_unico === 'Derecha'
+        ? datos.lado_unico
+        : null;
     const plan = planAjusteBrazos(brazos || [], {
       turnoId,
       numeroTurno: numeroDestino,
       organizacionId,
       nuevoTotal,
+      ladoUnico,
     });
     if (plan.error) return { error: plan.error };
 
@@ -784,9 +788,15 @@ export async function agregarTurnoProcesion(organizacionId, cortejoId, datos) {
   }
 
   const totalBrazos = Number(datos.total_brazos) || 0;
-  if (!validarBrazosPares(totalBrazos)) {
-    return { error: 'El total de brazos debe ser par y mayor que 0.' };
+  if (!Number.isInteger(totalBrazos) || totalBrazos < 1) {
+    return { error: 'El total de brazos debe ser un entero mayor que 0.' };
   }
+  const ladoUnico =
+    datos.lado_unico === 'Izquierda' || datos.lado_unico === 'Derecha'
+      ? datos.lado_unico
+      : totalBrazos % 2 !== 0
+        ? 'Izquierda'
+        : null;
 
   const tipo = datos.tipo_turno?.trim() || 'Ordinario';
   const payload = {
@@ -814,6 +824,7 @@ export async function agregarTurnoProcesion(organizacionId, cortejoId, datos) {
     totalBrazos,
     organizacionId,
     idPrefix: 'brazo',
+    ladoUnico,
   }).map(({ id, ...b }) => b);
 
   const bErr = await insertarBrazosEnLotes(brazosTurno);

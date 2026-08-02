@@ -340,11 +340,16 @@ export function updateTurnoMock(organizacionId, turnoId, datos) {
     const brazosDelTurno = store.brazos.filter(
       (b) => b.turno_id === turnoId && b.organizacion_id === organizacionId
     );
+    const ladoUnico =
+      datos.lado_unico === 'Izquierda' || datos.lado_unico === 'Derecha'
+        ? datos.lado_unico
+        : null;
     const plan = planAjusteBrazos(brazosDelTurno, {
       turnoId,
       numeroTurno: numeroDestino,
       organizacionId,
       nuevoTotal,
+      ladoUnico,
     });
     if (plan.error) return { error: plan.error };
 
@@ -430,9 +435,15 @@ export function agregarTurnoProcesionMock(organizacionId, cortejoId, datos) {
   }
 
   const totalBrazos = Number(datos.total_brazos) || 0;
-  if (totalBrazos <= 0 || totalBrazos % 2 !== 0) {
-    return { error: 'El total de brazos debe ser par y mayor que 0.' };
+  if (!Number.isInteger(totalBrazos) || totalBrazos < 1) {
+    return { error: 'El total de brazos debe ser un entero mayor que 0.' };
   }
+  const ladoUnico =
+    datos.lado_unico === 'Izquierda' || datos.lado_unico === 'Derecha'
+      ? datos.lado_unico
+      : totalBrazos % 2 !== 0
+        ? 'Izquierda'
+        : null;
 
   const ts = Date.now();
   const turnoId = `turno-add-${ts}`;
@@ -455,6 +466,7 @@ export function agregarTurnoProcesionMock(organizacionId, cortejoId, datos) {
     totalBrazos,
     organizacionId,
     idPrefix: `brazo-add-${ts}`,
+    ladoUnico,
   });
 
   store.turnos.push(turno);
