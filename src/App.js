@@ -9,6 +9,7 @@ import ConfirmarCorreo from './views/ConfirmarCorreo';
 import Dashboard from './views/Dashboard';
 import ConfigSaaS from './views/ConfigSaaS';
 import ConfigCorreo from './views/ConfigCorreo';
+import CorreoMasivo from './views/CorreoMasivo';
 import ConfigRecibo from './views/ConfigRecibo';
 import ConfigUsuarios from './views/ConfigUsuarios';
 import ConfigImportReservas from './views/ConfigImportReservas';
@@ -78,6 +79,14 @@ function App() {
             element={
               <PrivateRoute permission="config_correo">
                 <ConfigCorreo />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/config/correo-masivo"
+            element={
+              <PrivateRoute permission="correo_masivo">
+                <CorreoMasivo />
               </PrivateRoute>
             }
           />

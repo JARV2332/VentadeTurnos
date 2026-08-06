@@ -18,6 +18,7 @@ const LABEL_CORTO = {
   reporte_entrega: 'Entregas',
   config: 'Procesiones',
   config_correo: 'Correo',
+  correo_masivo: 'Masivo',
   config_recibo: 'Recibos',
   usuarios: 'Usuarios',
   import_reservas: 'Apartados',

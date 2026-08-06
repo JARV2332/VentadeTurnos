@@ -389,6 +389,9 @@ export default function ConfigCorreo() {
         Personalice boletas en <Link to="/config/recibo">Diseño de recibos</Link>. Cada hermandad o
 
         cofradía configura <strong>su propia cuenta Gmail</strong> aquí abajo.
+        {' '}
+        Para novenario u otros avisos con texto e imagen:{' '}
+        <Link to="/config/correo-masivo">Correo masivo</Link>.
 
       </p>
 

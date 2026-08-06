@@ -1,10 +1,12 @@
 /**
  * Envío de boletas por Gmail SMTP — credenciales por organización o fallback en Vercel.
  * También: action=reenviar-pendiente (correoId) para reintentar error/encolado.
+ * tipo=aviso: texto libre + imagen (novenario / comunicados).
  */
 import { verifyOrgMember } from './_lib/verifyOrgMember.js';
 import { buildBoletaEmailContent } from './_lib/emailBoletaContent.js';
 import { buildEntregaEmailContent } from './_lib/emailEntregaContent.js';
+import { buildAvisoEmailContent } from './_lib/emailAvisoContent.js';
 import { createTransporter, obtenerCredencialesSmtp } from './_lib/emailSmtp.js';
 import { reenviarCorreoPendiente } from './_lib/reenviarCorreoPendiente.js';
 
@@ -26,6 +28,7 @@ export default async function handler(req, res) {
     enlace_boleta,
     tipo,
     entrega,
+    aviso,
     action,
     correoId,
   } = body;
@@ -79,8 +82,21 @@ export default async function handler(req, res) {
   try {
     let mailHtml = html;
     let attachments = [];
+    let mailText = text || '';
 
-    if (!mailHtml && tipo === 'entrega' && entrega) {
+    if (tipo === 'aviso' || aviso) {
+      const built = buildAvisoEmailContent({
+        texto: aviso?.texto ?? text ?? '',
+        nombre: aviso?.nombre,
+        organizacion: aviso?.organizacion,
+        imagenBase64: aviso?.imagenBase64,
+        imagenMime: aviso?.imagenMime,
+        imagenNombre: aviso?.imagenNombre,
+      });
+      mailHtml = built.html;
+      attachments = built.attachments || [];
+      mailText = String(aviso?.texto ?? text ?? '').trim();
+    } else if (!mailHtml && tipo === 'entrega' && entrega) {
       const built = buildEntregaEmailContent(entrega);
       mailHtml = built.html;
       attachments = built.attachments || [];
@@ -100,7 +116,7 @@ export default async function handler(req, res) {
       replyTo,
       to: destinatario,
       subject: subject.trim(),
-      text: text || '',
+      text: mailText || text || '',
       html: mailHtml || undefined,
       attachments: attachments.length ? attachments : undefined,
       headers: {

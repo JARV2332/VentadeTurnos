@@ -51,6 +51,14 @@ export const PANTALLAS = [
   { id: 'config', label: 'Procesiones', path: '/config', icon: '⚙', grupo: 'Administración' },
   { id: 'config_correo', label: 'Correo y boletas', path: '/config/correo', icon: '✉', grupo: 'Administración' },
   {
+    id: 'correo_masivo',
+    label: 'Correo masivo (novenario)',
+    path: '/config/correo-masivo',
+    icon: '✉',
+    grupo: 'Administración',
+    visibleConPermisos: ['config_correo'],
+  },
+  {
     id: 'config_recibo',
     label: 'Diseño de recibos',
     path: '/config/recibo',
