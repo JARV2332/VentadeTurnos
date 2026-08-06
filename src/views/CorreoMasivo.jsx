@@ -7,7 +7,9 @@ import { getCargadoresByOrg, getCorreosEnviados } from '../services/dataService'
 import { ejecutarCorreoMasivo } from '../services/correoMasivoService';
 import {
   construirDestinatariosCorreoMasivo,
+  correoPareceValido,
   leerImagenComoBase64,
+  normalizarCorreo,
 } from '../utils/correoMasivoUtils';
 import {
   DELAY_DEFAULT_SEG,
@@ -28,7 +30,7 @@ const MODOS = [
 ];
 
 export default function CorreoMasivo() {
-  const { organizacionId, organizacion } = useAuth();
+  const { organizacionId, organizacion, user } = useAuth();
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [historial, setHistorial] = useState([]);
@@ -40,6 +42,7 @@ export default function CorreoMasivo() {
   );
   const [imagen, setImagen] = useState(null);
   const [delaySeg, setDelaySeg] = useState(DELAY_DEFAULT_SEG);
+  const [emailPrueba, setEmailPrueba] = useState(() => normalizarCorreo(user?.email || ''));
   const [enviando, setEnviando] = useState(false);
   const [progreso, setProgreso] = useState(null);
   const [resultado, setResultado] = useState(null);
@@ -67,12 +70,29 @@ export default function CorreoMasivo() {
     cargar();
   }, [cargar]);
 
+  useEffect(() => {
+    if (!emailPrueba && user?.email) {
+      setEmailPrueba(normalizarCorreo(user.email));
+    }
+  }, [user?.email, emailPrueba]);
+
   const { incluidos, excluidos } = useMemo(
     () => construirDestinatariosCorreoMasivo({ historial, cargadores, modo }),
     [historial, cargadores, modo]
   );
 
   const estimado = formatearDuracionEstimada(incluidos.length, delaySeg);
+  const emailPruebaNorm = normalizarCorreo(emailPrueba);
+  const destPrueba = useMemo(() => {
+    if (!correoPareceValido(emailPruebaNorm)) return null;
+    const enLista = incluidos.find((d) => d.correo === emailPruebaNorm);
+    if (enLista) return enLista;
+    return {
+      correo: emailPruebaNorm,
+      nombre: user?.nombre?.trim() || 'Prueba',
+      cargadorId: null,
+    };
+  }, [emailPruebaNorm, incluidos, user?.nombre]);
 
   const onElegirImagen = async (e) => {
     const file = e.target.files?.[0];
@@ -88,37 +108,36 @@ export default function CorreoMasivo() {
     }
   };
 
-  const handleEnviar = async () => {
+  const validarMensaje = () => {
     if (!asunto.trim()) {
       setError('Escriba el asunto del correo.');
-      return;
+      return false;
     }
     if (!texto.trim()) {
       setError('Escriba el texto del rezo o mensaje.');
+      return false;
+    }
+    return true;
+  };
+
+  const correrEnvio = async (destinatarios, confirmar) => {
+    if (!validarMensaje()) return;
+    if (!destinatarios.length) {
+      setError('No hay destinatarios válidos.');
       return;
     }
-    if (!incluidos.length) {
-      setError('No hay destinatarios válidos con este filtro.');
-      return;
-    }
-    if (
-      !window.confirm(
-        `Se enviarán ${incluidos.length} correos uno por uno (pausa ${delaySeg}s). Estimado ${estimado}.\n\n¿Continuar?`
-      )
-    ) {
-      return;
-    }
+    if (confirmar && !window.confirm(confirmar)) return;
 
     cancelRef.current = { cancelled: false };
     setEnviando(true);
     setResultado(null);
     setError('');
-    setProgreso({ fase: 'enviando', indice: 0, total: incluidos.length });
+    setProgreso({ fase: 'enviando', indice: 0, total: destinatarios.length });
 
     const res = await ejecutarCorreoMasivo({
       organizacionId,
       organizacion,
-      destinatarios: incluidos,
+      destinatarios,
       asunto: asunto.trim(),
       texto,
       imagen,
@@ -131,6 +150,28 @@ export default function CorreoMasivo() {
     setEnviando(false);
     setProgreso(null);
     await cargar();
+  };
+
+  const handleEnviar = () => {
+    if (!incluidos.length) {
+      setError('No hay destinatarios válidos con este filtro.');
+      return;
+    }
+    correrEnvio(
+      incluidos,
+      `Se enviarán ${incluidos.length} correos uno por uno (pausa ${delaySeg}s). Estimado ${estimado}.\n\n¿Continuar?`
+    );
+  };
+
+  const handleEnviarPrueba = () => {
+    if (!destPrueba) {
+      setError('Elija o escriba un correo válido para la prueba.');
+      return;
+    }
+    correrEnvio(
+      [destPrueba],
+      `Se enviará UNA prueba a:\n${destPrueba.nombre} · ${destPrueba.correo}\n\n¿Continuar?`
+    );
   };
 
   const pct =
@@ -260,7 +301,48 @@ export default function CorreoMasivo() {
               <strong>{excluidos.length}</strong> · tiempo estimado {estimado}
             </p>
 
-            <div className="listado-turnos__acciones">
+            <div
+              className="listado-turnos__filtros-grid"
+              style={{
+                marginTop: '0.75rem',
+                padding: '0.75rem',
+                border: '1px dashed var(--border, #cbd5e1)',
+                borderRadius: '8px',
+              }}
+            >
+              <label style={{ gridColumn: '1 / -1' }}>
+                Prueba — enviar solo a este correo
+                <input
+                  type="email"
+                  value={emailPrueba}
+                  onChange={(e) => setEmailPrueba(e.target.value)}
+                  disabled={enviando}
+                  placeholder="ej. usted@gmail.com"
+                  autoComplete="email"
+                />
+              </label>
+              <label style={{ gridColumn: '1 / -1' }}>
+                O elija de la lista
+                <select
+                  value={
+                    incluidos.some((d) => d.correo === emailPruebaNorm)
+                      ? emailPruebaNorm
+                      : ''
+                  }
+                  onChange={(e) => setEmailPrueba(e.target.value)}
+                  disabled={enviando || !incluidos.length}
+                >
+                  <option value="">— Escoger destinatario —</option>
+                  {incluidos.slice(0, 500).map((d) => (
+                    <option key={d.correo} value={d.correo}>
+                      {d.nombre} · {d.correo}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="listado-turnos__acciones" style={{ marginTop: '0.75rem' }}>
               <button
                 type="button"
                 className="btn btn--ghost btn--sm"
@@ -270,14 +352,25 @@ export default function CorreoMasivo() {
                 Actualizar lista
               </button>
               {!enviando ? (
-                <button
-                  type="button"
-                  className="btn btn--primary btn--sm"
-                  onClick={handleEnviar}
-                  disabled={!incluidos.length}
-                >
-                  Enviar a {incluidos.length} correo(s)
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={handleEnviarPrueba}
+                    disabled={!destPrueba}
+                    title="Envía solo a un correo para ver cómo llega"
+                  >
+                    Enviar prueba
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm"
+                    onClick={handleEnviar}
+                    disabled={!incluidos.length}
+                  >
+                    Enviar a {incluidos.length} correo(s)
+                  </button>
+                </>
               ) : (
                 <button
                   type="button"
@@ -334,13 +427,31 @@ export default function CorreoMasivo() {
               <table className="data-table data-table--compact">
                 <thead>
                   <tr>
+                    <th style={{ width: '2.5rem' }}>Prueba</th>
                     <th>Nombre</th>
                     <th>Correo</th>
                   </tr>
                 </thead>
                 <tbody>
                   {incluidos.slice(0, 200).map((d) => (
-                    <tr key={d.correo}>
+                    <tr
+                      key={d.correo}
+                      style={
+                        d.correo === emailPruebaNorm
+                          ? { background: 'rgba(59, 130, 246, 0.08)' }
+                          : undefined
+                      }
+                    >
+                      <td>
+                        <input
+                          type="radio"
+                          name="correo-prueba"
+                          checked={d.correo === emailPruebaNorm}
+                          onChange={() => setEmailPrueba(d.correo)}
+                          disabled={enviando}
+                          aria-label={`Usar ${d.correo} como prueba`}
+                        />
+                      </td>
                       <td>{d.nombre}</td>
                       <td>{d.correo}</td>
                     </tr>
@@ -349,7 +460,8 @@ export default function CorreoMasivo() {
               </table>
               {incluidos.length > 200 && (
                 <p className="text-muted config-hint">
-                  Mostrando 200 de {incluidos.length}. Se enviará a todos.
+                  Mostrando 200 de {incluidos.length}. El envío masivo va a todos; la prueba solo
+                  al correo elegido.
                 </p>
               )}
             </div>
