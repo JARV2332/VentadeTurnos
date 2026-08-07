@@ -94,8 +94,10 @@ export function buildAvisoEmailContent({
       </tr>`;
   }
 
+  const plural = /\sy\s/i.test(String(nombre || ''));
+  const saludoTitulo = plural ? 'Estimados/as' : 'Estimado/a';
   const saludo = nombre
-    ? `<p style="margin:0 0 16px;font-size:15px;color:#0f172a;">Estimado/a <strong>${escapeHtml(nombre)}</strong>,</p>`
+    ? `<p style="margin:0 0 16px;font-size:15px;color:#0f172a;">${saludoTitulo} <strong>${escapeHtml(nombre)}</strong>,</p>`
     : '';
 
   const html = `<!DOCTYPE html>

@@ -76,7 +76,7 @@ export default function CorreoMasivo() {
     }
   }, [user?.email, emailPrueba]);
 
-  const { incluidos, excluidos } = useMemo(
+  const { incluidos, excluidos, personasIncluidas, correosConVarios } = useMemo(
     () => construirDestinatariosCorreoMasivo({ historial, cargadores, modo }),
     [historial, cargadores, modo]
   );
@@ -221,7 +221,8 @@ export default function CorreoMasivo() {
             </div>
             <p className="text-muted config-hint">
               Puede usar <code>{'{nombre}'}</code> o <code>{'{nombre_completo}'}</code> para
-              personalizar.
+              personalizar. Si varios devotos comparten el mismo correo, se envía uno solo y se
+              concatenan los nombres.
             </p>
 
             <label className="config-hint" style={{ display: 'block', marginTop: '0.75rem' }}>
@@ -297,8 +298,21 @@ export default function CorreoMasivo() {
             </div>
 
             <p className="text-muted config-hint listado-turnos__resumen">
-              <strong>{incluidos.length}</strong> destinatario(s) · excluidos por error/rebote:{' '}
-              <strong>{excluidos.length}</strong> · tiempo estimado {estimado}
+              <strong>{incluidos.length}</strong> correo(s)
+              {personasIncluidas > incluidos.length ? (
+                <>
+                  {' '}
+                  · <strong>{personasIncluidas}</strong> persona(s)
+                  {correosConVarios > 0 ? (
+                    <>
+                      {' '}
+                      · <strong>{correosConVarios}</strong> correo(s) con varios nombres
+                    </>
+                  ) : null}
+                </>
+              ) : null}
+              {' · '}excluidos por error/rebote: <strong>{excluidos.length}</strong> · tiempo
+              estimado {estimado}
             </p>
 
             <div
@@ -428,7 +442,8 @@ export default function CorreoMasivo() {
                 <thead>
                   <tr>
                     <th style={{ width: '2.5rem' }}>Prueba</th>
-                    <th>Nombre</th>
+                    <th>Nombre(s)</th>
+                    <th style={{ width: '3.5rem' }}>Pers.</th>
                     <th>Correo</th>
                   </tr>
                 </thead>
@@ -453,6 +468,7 @@ export default function CorreoMasivo() {
                         />
                       </td>
                       <td>{d.nombre}</td>
+                      <td>{d.cantidadPersonas || 1}</td>
                       <td>{d.correo}</td>
                     </tr>
                   ))}

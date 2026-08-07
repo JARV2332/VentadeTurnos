@@ -4,7 +4,10 @@
 import { supabase } from '../config/supabaseClient';
 import { getEmailConfig, registrarCorreoEnviado } from './dataService';
 import { dormir } from '../utils/reenvioMasivoUtils';
-import { personalizarTextoAviso } from '../utils/correoMasivoUtils';
+import {
+  formatearPrimerosNombres,
+  personalizarTextoAviso,
+} from '../utils/correoMasivoUtils';
 
 const EMAIL_API =
   process.env.REACT_APP_EMAIL_WEBHOOK_URL ||
@@ -115,7 +118,11 @@ export async function ejecutarCorreoMasivo({
     const dest = lista[i];
     const etiqueta = `${dest.nombre || '—'} · ${dest.correo}`;
     const cuerpo = personalizarTextoAviso(texto, dest);
-    const primerNombre = (dest.nombre || '').split(/\s+/)[0] || '';
+    const nombres =
+      Array.isArray(dest.nombres) && dest.nombres.length
+        ? dest.nombres
+        : [dest.nombre].filter(Boolean);
+    const nombreSaludo = formatearPrimerosNombres(nombres);
 
     onProgress?.({
       fase: 'enviando',
@@ -131,7 +138,7 @@ export async function ejecutarCorreoMasivo({
       to: dest.correo,
       subject: asunto,
       texto: cuerpo,
-      nombre: primerNombre,
+      nombre: nombreSaludo,
       organizacionNombre: orgNombre,
       imagen,
     });

@@ -15,11 +15,51 @@ export function correoPareceValido(correo) {
 }
 
 /**
+ * Une nombres en español: "A", "A y B", "A, B y C".
+ */
+export function formatearListaNombres(nombres) {
+  const lista = [];
+  const vistos = new Set();
+  (nombres || []).forEach((raw) => {
+    const n = String(raw || '').trim();
+    if (!n || n === '—') return;
+    const key = n.toLowerCase();
+    if (vistos.has(key)) return;
+    vistos.add(key);
+    lista.push(n);
+  });
+  if (!lista.length) return 'devoto(a)';
+  if (lista.length === 1) return lista[0];
+  if (lista.length === 2) return `${lista[0]} y ${lista[1]}`;
+  return `${lista.slice(0, -1).join(', ')} y ${lista[lista.length - 1]}`;
+}
+
+/** Primer nombre de cada persona, unidos igual que formatearListaNombres. */
+export function formatearPrimerosNombres(nombres) {
+  return formatearListaNombres(
+    (nombres || []).map((n) => {
+      const t = String(n || '').trim();
+      return t.split(/\s+/)[0] || t;
+    })
+  );
+}
+
+function nombresDeDestinatario(destinatario) {
+  if (Array.isArray(destinatario?.nombres) && destinatario.nombres.length) {
+    return destinatario.nombres;
+  }
+  const unico = String(destinatario?.nombre || '').trim();
+  return unico ? [unico] : [];
+}
+
+/**
  * Personaliza el cuerpo: {nombre} / {nombre_completo}
+ * Si varios devotos comparten el correo, concatena los nombres.
  */
 export function personalizarTextoAviso(texto, destinatario) {
-  const nombreCompleto = destinatario?.nombre || 'devoto(a)';
-  const primerNombre = nombreCompleto.split(/\s+/)[0] || nombreCompleto;
+  const nombres = nombresDeDestinatario(destinatario);
+  const nombreCompleto = formatearListaNombres(nombres);
+  const primerNombre = formatearPrimerosNombres(nombres);
   return String(texto || '')
     .replace(/\{nombre_completo\}/gi, nombreCompleto)
     .replace(/\{nombre\}/gi, primerNombre);
@@ -29,6 +69,7 @@ export function personalizarTextoAviso(texto, destinatario) {
  * @param {'exitosos'|'excepto_fallidos'} modo
  *   - exitosos: solo correos con al menos un envío OK (y sin rebote)
  *   - excepto_fallidos: todos los devotos con correo, excepto los que tienen error/rebotado
+ * Un mismo correo = un solo envío; se concatenan los nombres de todos los devotos.
  */
 export function construirDestinatariosCorreoMasivo({
   historial = [],
@@ -39,12 +80,23 @@ export function construirDestinatariosCorreoMasivo({
   (cargadores || []).forEach((c) => {
     const email = normalizarCorreo(c.correo);
     if (!correoPareceValido(email)) return;
+    const nombre = c.nombre_completo?.trim() || '—';
     if (!porEmailCargador.has(email)) {
       porEmailCargador.set(email, {
         correo: email,
-        nombre: c.nombre_completo?.trim() || '—',
+        nombres: nombre && nombre !== '—' ? [nombre] : [],
         cargadorId: c.id,
       });
+      return;
+    }
+    const entry = porEmailCargador.get(email);
+    const key = nombre.toLowerCase();
+    if (
+      nombre &&
+      nombre !== '—' &&
+      !entry.nombres.some((n) => n.toLowerCase() === key)
+    ) {
+      entry.nombres.push(nombre);
     }
   });
 
@@ -78,25 +130,33 @@ export function construirDestinatariosCorreoMasivo({
 
   emailsBase.forEach((email) => {
     const motivo = motivoExclusion(email);
-    const nombreBase =
-      porEmailCargador.get(email)?.nombre ||
+    const desdeCargadores = porEmailCargador.get(email);
+    const nombreHistorial =
       (historial || []).find((r) => normalizarCorreo(r.destinatario) === email)?.metadata
-        ?.cargador_nombre ||
-      '—';
+        ?.cargador_nombre || '—';
+    const nombres = [...(desdeCargadores?.nombres || [])];
+    if (!nombres.length && nombreHistorial && nombreHistorial !== '—') {
+      nombres.push(nombreHistorial);
+    }
+    const nombre = formatearListaNombres(nombres);
 
     if (motivo) {
-      excluidos.push({ correo: email, nombre: nombreBase, motivo });
+      excluidos.push({
+        correo: email,
+        nombre,
+        nombres,
+        cantidadPersonas: Math.max(nombres.length, 1),
+        motivo,
+      });
       return;
     }
 
-    const base = porEmailCargador.get(email) || {
-      correo: email,
-      nombre: nombreBase,
-      cargadorId: null,
-    };
     incluidos.push({
-      ...base,
       correo: email,
+      nombre,
+      nombres,
+      cantidadPersonas: Math.max(nombres.length, 1),
+      cargadorId: desdeCargadores?.cargadorId ?? null,
       tuvoExito: tieneExito.has(email),
     });
   });
@@ -104,9 +164,17 @@ export function construirDestinatariosCorreoMasivo({
   incluidos.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
   excluidos.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 
+  const personasIncluidas = incluidos.reduce(
+    (acc, d) => acc + (d.cantidadPersonas || 1),
+    0
+  );
+  const correosConVarios = incluidos.filter((d) => (d.cantidadPersonas || 1) > 1).length;
+
   return {
     incluidos,
     excluidos,
+    personasIncluidas,
+    correosConVarios,
     totalExitososHistorial: tieneExito.size,
     totalConProblema: new Set([...tieneError, ...tieneRebote]).size,
   };
