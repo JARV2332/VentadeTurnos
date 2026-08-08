@@ -42,6 +42,7 @@ export default function CorreoMasivo() {
     'Estimado/a {nombre},\n\nCompartimos con usted el rezo del novenario.\n\nQue Nuestra Señora de la Asunción interceda por usted y su familia.\n'
   );
   const [imagenes, setImagenes] = useState([]);
+  const [cargandoImagenes, setCargandoImagenes] = useState(false);
   const [delaySeg, setDelaySeg] = useState(DELAY_DEFAULT_SEG);
   const [emailPrueba, setEmailPrueba] = useState(() => normalizarCorreo(user?.email || ''));
   const [enviando, setEnviando] = useState(false);
@@ -96,10 +97,12 @@ export default function CorreoMasivo() {
   }, [emailPruebaNorm, incluidos, user?.nombre]);
 
   const onElegirImagenes = async (e) => {
-    const files = e.target.files;
+    // Copiar antes de limpiar: FileList es live y value='' lo vacía.
+    const files = Array.from(e.target.files || []);
     e.target.value = '';
-    if (!files?.length) return;
+    if (!files.length) return;
     setError('');
+    setCargandoImagenes(true);
     try {
       const { imagenes: next, advertencias } = await agregarImagenesAviso(imagenes, files);
       setImagenes(next);
@@ -108,6 +111,8 @@ export default function CorreoMasivo() {
       }
     } catch (err) {
       setError(err.message || 'No se pudieron cargar las imágenes.');
+    } finally {
+      setCargandoImagenes(false);
     }
   };
 
@@ -236,13 +241,20 @@ export default function CorreoMasivo() {
               Imágenes adjuntas (opcional, hasta {MAX_IMAGENES_AVISO}, máx. 900 KB c/u)
               <input
                 type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
+                accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
                 multiple
                 onChange={onElegirImagenes}
-                disabled={enviando || imagenes.length >= MAX_IMAGENES_AVISO}
+                disabled={
+                  enviando || cargandoImagenes || imagenes.length >= MAX_IMAGENES_AVISO
+                }
                 style={{ display: 'block', marginTop: '0.35rem' }}
               />
             </label>
+            {cargandoImagenes && (
+              <p className="text-muted config-hint" style={{ marginTop: '0.35rem' }}>
+                Cargando imágenes…
+              </p>
+            )}
             <p className="text-muted config-hint">
               Puede elegir varias a la vez. Total combinado máx. ~3.2 MB para que el envío no falle.
               {imagenes.length > 0

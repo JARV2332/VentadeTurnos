@@ -188,14 +188,27 @@ export const MAX_IMAGENES_AVISO = 5;
  */
 export const MAX_TOTAL_IMAGENES_BYTES = Math.floor(3.2 * 1024 * 1024);
 
+function mimeDesdeNombre(nombre) {
+  const ext = String(nombre || '')
+    .split('.')
+    .pop()
+    ?.toLowerCase();
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+  if (ext === 'png') return 'image/png';
+  if (ext === 'webp') return 'image/webp';
+  if (ext === 'gif') return 'image/gif';
+  return '';
+}
+
 export function leerImagenComoBase64(file) {
   return new Promise((resolve, reject) => {
     if (!file) {
       reject(new Error('Seleccione una imagen.'));
       return;
     }
-    if (!String(file.type || '').startsWith('image/')) {
-      reject(new Error('El archivo debe ser una imagen (JPG, PNG, WEBP o GIF).'));
+    const mime = String(file.type || '').trim() || mimeDesdeNombre(file.name);
+    if (!mime.startsWith('image/')) {
+      reject(new Error(`«${file.name || 'archivo'}» no es una imagen (JPG, PNG, WEBP o GIF).`));
       return;
     }
     if (file.size > MAX_IMAGEN_BYTES) {
@@ -213,13 +226,13 @@ export function leerImagenComoBase64(file) {
       resolve({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         base64,
-        mime: file.type,
+        mime: mime === 'image/jpg' ? 'image/jpeg' : mime,
         nombre: file.name || 'novenario.jpg',
         previewUrl: dataUrl,
         size: file.size,
       });
     };
-    reader.onerror = () => reject(new Error('No se pudo leer la imagen.'));
+    reader.onerror = () => reject(new Error(`No se pudo leer «${file.name || 'la imagen'}».`));
     reader.readAsDataURL(file);
   });
 }
@@ -237,7 +250,7 @@ export async function agregarImagenesAviso(existentes = [], files = []) {
     return { imagenes: actuales, advertencias };
   }
 
-  let cupo = MAX_IMAGENES_AVISO - actuales.length;
+  const cupo = MAX_IMAGENES_AVISO - actuales.length;
   if (cupo <= 0) {
     throw new Error(`Ya hay ${MAX_IMAGENES_AVISO} imágenes. Quite alguna para agregar otra.`);
   }
@@ -249,7 +262,19 @@ export async function agregarImagenesAviso(existentes = [], files = []) {
   }
 
   const aLeer = listaFiles.slice(0, cupo);
-  const leidas = await Promise.all(aLeer.map((file) => leerImagenComoBase64(file)));
+  const leidas = [];
+  const resultados = await Promise.allSettled(aLeer.map((file) => leerImagenComoBase64(file)));
+  resultados.forEach((res, i) => {
+    if (res.status === 'fulfilled') {
+      leidas.push(res.value);
+      return;
+    }
+    advertencias.push(res.reason?.message || `No se pudo leer «${aLeer[i]?.name || 'imagen'}».`);
+  });
+
+  if (!leidas.length) {
+    throw new Error(advertencias.join(' ') || 'No se pudieron cargar las imágenes.');
+  }
 
   const combinadas = [...actuales, ...leidas];
   let total = combinadas.reduce((acc, img) => acc + (img.size || 0), 0);
@@ -265,7 +290,7 @@ export async function agregarImagenesAviso(existentes = [], files = []) {
     );
   }
 
-  if (combinadas.length === actuales.length && leidas.length) {
+  if (combinadas.length === actuales.length) {
     throw new Error(
       `No hay espacio: el total de adjuntos no puede pasar de ${(
         MAX_TOTAL_IMAGENES_BYTES /
