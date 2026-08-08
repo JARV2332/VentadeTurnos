@@ -1,12 +1,16 @@
 /**
  * Envío masivo de avisos/novenario (texto + imagen) vía /api/send-email.
+ * Por defecto: lotes en copia oculta (BCC) para ir mucho más rápido.
  */
 import { supabase } from '../config/supabaseClient';
 import { getEmailConfig, registrarCorreoEnviado } from './dataService';
 import { dormir } from '../utils/reenvioMasivoUtils';
 import {
   formatearPrimerosNombres,
+  partirEnLotes,
   personalizarTextoAviso,
+  personalizarTextoAvisoGenerico,
+  TAMANO_LOTE_BCC,
 } from '../utils/correoMasivoUtils';
 
 const EMAIL_API =
@@ -37,6 +41,7 @@ export async function enviarAvisoCorreoApi({
   from,
   reply_to,
   to,
+  bcc = null,
   subject,
   texto,
   nombre,
@@ -45,9 +50,12 @@ export async function enviarAvisoCorreoApi({
   imagenes = null,
 }) {
   const listaImagenes = normalizarImagenesAviso(imagenes, imagen);
+  const bccList = Array.isArray(bcc)
+    ? bcc.map((e) => String(e || '').trim().toLowerCase()).filter((e) => e.includes('@'))
+    : [];
   const headers = await authHeaders();
   const controller = new AbortController();
-  const timeoutMs = listaImagenes.length > 1 ? 70000 : 45000;
+  const timeoutMs = listaImagenes.length > 1 || bccList.length > 1 ? 90000 : 45000;
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
@@ -62,6 +70,7 @@ export async function enviarAvisoCorreoApi({
         from,
         reply_to,
         to,
+        bcc: bccList.length ? bccList : undefined,
         subject,
         text: texto,
         aviso: {
@@ -94,8 +103,52 @@ export async function enviarAvisoCorreoApi({
   }
 }
 
+async function registrarLote({
+  organizacionId,
+  lote,
+  asunto,
+  ok,
+  errorMsg,
+  resultados,
+}) {
+  for (const dest of lote) {
+    const entrada = {
+      correo: dest.correo,
+      nombre: dest.nombre,
+      etiqueta: `${dest.nombre || '—'} · ${dest.correo}`,
+    };
+    if (ok) {
+      resultados.ok.push(entrada);
+      await registrarCorreoEnviado(organizacionId, {
+        destinatario: dest.correo,
+        asunto,
+        estado: 'enviado',
+        cargador: dest.cargadorId
+          ? { id: dest.cargadorId, nombre_completo: dest.nombre, correo: dest.correo }
+          : { nombre_completo: dest.nombre, correo: dest.correo },
+        modo: 'aviso_masivo_bcc',
+        enviado_en: new Date().toISOString(),
+      });
+    } else {
+      resultados.error.push({ ...entrada, error: errorMsg || 'Error' });
+      await registrarCorreoEnviado(organizacionId, {
+        destinatario: dest.correo,
+        asunto,
+        estado: 'error',
+        error: errorMsg || 'Error al enviar aviso (lote BCC)',
+        cargador: dest.cargadorId
+          ? { id: dest.cargadorId, nombre_completo: dest.nombre, correo: dest.correo }
+          : { nombre_completo: dest.nombre, correo: dest.correo },
+        modo: 'aviso_masivo_bcc',
+        enviado_en: new Date().toISOString(),
+      });
+    }
+  }
+}
+
 /**
- * Envía uno a uno con pausa. Registra cada intento en correos_enviados.
+ * Envía en lotes por copia oculta (BCC) o uno a uno.
+ * modoEnvio: 'bcc' (default) | 'individual'
  */
 export async function ejecutarCorreoMasivo({
   organizacionId,
@@ -106,6 +159,8 @@ export async function ejecutarCorreoMasivo({
   imagen = null,
   imagenes = null,
   delaySegundos = 5,
+  modoEnvio = 'bcc',
+  tamanoLote = TAMANO_LOTE_BCC,
   onProgress,
   signal,
 }) {
@@ -119,6 +174,9 @@ export async function ejecutarCorreoMasivo({
     };
   }
 
+  const smtpUser = (emailConfig.gmail_smtp_user || emailConfig.correo_remitente || '')
+    .trim()
+    .toLowerCase();
   const from = `${emailConfig.nombre_remitente || organizacion?.nombre_oficial || 'Asociación'} <${
     emailConfig.correo_remitente || emailConfig.gmail_smtp_user
   }>`;
@@ -126,85 +184,148 @@ export async function ejecutarCorreoMasivo({
   const orgNombre = organizacion?.nombre_oficial || emailConfig.nombre_remitente || '';
 
   const lista = destinatarios || [];
-  const resultados = { ok: [], error: [], cancelado: false };
+  const resultados = { ok: [], error: [], cancelado: false, modoEnvio };
 
-  for (let i = 0; i < lista.length; i += 1) {
+  if (modoEnvio === 'individual') {
+    for (let i = 0; i < lista.length; i += 1) {
+      if (signal?.cancelled) {
+        resultados.cancelado = true;
+        break;
+      }
+
+      const dest = lista[i];
+      const etiqueta = `${dest.nombre || '—'} · ${dest.correo}`;
+      const cuerpo = personalizarTextoAviso(texto, dest);
+      const nombres =
+        Array.isArray(dest.nombres) && dest.nombres.length
+          ? dest.nombres
+          : [dest.nombre].filter(Boolean);
+      const nombreSaludo = formatearPrimerosNombres(nombres);
+
+      onProgress?.({
+        fase: 'enviando',
+        indice: i + 1,
+        total: lista.length,
+        etiqueta,
+      });
+
+      const res = await enviarAvisoCorreoApi({
+        organizacionId,
+        from,
+        reply_to,
+        to: dest.correo,
+        subject: asunto,
+        texto: cuerpo,
+        nombre: nombreSaludo,
+        organizacionNombre: orgNombre,
+        imagenes: listaImagenes,
+      });
+
+      const entrada = {
+        correo: dest.correo,
+        nombre: dest.nombre,
+        etiqueta,
+      };
+
+      if (res.ok) {
+        resultados.ok.push(entrada);
+        await registrarCorreoEnviado(organizacionId, {
+          destinatario: dest.correo,
+          asunto,
+          estado: 'enviado',
+          cargador: dest.cargadorId
+            ? { id: dest.cargadorId, nombre_completo: dest.nombre, correo: dest.correo }
+            : { nombre_completo: dest.nombre, correo: dest.correo },
+          modo: 'aviso_masivo',
+          enviado_en: new Date().toISOString(),
+        });
+      } else {
+        resultados.error.push({ ...entrada, error: res.error || 'Error' });
+        await registrarCorreoEnviado(organizacionId, {
+          destinatario: dest.correo,
+          asunto,
+          estado: 'error',
+          error: res.error || 'Error al enviar aviso',
+          cargador: dest.cargadorId
+            ? { id: dest.cargadorId, nombre_completo: dest.nombre, correo: dest.correo }
+            : { nombre_completo: dest.nombre, correo: dest.correo },
+          modo: 'aviso_masivo',
+          enviado_en: new Date().toISOString(),
+        });
+      }
+
+      onProgress?.({
+        fase: i < lista.length - 1 ? 'espera' : 'fin',
+        indice: i + 1,
+        total: lista.length,
+        etiqueta,
+        ultimoResultado: res.ok ? 'ok' : 'error',
+        resultados,
+      });
+
+      if (i < lista.length - 1 && !signal?.cancelled) {
+        await dormir(Math.max(0, delaySegundos) * 1000);
+      }
+    }
+    return resultados;
+  }
+
+  // --- Modo BCC por lotes (saludo en el texto; sin nombre personalizado en HTML) ---
+  const lotes = partirEnLotes(lista, tamanoLote);
+  const cuerpo = personalizarTextoAvisoGenerico(texto);
+
+  for (let i = 0; i < lotes.length; i += 1) {
     if (signal?.cancelled) {
       resultados.cancelado = true;
       break;
     }
 
-    const dest = lista[i];
-    const etiqueta = `${dest.nombre || '—'} · ${dest.correo}`;
-    const cuerpo = personalizarTextoAviso(texto, dest);
-    const nombres =
-      Array.isArray(dest.nombres) && dest.nombres.length
-        ? dest.nombres
-        : [dest.nombre].filter(Boolean);
-    const nombreSaludo = formatearPrimerosNombres(nombres);
+    const lote = lotes[i];
+    const bccEmails = lote
+      .map((d) => d.correo)
+      .filter((email) => email && email !== smtpUser);
+    const etiqueta = `Lote ${i + 1}/${lotes.length} · ${bccEmails.length} en copia oculta`;
 
     onProgress?.({
       fase: 'enviando',
       indice: i + 1,
-      total: lista.length,
+      total: lotes.length,
       etiqueta,
+      personasEnLote: bccEmails.length,
     });
 
     const res = await enviarAvisoCorreoApi({
       organizacionId,
       from,
       reply_to,
-      to: dest.correo,
+      to: smtpUser,
+      bcc: bccEmails,
       subject: asunto,
       texto: cuerpo,
-      nombre: nombreSaludo,
+      nombre: undefined,
       organizacionNombre: orgNombre,
       imagenes: listaImagenes,
     });
 
-    const entrada = {
-      correo: dest.correo,
-      nombre: dest.nombre,
-      etiqueta,
-    };
-
-    if (res.ok) {
-      resultados.ok.push(entrada);
-      await registrarCorreoEnviado(organizacionId, {
-        destinatario: dest.correo,
-        asunto,
-        estado: 'enviado',
-        cargador: dest.cargadorId
-          ? { id: dest.cargadorId, nombre_completo: dest.nombre, correo: dest.correo }
-          : { nombre_completo: dest.nombre, correo: dest.correo },
-        modo: 'aviso_masivo',
-        enviado_en: new Date().toISOString(),
-      });
-    } else {
-      resultados.error.push({ ...entrada, error: res.error || 'Error' });
-      await registrarCorreoEnviado(organizacionId, {
-        destinatario: dest.correo,
-        asunto,
-        estado: 'error',
-        error: res.error || 'Error al enviar aviso',
-        cargador: dest.cargadorId
-          ? { id: dest.cargadorId, nombre_completo: dest.nombre, correo: dest.correo }
-          : { nombre_completo: dest.nombre, correo: dest.correo },
-        modo: 'aviso_masivo',
-        enviado_en: new Date().toISOString(),
-      });
-    }
+    await registrarLote({
+      organizacionId,
+      lote,
+      asunto,
+      ok: res.ok,
+      errorMsg: res.error,
+      resultados,
+    });
 
     onProgress?.({
-      fase: i < lista.length - 1 ? 'espera' : 'fin',
+      fase: i < lotes.length - 1 ? 'espera' : 'fin',
       indice: i + 1,
-      total: lista.length,
+      total: lotes.length,
       etiqueta,
       ultimoResultado: res.ok ? 'ok' : 'error',
       resultados,
     });
 
-    if (i < lista.length - 1 && !signal?.cancelled) {
+    if (i < lotes.length - 1 && !signal?.cancelled) {
       await dormir(Math.max(0, delaySegundos) * 1000);
     }
   }

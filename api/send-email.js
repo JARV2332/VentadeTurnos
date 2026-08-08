@@ -21,6 +21,7 @@ export default async function handler(req, res) {
     from,
     reply_to,
     to,
+    bcc,
     subject,
     text,
     html,
@@ -59,9 +60,33 @@ export default async function handler(req, res) {
     });
   }
 
-  const destinatario = String(to || '')
+  const MAX_BCC = 50;
+  const bccList = [];
+  const bccRaw = Array.isArray(bcc) ? bcc : bcc ? String(bcc).split(/[,;]+/) : [];
+  const vistosBcc = new Set();
+  for (const raw of bccRaw) {
+    const email = String(raw || '')
+      .trim()
+      .toLowerCase();
+    if (!email || !email.includes('@') || vistosBcc.has(email)) continue;
+    vistosBcc.add(email);
+    bccList.push(email);
+    if (bccList.length > MAX_BCC) {
+      return res.status(400).json({
+        error: `Máximo ${MAX_BCC} destinatarios en copia oculta por envío.`,
+      });
+    }
+  }
+
+  let destinatario = String(to || '')
     .trim()
     .toLowerCase();
+  // Con BCC: el "Para" puede ser la propia cuenta (nadie ve la lista).
+  if (!destinatario && bccList.length) {
+    destinatario = String(creds.user || '')
+      .trim()
+      .toLowerCase();
+  }
   if (!destinatario || !destinatario.includes('@')) {
     return res.status(400).json({ error: 'Destinatario no válido' });
   }
@@ -112,7 +137,7 @@ export default async function handler(req, res) {
     }
 
     const transporter = createTransporter(creds.user, creds.pass);
-    const info = await transporter.sendMail({
+    const mailOptions = {
       from: `"${nombreVisible.replace(/"/g, '')}" <${creds.user}>`,
       replyTo,
       to: destinatario,
@@ -124,12 +149,18 @@ export default async function handler(req, res) {
         'X-Mailer': 'VentaDeTurnos',
         'Auto-Submitted': 'no',
       },
-    });
+    };
+    if (bccList.length) {
+      mailOptions.bcc = bccList;
+    }
+
+    const info = await transporter.sendMail(mailOptions);
 
     return res.status(200).json({
       ok: true,
       messageId: info.messageId,
       destinatario,
+      bccCount: bccList.length || undefined,
       origen: creds.origen,
     });
   } catch (err) {

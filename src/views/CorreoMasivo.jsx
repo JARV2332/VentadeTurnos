@@ -11,6 +11,8 @@ import {
   correoPareceValido,
   MAX_IMAGENES_AVISO,
   normalizarCorreo,
+  partirEnLotes,
+  TAMANO_LOTE_BCC,
 } from '../utils/correoMasivoUtils';
 import {
   DELAY_DEFAULT_SEG,
@@ -30,6 +32,17 @@ const MODOS = [
   },
 ];
 
+const MODOS_ENVIO = [
+  {
+    value: 'bcc',
+    label: `Copia oculta en lotes de ${TAMANO_LOTE_BCC} (rápido)`,
+  },
+  {
+    value: 'individual',
+    label: 'Uno por uno (personaliza {nombre}, más lento)',
+  },
+];
+
 export default function CorreoMasivo() {
   const { organizacionId, organizacion, user } = useAuth();
   const [cargando, setCargando] = useState(true);
@@ -37,9 +50,10 @@ export default function CorreoMasivo() {
   const [historial, setHistorial] = useState([]);
   const [cargadores, setCargadores] = useState([]);
   const [modo, setModo] = useState('exitosos');
+  const [modoEnvio, setModoEnvio] = useState('bcc');
   const [asunto, setAsunto] = useState('Novenario — Nuestra Señora de la Asunción');
   const [texto, setTexto] = useState(
-    'Estimado/a {nombre},\n\nCompartimos con usted el rezo del novenario.\n\nQue Nuestra Señora de la Asunción interceda por usted y su familia.\n'
+    'Estimados/as hermanos y hermanas,\n\nCompartimos con ustedes el rezo del novenario.\n\nQue Nuestra Señora de la Asunción interceda por ustedes y su familia.\n'
   );
   const [imagenes, setImagenes] = useState([]);
   const [cargandoImagenes, setCargandoImagenes] = useState(false);
@@ -83,7 +97,14 @@ export default function CorreoMasivo() {
     [historial, cargadores, modo]
   );
 
-  const estimado = formatearDuracionEstimada(incluidos.length, delaySeg);
+  const lotesBcc = useMemo(
+    () => partirEnLotes(incluidos, TAMANO_LOTE_BCC),
+    [incluidos]
+  );
+  const estimado = formatearDuracionEstimada(
+    modoEnvio === 'bcc' ? lotesBcc.length : incluidos.length,
+    delaySeg
+  );
   const emailPruebaNorm = normalizarCorreo(emailPrueba);
   const destPrueba = useMemo(() => {
     if (!correoPareceValido(emailPruebaNorm)) return null;
@@ -144,7 +165,11 @@ export default function CorreoMasivo() {
     setEnviando(true);
     setResultado(null);
     setError('');
-    setProgreso({ fase: 'enviando', indice: 0, total: destinatarios.length });
+    const totalProgreso =
+      modoEnvio === 'bcc'
+        ? Math.max(1, Math.ceil(destinatarios.length / TAMANO_LOTE_BCC))
+        : destinatarios.length;
+    setProgreso({ fase: 'enviando', indice: 0, total: totalProgreso });
 
     const res = await ejecutarCorreoMasivo({
       organizacionId,
@@ -154,6 +179,7 @@ export default function CorreoMasivo() {
       texto,
       imagenes,
       delaySegundos: delaySeg,
+      modoEnvio,
       signal: cancelRef.current,
       onProgress: setProgreso,
     });
@@ -169,21 +195,50 @@ export default function CorreoMasivo() {
       setError('No hay destinatarios válidos con este filtro.');
       return;
     }
-    correrEnvio(
-      incluidos,
-      `Se enviarán ${incluidos.length} correos uno por uno (pausa ${delaySeg}s). Estimado ${estimado}.\n\n¿Continuar?`
-    );
+    const confirmacion =
+      modoEnvio === 'bcc'
+        ? `Se enviarán ${incluidos.length} destinatarios en ${lotesBcc.length} correo(s) con copia oculta (lotes de ${TAMANO_LOTE_BCC}).\nPausa entre lotes: ${delaySeg}s. Estimado ${estimado}.\n\nNadie verá los demás correos. El saludo no se personaliza por nombre.\n\n¿Continuar?`
+        : `Se enviarán ${incluidos.length} correos uno por uno (pausa ${delaySeg}s). Estimado ${estimado}.\n\n¿Continuar?`;
+    correrEnvio(incluidos, confirmacion);
   };
 
-  const handleEnviarPrueba = () => {
+  const handleEnviarPrueba = async () => {
     if (!destPrueba) {
       setError('Elija o escriba un correo válido para la prueba.');
       return;
     }
-    correrEnvio(
-      [destPrueba],
-      `Se enviará UNA prueba a:\n${destPrueba.nombre} · ${destPrueba.correo}\n\n¿Continuar?`
-    );
+    if (!validarMensaje()) return;
+    if (
+      !window.confirm(
+        `Se enviará UNA prueba a:\n${destPrueba.nombre} · ${destPrueba.correo}\n\n¿Continuar?`
+      )
+    ) {
+      return;
+    }
+
+    cancelRef.current = { cancelled: false };
+    setEnviando(true);
+    setResultado(null);
+    setError('');
+    setProgreso({ fase: 'enviando', indice: 0, total: 1 });
+
+    const res = await ejecutarCorreoMasivo({
+      organizacionId,
+      organizacion,
+      destinatarios: [destPrueba],
+      asunto: asunto.trim(),
+      texto,
+      imagenes,
+      delaySegundos: 0,
+      modoEnvio: 'individual',
+      signal: cancelRef.current,
+      onProgress: setProgreso,
+    });
+
+    setResultado(res);
+    setEnviando(false);
+    setProgreso(null);
+    await cargar();
   };
 
   const pct =
@@ -197,8 +252,9 @@ export default function CorreoMasivo() {
       <p className="text-muted config-hint" style={{ marginBottom: '1rem' }}>
         <Link to="/config/correo">← Volver a Correo y boletas</Link>
         {' · '}
-        Gmail tiene límite diario: use pausa de 5 s o más. Los correos con error o rebote se
-        excluyen automáticamente.
+        Envío rápido por defecto: lotes de {TAMANO_LOTE_BCC} en copia oculta. Gmail sigue
+        teniendo límite diario (~500 en cuentas gratis). Los correos con error o rebote se
+        excluyen.
       </p>
 
       {error && <div className="alert alert--error">{error}</div>}
@@ -232,9 +288,9 @@ export default function CorreoMasivo() {
               </label>
             </div>
             <p className="text-muted config-hint">
-              Puede usar <code>{'{nombre}'}</code> o <code>{'{nombre_completo}'}</code> para
-              personalizar. Si varios devotos comparten el mismo correo, se envía uno solo y se
-              concatenan los nombres.
+              En copia oculta el saludo es genérico (no usa el nombre de cada uno). En modo uno por
+              uno puede usar <code>{'{nombre}'}</code> / <code>{'{nombre_completo}'}</code>. Si
+              varios compartan el mismo correo, se envía uno solo.
             </p>
 
             <label className="config-hint" style={{ display: 'block', marginTop: '0.75rem' }}>
@@ -347,7 +403,21 @@ export default function CorreoMasivo() {
                 </select>
               </label>
               <label>
-                Pausa entre correos
+                Cómo enviar
+                <select
+                  value={modoEnvio}
+                  onChange={(e) => setModoEnvio(e.target.value)}
+                  disabled={enviando}
+                >
+                  {MODOS_ENVIO.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                {modoEnvio === 'bcc' ? 'Pausa entre lotes' : 'Pausa entre correos'}
                 <select
                   value={delaySeg}
                   onChange={(e) => setDelaySeg(Number(e.target.value))}
@@ -364,6 +434,12 @@ export default function CorreoMasivo() {
 
             <p className="text-muted config-hint listado-turnos__resumen">
               <strong>{incluidos.length}</strong> correo(s)
+              {modoEnvio === 'bcc' ? (
+                <>
+                  {' '}
+                  · <strong>{lotesBcc.length}</strong> lote(s) BCC
+                </>
+              ) : null}
               {personasIncluidas > incluidos.length ? (
                 <>
                   {' '}
@@ -447,7 +523,9 @@ export default function CorreoMasivo() {
                     onClick={handleEnviar}
                     disabled={!incluidos.length}
                   >
-                    Enviar a {incluidos.length} correo(s)
+                    {modoEnvio === 'bcc'
+                      ? `Enviar ${incluidos.length} en ${lotesBcc.length} lote(s)`
+                      : `Enviar a ${incluidos.length} correo(s)`}
                   </button>
                 </>
               ) : (

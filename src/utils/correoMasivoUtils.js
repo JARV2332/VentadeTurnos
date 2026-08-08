@@ -180,6 +180,27 @@ export function construirDestinatariosCorreoMasivo({
   };
 }
 
+/** Destinatarios por lote en copia oculta (BCC). Gmail SMTP tolera ~100; 50 es seguro. */
+export const TAMANO_LOTE_BCC = 50;
+
+export function partirEnLotes(lista = [], tamano = TAMANO_LOTE_BCC) {
+  const arr = Array.isArray(lista) ? lista : [];
+  const size = Math.max(1, Number(tamano) || TAMANO_LOTE_BCC);
+  const lotes = [];
+  for (let i = 0; i < arr.length; i += size) {
+    lotes.push(arr.slice(i, i + size));
+  }
+  return lotes;
+}
+
+/** Saludo genérico cuando el aviso va en BCC (sin personalizar por persona). */
+export function personalizarTextoAvisoGenerico(texto) {
+  return personalizarTextoAviso(texto, {
+    nombre: 'hermanos y hermanas',
+    nombres: ['hermanos y hermanas'],
+  });
+}
+
 export const MAX_IMAGEN_BYTES = 900 * 1024;
 /** Máx. imágenes por aviso (novenario). */
 export const MAX_IMAGENES_AVISO = 5;
