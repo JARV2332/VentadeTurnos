@@ -137,11 +137,14 @@ export function buildAvisoEmailContent({
 
   const imgBlock = imgRows.join('');
 
+  // Evitar saludo doble: si el texto ya empieza con "Estimado…", no anteponer otro.
+  const textoYaTieneSaludo = /^\s*estimad/i.test(String(texto || ''));
   const plural = /\sy\s/i.test(String(nombre || ''));
   const saludoTitulo = plural ? 'Estimados/as' : 'Estimado/a';
-  const saludo = nombre
-    ? `<p style="margin:0 0 16px;font-size:15px;color:#0f172a;">${saludoTitulo} <strong>${escapeHtml(nombre)}</strong>,</p>`
-    : '';
+  const saludo =
+    nombre && !textoYaTieneSaludo
+      ? `<p style="margin:0 0 16px;font-size:15px;color:#0f172a;">${saludoTitulo} <strong>${escapeHtml(nombre)}</strong>,</p>`
+      : '';
 
   const html = `<!DOCTYPE html>
 <html lang="es">

@@ -75,7 +75,8 @@ export async function enviarAvisoCorreoApi({
         text: texto,
         aviso: {
           texto,
-          nombre,
+          // Solo enviar nombre si hay valor (undefined se omite en JSON).
+          ...(nombre ? { nombre } : {}),
           organizacion: organizacionNombre,
           imagenes: listaImagenes.map((img) => ({
             base64: img.base64,
@@ -302,7 +303,7 @@ export async function ejecutarCorreoMasivo({
       bcc: bccEmails,
       subject: asunto,
       texto: cuerpo,
-      nombre: undefined,
+      // Sin nombre → el HTML no antepone saludo; queda solo el del texto.
       organizacionNombre: orgNombre,
       imagenes: listaImagenes,
     });
