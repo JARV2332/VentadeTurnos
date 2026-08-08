@@ -24,6 +24,14 @@ async function authHeaders() {
   return headers;
 }
 
+function normalizarImagenesAviso(imagenes, imagen) {
+  if (Array.isArray(imagenes) && imagenes.length) {
+    return imagenes.filter((img) => img?.base64 && img?.mime);
+  }
+  if (imagen?.base64 && imagen?.mime) return [imagen];
+  return [];
+}
+
 export async function enviarAvisoCorreoApi({
   organizacionId,
   from,
@@ -33,13 +41,17 @@ export async function enviarAvisoCorreoApi({
   texto,
   nombre,
   organizacionNombre,
-  imagen,
+  imagen = null,
+  imagenes = null,
 }) {
+  const listaImagenes = normalizarImagenesAviso(imagenes, imagen);
   const headers = await authHeaders();
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 45000);
+  const timeoutMs = listaImagenes.length > 1 ? 70000 : 45000;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    const primera = listaImagenes[0];
     const res = await fetch(EMAIL_API, {
       method: 'POST',
       headers,
@@ -56,9 +68,14 @@ export async function enviarAvisoCorreoApi({
           texto,
           nombre,
           organizacion: organizacionNombre,
-          imagenBase64: imagen?.base64 || undefined,
-          imagenMime: imagen?.mime || undefined,
-          imagenNombre: imagen?.nombre || undefined,
+          imagenes: listaImagenes.map((img) => ({
+            base64: img.base64,
+            mime: img.mime,
+            nombre: img.nombre,
+          })),
+          imagenBase64: primera?.base64 || undefined,
+          imagenMime: primera?.mime || undefined,
+          imagenNombre: primera?.nombre || undefined,
         },
       }),
     });
@@ -87,10 +104,12 @@ export async function ejecutarCorreoMasivo({
   asunto,
   texto,
   imagen = null,
+  imagenes = null,
   delaySegundos = 5,
   onProgress,
   signal,
 }) {
+  const listaImagenes = normalizarImagenesAviso(imagenes, imagen);
   const emailConfig = await getEmailConfig(organizacionId);
   if (!emailConfig?.correo_remitente?.trim() && !emailConfig?.gmail_smtp_user?.trim()) {
     return {
@@ -140,7 +159,7 @@ export async function ejecutarCorreoMasivo({
       texto: cuerpo,
       nombre: nombreSaludo,
       organizacionNombre: orgNombre,
-      imagen,
+      imagenes: listaImagenes,
     });
 
     const entrada = {

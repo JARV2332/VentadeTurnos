@@ -390,7 +390,7 @@ export default function ConfigCorreo() {
 
         cofradía configura <strong>su propia cuenta Gmail</strong> aquí abajo.
         {' '}
-        Para novenario u otros avisos con texto e imagen:{' '}
+        Para novenario u otros avisos con texto e imágenes:{' '}
         <Link to="/config/correo-masivo">Correo masivo</Link>.
 
       </p>

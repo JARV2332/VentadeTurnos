@@ -181,6 +181,12 @@ export function construirDestinatariosCorreoMasivo({
 }
 
 export const MAX_IMAGEN_BYTES = 900 * 1024;
+/** Máx. imágenes por aviso (novenario). */
+export const MAX_IMAGENES_AVISO = 5;
+/**
+ * Tope combinado (~3.2 MB) para no superar el body de la API (Vercel ~4.5 MB en base64).
+ */
+export const MAX_TOTAL_IMAGENES_BYTES = Math.floor(3.2 * 1024 * 1024);
 
 export function leerImagenComoBase64(file) {
   return new Promise((resolve, reject) => {
@@ -195,7 +201,7 @@ export function leerImagenComoBase64(file) {
     if (file.size > MAX_IMAGEN_BYTES) {
       reject(
         new Error(
-          `La imagen pesa ${(file.size / 1024).toFixed(0)} KB. Máximo 900 KB. Redúzcala antes de adjuntar.`
+          `«${file.name || 'imagen'}» pesa ${(file.size / 1024).toFixed(0)} KB. Máximo 900 KB por archivo.`
         )
       );
       return;
@@ -205,6 +211,7 @@ export function leerImagenComoBase64(file) {
       const dataUrl = String(reader.result || '');
       const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
       resolve({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         base64,
         mime: file.type,
         nombre: file.name || 'novenario.jpg',
@@ -215,4 +222,58 @@ export function leerImagenComoBase64(file) {
     reader.onerror = () => reject(new Error('No se pudo leer la imagen.'));
     reader.readAsDataURL(file);
   });
+}
+
+/**
+ * Lee varias imágenes y las agrega a las ya elegidas (máx. MAX_IMAGENES_AVISO).
+ * @returns {Promise<{ imagenes: object[], advertencias: string[] }>}
+ */
+export async function agregarImagenesAviso(existentes = [], files = []) {
+  const actuales = Array.isArray(existentes) ? [...existentes] : [];
+  const listaFiles = Array.from(files || []).filter(Boolean);
+  const advertencias = [];
+
+  if (!listaFiles.length) {
+    return { imagenes: actuales, advertencias };
+  }
+
+  let cupo = MAX_IMAGENES_AVISO - actuales.length;
+  if (cupo <= 0) {
+    throw new Error(`Ya hay ${MAX_IMAGENES_AVISO} imágenes. Quite alguna para agregar otra.`);
+  }
+
+  if (listaFiles.length > cupo) {
+    advertencias.push(
+      `Solo se agregaron ${cupo} de ${listaFiles.length} (máximo ${MAX_IMAGENES_AVISO}).`
+    );
+  }
+
+  const aLeer = listaFiles.slice(0, cupo);
+  const leidas = await Promise.all(aLeer.map((file) => leerImagenComoBase64(file)));
+
+  const combinadas = [...actuales, ...leidas];
+  let total = combinadas.reduce((acc, img) => acc + (img.size || 0), 0);
+  while (total > MAX_TOTAL_IMAGENES_BYTES && combinadas.length > actuales.length) {
+    const quitada = combinadas.pop();
+    total -= quitada?.size || 0;
+    advertencias.push(
+      `«${quitada?.nombre || 'imagen'}» no cabe: el total de adjuntos no puede pasar de ${(
+        MAX_TOTAL_IMAGENES_BYTES /
+        1024 /
+        1024
+      ).toFixed(1)} MB. Reduzca el tamaño de las imágenes.`
+    );
+  }
+
+  if (combinadas.length === actuales.length && leidas.length) {
+    throw new Error(
+      `No hay espacio: el total de adjuntos no puede pasar de ${(
+        MAX_TOTAL_IMAGENES_BYTES /
+        1024 /
+        1024
+      ).toFixed(1)} MB. Reduzca las imágenes.`
+    );
+  }
+
+  return { imagenes: combinadas, advertencias };
 }

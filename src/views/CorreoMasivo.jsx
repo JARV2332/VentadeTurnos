@@ -6,9 +6,10 @@ import { useAuth } from '../context/AuthContext';
 import { getCargadoresByOrg, getCorreosEnviados } from '../services/dataService';
 import { ejecutarCorreoMasivo } from '../services/correoMasivoService';
 import {
+  agregarImagenesAviso,
   construirDestinatariosCorreoMasivo,
   correoPareceValido,
-  leerImagenComoBase64,
+  MAX_IMAGENES_AVISO,
   normalizarCorreo,
 } from '../utils/correoMasivoUtils';
 import {
@@ -40,7 +41,7 @@ export default function CorreoMasivo() {
   const [texto, setTexto] = useState(
     'Estimado/a {nombre},\n\nCompartimos con usted el rezo del novenario.\n\nQue Nuestra Señora de la Asunción interceda por usted y su familia.\n'
   );
-  const [imagen, setImagen] = useState(null);
+  const [imagenes, setImagenes] = useState([]);
   const [delaySeg, setDelaySeg] = useState(DELAY_DEFAULT_SEG);
   const [emailPrueba, setEmailPrueba] = useState(() => normalizarCorreo(user?.email || ''));
   const [enviando, setEnviando] = useState(false);
@@ -94,18 +95,24 @@ export default function CorreoMasivo() {
     };
   }, [emailPruebaNorm, incluidos, user?.nombre]);
 
-  const onElegirImagen = async (e) => {
-    const file = e.target.files?.[0];
+  const onElegirImagenes = async (e) => {
+    const files = e.target.files;
     e.target.value = '';
-    if (!file) return;
+    if (!files?.length) return;
     setError('');
     try {
-      const data = await leerImagenComoBase64(file);
-      setImagen(data);
+      const { imagenes: next, advertencias } = await agregarImagenesAviso(imagenes, files);
+      setImagenes(next);
+      if (advertencias.length) {
+        setError(advertencias.join(' '));
+      }
     } catch (err) {
-      setImagen(null);
-      setError(err.message || 'No se pudo cargar la imagen.');
+      setError(err.message || 'No se pudieron cargar las imágenes.');
     }
+  };
+
+  const quitarImagen = (id) => {
+    setImagenes((prev) => prev.filter((img) => img.id !== id));
   };
 
   const validarMensaje = () => {
@@ -140,7 +147,7 @@ export default function CorreoMasivo() {
       destinatarios,
       asunto: asunto.trim(),
       texto,
-      imagen,
+      imagenes,
       delaySegundos: delaySeg,
       signal: cancelRef.current,
       onProgress: setProgreso,
@@ -180,7 +187,7 @@ export default function CorreoMasivo() {
   return (
     <Layout
       title="Correo masivo (novenario)"
-      subtitle="Texto libre e imagen a correos que sí funcionan"
+      subtitle="Texto libre e imágenes a correos que sí funcionan"
     >
       <p className="text-muted config-hint" style={{ marginBottom: '1rem' }}>
         <Link to="/config/correo">← Volver a Correo y boletas</Link>
@@ -226,38 +233,84 @@ export default function CorreoMasivo() {
             </p>
 
             <label className="config-hint" style={{ display: 'block', marginTop: '0.75rem' }}>
-              Imagen adjunta (opcional, máx. 900 KB)
+              Imágenes adjuntas (opcional, hasta {MAX_IMAGENES_AVISO}, máx. 900 KB c/u)
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/gif"
-                onChange={onElegirImagen}
-                disabled={enviando}
+                multiple
+                onChange={onElegirImagenes}
+                disabled={enviando || imagenes.length >= MAX_IMAGENES_AVISO}
                 style={{ display: 'block', marginTop: '0.35rem' }}
               />
             </label>
-            {imagen && (
+            <p className="text-muted config-hint">
+              Puede elegir varias a la vez. Total combinado máx. ~3.2 MB para que el envío no falle.
+              {imagenes.length > 0
+                ? ` · ${imagenes.length}/${MAX_IMAGENES_AVISO} · ${(
+                    imagenes.reduce((acc, img) => acc + (img.size || 0), 0) /
+                    1024
+                  ).toFixed(0)} KB`
+                : ''}
+            </p>
+            {imagenes.length > 0 && (
               <div style={{ marginTop: '0.75rem' }}>
-                <img
-                  src={imagen.previewUrl}
-                  alt="Vista previa"
+                <div
                   style={{
-                    maxWidth: '280px',
-                    width: '100%',
-                    borderRadius: '8px',
-                    border: '1px solid #e2e8f0',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                    gap: '0.75rem',
                   }}
-                />
+                >
+                  {imagenes.map((img) => (
+                    <div
+                      key={img.id}
+                      style={{
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        padding: '0.5rem',
+                        background: '#fff',
+                      }}
+                    >
+                      <img
+                        src={img.previewUrl}
+                        alt={img.nombre}
+                        style={{
+                          width: '100%',
+                          height: '110px',
+                          objectFit: 'cover',
+                          borderRadius: '6px',
+                          display: 'block',
+                        }}
+                      />
+                      <p
+                        className="text-muted"
+                        style={{
+                          margin: '0.4rem 0 0.35rem',
+                          fontSize: '0.75rem',
+                          wordBreak: 'break-all',
+                        }}
+                      >
+                        {img.nombre} · {(img.size / 1024).toFixed(0)} KB
+                      </p>
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm"
+                        disabled={enviando}
+                        onClick={() => quitarImagen(img.id)}
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  ))}
+                </div>
                 <div className="listado-turnos__acciones" style={{ marginTop: '0.5rem' }}>
-                  <span className="text-muted">
-                    {imagen.nombre} · {(imagen.size / 1024).toFixed(0)} KB
-                  </span>
                   <button
                     type="button"
                     className="btn btn--ghost btn--sm"
                     disabled={enviando}
-                    onClick={() => setImagen(null)}
+                    onClick={() => setImagenes([])}
                   >
-                    Quitar imagen
+                    Quitar todas
                   </button>
                 </div>
               </div>

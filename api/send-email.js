@@ -1,7 +1,7 @@
 /**
  * Envío de boletas por Gmail SMTP — credenciales por organización o fallback en Vercel.
  * También: action=reenviar-pendiente (correoId) para reintentar error/encolado.
- * tipo=aviso: texto libre + imagen (novenario / comunicados).
+ * tipo=aviso: texto libre + imagen(es) (novenario / comunicados).
  */
 import { verifyOrgMember } from './_lib/verifyOrgMember.js';
 import { buildBoletaEmailContent } from './_lib/emailBoletaContent.js';
@@ -89,6 +89,7 @@ export default async function handler(req, res) {
         texto: aviso?.texto ?? text ?? '',
         nombre: aviso?.nombre,
         organizacion: aviso?.organizacion,
+        imagenes: aviso?.imagenes,
         imagenBase64: aviso?.imagenBase64,
         imagenMime: aviso?.imagenMime,
         imagenNombre: aviso?.imagenNombre,

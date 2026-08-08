@@ -1,5 +1,5 @@
 /**
- * HTML para avisos / novenario: texto libre + imagen opcional (inline CID + adjunto).
+ * HTML para avisos / novenario: texto libre + imagen(es) opcional(es) (inline CID + adjunto).
  */
 
 export const AVISO_IMAGEN_CID = 'aviso-imagen@ventadeturnos';
@@ -13,6 +13,8 @@ const MIME_PERMITIDOS = new Set([
 ]);
 
 const MAX_BYTES = 900 * 1024;
+const MAX_IMAGENES = 5;
+const MAX_TOTAL_BYTES = Math.floor(3.2 * 1024 * 1024);
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -34,11 +36,28 @@ function textoAHtml(texto) {
     .join('');
 }
 
+function normalizarListaImagenes({ imagenes, imagenBase64, imagenMime, imagenNombre }) {
+  if (Array.isArray(imagenes) && imagenes.length) {
+    return imagenes
+      .map((img) => ({
+        base64: img?.base64 ?? img?.imagenBase64,
+        mime: img?.mime ?? img?.imagenMime,
+        nombre: img?.nombre ?? img?.imagenNombre,
+      }))
+      .filter((img) => img.base64 && img.mime);
+  }
+  if (imagenBase64 && imagenMime) {
+    return [{ base64: imagenBase64, mime: imagenMime, nombre: imagenNombre }];
+  }
+  return [];
+}
+
 /**
  * @param {{
  *   texto?: string,
  *   nombre?: string,
  *   organizacion?: string,
+ *   imagenes?: Array<{ base64?: string, mime?: string, nombre?: string }>,
  *   imagenBase64?: string,
  *   imagenMime?: string,
  *   imagenNombre?: string,
@@ -48,51 +67,75 @@ export function buildAvisoEmailContent({
   texto,
   nombre,
   organizacion,
+  imagenes,
   imagenBase64,
   imagenMime,
   imagenNombre,
 }) {
   const attachments = [];
-  let imgBlock = '';
+  const lista = normalizarListaImagenes({
+    imagenes,
+    imagenBase64,
+    imagenMime,
+    imagenNombre,
+  }).slice(0, MAX_IMAGENES);
 
-  const mime = String(imagenMime || '').toLowerCase().trim();
-  const b64raw = String(imagenBase64 || '').replace(/^data:[^;]+;base64,/, '').trim();
+  let totalBytes = 0;
+  const imgRows = [];
 
-  if (b64raw && mime) {
+  lista.forEach((img, index) => {
+    const mime = String(img.mime || '').toLowerCase().trim();
+    const b64raw = String(img.base64 || '')
+      .replace(/^data:[^;]+;base64,/, '')
+      .trim();
+
+    if (!b64raw || !mime) return;
+
     if (!MIME_PERMITIDOS.has(mime)) {
-      throw new Error('La imagen debe ser JPG, PNG, WEBP o GIF.');
+      throw new Error('Cada imagen debe ser JPG, PNG, WEBP o GIF.');
     }
     const buffer = Buffer.from(b64raw, 'base64');
     if (!buffer.length) {
-      throw new Error('No se pudo leer la imagen adjunta.');
+      throw new Error('No se pudo leer una de las imágenes adjuntas.');
     }
     if (buffer.length > MAX_BYTES) {
-      throw new Error('La imagen supera el máximo de 900 KB. Redúzcala e intente de nuevo.');
+      throw new Error('Una imagen supera el máximo de 900 KB. Redúzcala e intente de nuevo.');
     }
-    const filename = String(imagenNombre || 'novenario.jpg')
-      .replace(/[^\w.\-áéíóúñÁÉÍÓÚÑ ]+/gi, '_')
-      .slice(0, 80) || 'novenario.jpg';
+    totalBytes += buffer.length;
+    if (totalBytes > MAX_TOTAL_BYTES) {
+      throw new Error(
+        'El total de imágenes supera ~3.2 MB. Reduzca el tamaño o quite alguna.'
+      );
+    }
+
+    const cid = index === 0 ? AVISO_IMAGEN_CID : `aviso-imagen-${index}@ventadeturnos`;
+    const filename =
+      String(img.nombre || `novenario-${index + 1}.jpg`)
+        .replace(/[^\w.\-áéíóúñÁÉÍÓÚÑ ]+/gi, '_')
+        .slice(0, 80) || `novenario-${index + 1}.jpg`;
 
     attachments.push({
       filename,
       content: buffer,
       contentType: mime === 'image/jpg' ? 'image/jpeg' : mime,
-      cid: AVISO_IMAGEN_CID,
+      cid,
       contentDisposition: 'inline',
     });
 
-    imgBlock = `
+    imgRows.push(`
       <tr>
-        <td style="padding:8px 16px 24px;">
+        <td style="padding:8px 16px ${index === lista.length - 1 ? '24px' : '8px'};">
           <img
-            src="cid:${AVISO_IMAGEN_CID}"
-            alt="Imagen adjunta"
+            src="cid:${cid}"
+            alt="Imagen ${index + 1}"
             width="520"
             style="display:block;width:100%;max-width:520px;height:auto;border-radius:10px;margin:0 auto;"
           />
         </td>
-      </tr>`;
-  }
+      </tr>`);
+  });
+
+  const imgBlock = imgRows.join('');
 
   const plural = /\sy\s/i.test(String(nombre || ''));
   const saludoTitulo = plural ? 'Estimados/as' : 'Estimado/a';
