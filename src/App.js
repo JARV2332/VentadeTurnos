@@ -26,6 +26,7 @@ import MisTurnosPublico from './views/MisTurnosPublico';
 import ConsultaTurnosDevoto from './views/ConsultaTurnosDevoto';
 import ListadoTurnos from './views/ListadoTurnos';
 import DisponibilidadTurnos from './views/DisponibilidadTurnos';
+import AsistenciaTurnos from './views/AsistenciaTurnos';
 import ApartadosPendientes from './views/ApartadosPendientes';
 import ReporteEntrega from './views/ReporteEntrega';
 import ReportePendientesPorTurno from './views/ReportePendientesPorTurno';
@@ -167,6 +168,14 @@ function App() {
             element={
               <PrivateRoute permission="disponibilidad_turnos">
                 <DisponibilidadTurnos />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/asistencia-turnos"
+            element={
+              <PrivateRoute permission="asistencia_turnos">
+                <AsistenciaTurnos />
               </PrivateRoute>
             }
           />

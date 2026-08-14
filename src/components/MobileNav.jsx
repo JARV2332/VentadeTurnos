@@ -15,6 +15,7 @@ const LABEL_CORTO = {
   consulta_turnos: 'Consulta',
   listado_turnos: 'Listado',
   disponibilidad_turnos: 'Libres',
+  asistencia_turnos: 'Asistencia',
   reporte_entrega: 'Entregas',
   config: 'Procesiones',
   config_correo: 'Correo',

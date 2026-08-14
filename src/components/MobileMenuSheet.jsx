@@ -17,6 +17,7 @@ const LABEL_CORTO = {
   usuarios: 'Usuarios',
   import_reservas: 'Apartados',
   plataforma: 'Asociaciones',
+  asistencia_turnos: 'Asistencia',
 };
 
 export default function MobileMenuSheet({ items, open, onClose }) {
