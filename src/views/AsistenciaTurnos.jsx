@@ -8,7 +8,7 @@ import {
   construirFilasAsistencia,
   exportAsistenciaTurnosPdf,
   resumenAsistencia,
-  TIPOS_FILTRO_RAPIDO,
+  TIPOS_FILTRO_CHECKBOX,
   tiposTurnoEnLista,
 } from '../utils/asistenciaTurnosUtils';
 import {
@@ -26,12 +26,21 @@ export default function AsistenciaTurnos() {
   const [error, setError] = useState('');
   const [reporteGenerado, setReporteGenerado] = useState(false);
 
-  /** '' = todos los tipos; o un tipo concreto (Ordinario, Extraordinario, …) */
-  const [filtroTipo, setFiltroTipo] = useState('all');
-  /** Set de números de turno seleccionados; vacío = todos los del tipo */
+  /** Tipos marcados (Ordinario, Extraordinario, Entrada, Salida…). */
+  const [tiposSeleccionados, setTiposSeleccionados] = useState(() => new Set());
+  /** Números de turno marcados. */
   const [numerosSeleccionados, setNumerosSeleccionados] = useState(() => new Set());
   const [soloAsignados, setSoloAsignados] = useState(true);
   const [incluirFirma, setIncluirFirma] = useState(true);
+
+  const sincronizarNumerosConTipos = useCallback((tiposSet, catalogoTurnos) => {
+    if (!tiposSet.size) {
+      setNumerosSeleccionados(new Set());
+      return;
+    }
+    const visibles = catalogoTurnos.filter((t) => tiposSet.has(t.tipo));
+    setNumerosSeleccionados(new Set(visibles.map((t) => String(t.numero))));
+  }, []);
 
   const cargarCortejos = useCallback(async () => {
     try {
@@ -51,7 +60,7 @@ export default function AsistenciaTurnos() {
     setReporteGenerado(false);
     setTurnosAgrupados([]);
     setError('');
-    setFiltroTipo('all');
+    setTiposSeleccionados(new Set());
     setNumerosSeleccionados(new Set());
   }, [cortejoId]);
 
@@ -65,7 +74,8 @@ export default function AsistenciaTurnos() {
       const turnos = await getTurnosAgrupados(cortejoId, organizacionId);
       if (seq !== cargarSeqRef.current) return;
       setTurnosAgrupados(turnos || []);
-      setFiltroTipo('all');
+      const tipos = new Set((turnos || []).map((t) => t.tipo_turno).filter(Boolean));
+      setTiposSeleccionados(tipos);
       const todos = (turnos || []).map((t) => String(t.numero_turno));
       setNumerosSeleccionados(new Set(todos));
       setReporteGenerado(true);
@@ -95,18 +105,18 @@ export default function AsistenciaTurnos() {
   );
 
   const turnosVisibles = useMemo(() => {
-    if (filtroTipo === 'all') return catalogo;
-    return catalogo.filter((t) => t.tipo === filtroTipo);
-  }, [catalogo, filtroTipo]);
+    if (!tiposSeleccionados.size) return [];
+    return catalogo.filter((t) => tiposSeleccionados.has(t.tipo));
+  }, [catalogo, tiposSeleccionados]);
 
-  const filtros = useMemo(() => {
-    const tiposTurno = filtroTipo === 'all' ? [] : [filtroTipo];
-    return {
-      tiposTurno,
+  const filtros = useMemo(
+    () => ({
+      tiposTurno: [...tiposSeleccionados],
       numerosTurno: [...numerosSeleccionados],
       soloAsignados,
-    };
-  }, [filtroTipo, numerosSeleccionados, soloAsignados]);
+    }),
+    [tiposSeleccionados, numerosSeleccionados, soloAsignados]
+  );
 
   const filas = useMemo(
     () => construirFilasAsistencia(turnosAgrupados, filtros),
@@ -115,13 +125,25 @@ export default function AsistenciaTurnos() {
 
   const resumen = useMemo(() => resumenAsistencia(filas), [filas]);
 
-  const cambiarTipo = (tipoId) => {
-    setFiltroTipo(tipoId);
-    const visibles =
-      tipoId === 'all'
-        ? catalogo
-        : catalogo.filter((t) => t.tipo === tipoId);
-    setNumerosSeleccionados(new Set(visibles.map((t) => String(t.numero))));
+  const toggleTipo = (tipoId) => {
+    setTiposSeleccionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(tipoId)) next.delete(tipoId);
+      else next.add(tipoId);
+      sincronizarNumerosConTipos(next, catalogo);
+      return next;
+    });
+  };
+
+  const marcarTodosTipos = () => {
+    const next = new Set(tiposEnProcesion);
+    setTiposSeleccionados(next);
+    sincronizarNumerosConTipos(next, catalogo);
+  };
+
+  const quitarTodosTipos = () => {
+    setTiposSeleccionados(new Set());
+    setNumerosSeleccionados(new Set());
   };
 
   const toggleNumero = (numero) => {
@@ -141,7 +163,8 @@ export default function AsistenciaTurnos() {
   const limpiarNumeros = () => setNumerosSeleccionados(new Set());
 
   const limpiarFiltros = () => {
-    setFiltroTipo('all');
+    const tipos = new Set(tiposEnProcesion);
+    setTiposSeleccionados(tipos);
     setNumerosSeleccionados(new Set(catalogo.map((t) => String(t.numero))));
     setSoloAsignados(true);
   };
@@ -161,14 +184,17 @@ export default function AsistenciaTurnos() {
     });
   };
 
-  const botonesTipo = useMemo(() => {
-    const base = TIPOS_FILTRO_RAPIDO.filter(
-      (b) => b.id === 'all' || tiposEnProcesion.includes(b.id)
+  const opcionesTipo = useMemo(() => {
+    const disponibles = TIPOS_FILTRO_CHECKBOX.filter((b) =>
+      tiposEnProcesion.includes(b.id)
     );
-    // Si aún no cargó tipos, mostrar todos los botones conocidos
-    if (!tiposEnProcesion.length && reporteGenerado) return TIPOS_FILTRO_RAPIDO;
-    return base.length ? base : TIPOS_FILTRO_RAPIDO;
-  }, [tiposEnProcesion, reporteGenerado]);
+    const conocidos = new Set(TIPOS_FILTRO_CHECKBOX.map((b) => b.id));
+    const extras = tiposEnProcesion
+      .filter((t) => !conocidos.has(t))
+      .map((t) => ({ id: t, label: t }));
+    const lista = [...disponibles, ...extras];
+    return lista.length ? lista : TIPOS_FILTRO_CHECKBOX;
+  }, [tiposEnProcesion]);
 
   return (
     <Layout
@@ -219,28 +245,65 @@ export default function AsistenciaTurnos() {
           <section className="panel listado-turnos__filtros" style={{ marginTop: '1rem' }}>
             <h3 className="panel__title">2. ¿Qué turnos quiere?</h3>
 
-            <p className="text-muted config-hint" style={{ marginBottom: '0.5rem' }}>
-              Tipo
-            </p>
             <div
               style={{
                 display: 'flex',
                 flexWrap: 'wrap',
-                gap: '0.4rem',
+                alignItems: 'center',
+                gap: '0.5rem',
+                marginBottom: '0.5rem',
+              }}
+            >
+              <strong style={{ fontSize: '0.9rem' }}>Tipo</strong>
+              <span className="text-muted config-hint">
+                (puede marcar varios: entrada + salida, etc.)
+              </span>
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={marcarTodosTipos}
+              >
+                Todos los tipos
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={quitarTodosTipos}
+                disabled={!tiposSeleccionados.size}
+              >
+                Ninguno
+              </button>
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '0.5rem',
                 marginBottom: '1rem',
               }}
             >
-              {botonesTipo.map((b) => {
-                const activo = filtroTipo === b.id;
+              {opcionesTipo.map((b) => {
+                const activo = tiposSeleccionados.has(b.id);
                 return (
-                  <button
+                  <label
                     key={b.id}
-                    type="button"
                     className={`btn btn--sm ${activo ? 'btn--primary' : 'btn--ghost'}`}
-                    onClick={() => cambiarTipo(b.id)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      cursor: 'pointer',
+                      margin: 0,
+                    }}
                   >
+                    <input
+                      type="checkbox"
+                      checked={activo}
+                      onChange={() => toggleTipo(b.id)}
+                    />
                     {b.label}
-                  </button>
+                  </label>
                 );
               })}
             </div>
@@ -256,7 +319,7 @@ export default function AsistenciaTurnos() {
             >
               <strong style={{ fontSize: '0.9rem' }}>Marque los turnos</strong>
               <span className="text-muted config-hint">
-                (ej. solo el #1, o varios extraordinarios)
+                (según los tipos marcados arriba)
               </span>
               <button
                 type="button"
@@ -276,8 +339,10 @@ export default function AsistenciaTurnos() {
               </button>
             </div>
 
-            {!turnosVisibles.length ? (
-              <p className="text-muted">No hay turnos con ese tipo en esta procesión.</p>
+            {!tiposSeleccionados.size ? (
+              <p className="text-muted">Marque al menos un tipo (ordinario, entrada…).</p>
+            ) : !turnosVisibles.length ? (
+              <p className="text-muted">No hay turnos con esos tipos en esta procesión.</p>
             ) : (
               <div
                 style={{
@@ -352,10 +417,10 @@ export default function AsistenciaTurnos() {
             <p className="text-muted config-hint listado-turnos__resumen">
               <strong>{resumen.total}</strong> persona(s) · <strong>{resumen.turnos}</strong>{' '}
               turno(s)
-              {filtroTipo !== 'all' ? (
+              {tiposSeleccionados.size > 0 ? (
                 <>
                   {' '}
-                  · tipo: <strong>{filtroTipo}</strong>
+                  · tipos: <strong>{[...tiposSeleccionados].join(', ')}</strong>
                 </>
               ) : null}
               {numerosSeleccionados.size > 0 ? (
@@ -370,7 +435,10 @@ export default function AsistenciaTurnos() {
                   </strong>
                 </>
               ) : (
-                <> · <strong>ningún turno marcado</strong></>
+                <>
+                  {' '}
+                  · <strong>ningún turno marcado</strong>
+                </>
               )}
               {Object.keys(resumen.porTipo).length > 0 && (
                 <>
@@ -385,7 +453,7 @@ export default function AsistenciaTurnos() {
 
             <div className="listado-turnos__acciones">
               <button type="button" className="btn btn--ghost btn--sm" onClick={limpiarFiltros}>
-                Limpiar filtros
+                Restablecer filtros
               </button>
               <button
                 type="button"

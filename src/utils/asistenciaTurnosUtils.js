@@ -106,6 +106,14 @@ export function catalogoTurnosAsistencia(turnosAgrupados = []) {
     .sort((a, b) => (a.numero || 0) - (b.numero || 0));
 }
 
+export const TIPOS_FILTRO_CHECKBOX = [
+  { id: 'Ordinario', label: 'Ordinario' },
+  { id: 'Extraordinario', label: 'Extraordinario' },
+  { id: 'Entrada', label: 'Entrada' },
+  { id: 'Salida', label: 'Salida' },
+];
+
+/** @deprecated usar TIPOS_FILTRO_CHECKBOX (multi-selección) */
 export const TIPOS_FILTRO_RAPIDO = [
   { id: 'all', label: 'Todos los tipos' },
   { id: 'Ordinario', label: 'Solo ordinarios' },
