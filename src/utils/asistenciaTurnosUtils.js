@@ -19,17 +19,35 @@ function esAsignado(brazo) {
 
 /**
  * Filas planas para pasar asistencia, ordenadas por turno → lado → brazo.
+ * filtros:
+ *  - tiposTurno: string[] — vacío = todos los tipos
+ *  - numerosTurno: number[]|string[] — vacío = ninguno (hay que marcar turnos)
+ *  - soloAsignados: boolean (default true)
  */
 export function construirFilasAsistencia(turnosAgrupados = [], filtros = {}) {
   const filas = [];
 
+  const tiposSel = normalizarListaFiltro(
+    filtros.tiposTurno ??
+      (filtros.tipoTurno && filtros.tipoTurno !== 'all' ? [filtros.tipoTurno] : null)
+  );
+  const numerosSel = normalizarListaFiltro(
+    filtros.numerosTurno ??
+      (filtros.numeroTurno?.toString?.().trim() ? [filtros.numeroTurno] : null)
+  ).map((n) => String(n));
+
+  // Sin números seleccionados → lista vacía (el UI marca todos por defecto).
+  if (!numerosSel.length && (filtros.numerosTurno != null || filtros.requireNumeros)) {
+    return filas;
+  }
+
   (turnosAgrupados || [])
     .filter((turno) => {
-      if (filtros.tipoTurno && filtros.tipoTurno !== 'all') {
-        return (turno.tipo_turno || '') === filtros.tipoTurno;
+      if (tiposSel.length && !tiposSel.includes(turno.tipo_turno || '')) {
+        return false;
       }
-      if (filtros.numeroTurno?.trim()) {
-        return String(turno.numero_turno) === String(filtros.numeroTurno).trim();
+      if (numerosSel.length && !numerosSel.includes(String(turno.numero_turno))) {
+        return false;
       }
       return true;
     })
@@ -64,6 +82,37 @@ export function construirFilasAsistencia(turnosAgrupados = [], filtros = {}) {
 
   return filas;
 }
+
+function normalizarListaFiltro(valor) {
+  if (valor == null) return [];
+  if (Array.isArray(valor)) {
+    return valor.map((v) => String(v).trim()).filter(Boolean);
+  }
+  if (valor instanceof Set) return [...valor].map((v) => String(v).trim()).filter(Boolean);
+  const s = String(valor).trim();
+  return s && s !== 'all' ? [s] : [];
+}
+
+/** Catálogo de turnos para el selector (número + tipo). */
+export function catalogoTurnosAsistencia(turnosAgrupados = []) {
+  return (turnosAgrupados || [])
+    .map((t) => ({
+      numero: t.numero_turno,
+      tipo: t.tipo_turno || '',
+      tipoLabel: labelTipoTurno(t.tipo_turno),
+      etiqueta: t.etiqueta || '',
+      horaEstimada: t.hora_estimada || '',
+    }))
+    .sort((a, b) => (a.numero || 0) - (b.numero || 0));
+}
+
+export const TIPOS_FILTRO_RAPIDO = [
+  { id: 'all', label: 'Todos los tipos' },
+  { id: 'Ordinario', label: 'Solo ordinarios' },
+  { id: 'Extraordinario', label: 'Solo extraordinarios' },
+  { id: 'Entrada', label: 'Solo entrada' },
+  { id: 'Salida', label: 'Solo salida' },
+];
 
 export function agruparFilasAsistenciaPorTurno(filas = []) {
   const map = new Map();
@@ -122,10 +171,25 @@ function escapeHtml(value) {
 
 function filtrosAsistenciaTexto(filtros = {}) {
   const partes = [];
-  if (filtros.tipoTurno && filtros.tipoTurno !== 'all') {
-    partes.push(`Tipo: ${labelTipoTurno(filtros.tipoTurno)}`);
+  const tipos = normalizarListaFiltro(
+    filtros.tiposTurno ??
+      (filtros.tipoTurno && filtros.tipoTurno !== 'all' ? [filtros.tipoTurno] : null)
+  );
+  if (tipos.length) {
+    partes.push(`Tipo: ${tipos.map((t) => labelTipoTurno(t)).join(', ')}`);
   }
-  if (filtros.numeroTurno?.trim()) partes.push(`Turno #${filtros.numeroTurno.trim()}`);
+  const numeros = normalizarListaFiltro(
+    filtros.numerosTurno ??
+      (filtros.numeroTurno?.toString?.().trim() ? [filtros.numeroTurno] : null)
+  );
+  if (numeros.length) {
+    const ordenados = [...numeros].sort((a, b) => Number(a) - Number(b));
+    partes.push(
+      ordenados.length <= 12
+        ? `Turnos: ${ordenados.map((n) => `#${n}`).join(', ')}`
+        : `${ordenados.length} turnos seleccionados`
+    );
+  }
   if (filtros.soloAsignados !== false) partes.push('Solo asignados');
   return partes.length ? partes.join(' · ') : 'Todos';
 }
