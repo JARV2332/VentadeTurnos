@@ -185,9 +185,21 @@ export default function Landing() {
           )}
 
           {!MOCK_MODE && tab === 'login' && (
-            <p className="auth-demo" style={{ marginTop: '1rem', fontSize: '0.85rem', opacity: 0.85 }}>
-              Super administrador: <strong>super@ventadeturnos.com</strong>
-            </p>
+            <div className="auth-demo" style={{ marginTop: '1rem' }}>
+              <p style={{ fontSize: '0.85rem', opacity: 0.9, marginBottom: '0.5rem' }}>
+                Super administrador: <strong>super@ventadeturnos.com</strong>
+              </p>
+              <p style={{ fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+                <strong>Prueba demo:</strong>
+              </p>
+              <p style={{ fontSize: '0.8rem', opacity: 0.9 }}>
+                Admin <code>admin@demo.com</code> · Caja <code>caja@demo.com</code> · Vendedor{' '}
+                <code>vendedor@demo.com</code>
+              </p>
+              <p style={{ fontSize: '0.8rem', opacity: 0.9 }}>
+                Contraseña: <code>demo123</code>
+              </p>
+            </div>
           )}
 
           {MOCK_MODE && (
