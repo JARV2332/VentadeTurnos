@@ -31,6 +31,7 @@ export default function EditTurnoModal({
   const [ladoUnico, setLadoUnico] = useState('Izquierda');
   const [son, setSon] = useState('');
   const [alabado, setAlabado] = useState('');
+  const [direccion, setDireccion] = useState('');
   const [horaEstimada, setHoraEstimada] = useState('');
   const [errorLocal, setErrorLocal] = useState('');
 
@@ -66,6 +67,7 @@ export default function EditTurnoModal({
     setTotalBrazos(Number(turno.total_brazos) || 20);
     setSon(turno.son || '');
     setAlabado(turno.alabado || '');
+    setDireccion(turno.direccion || '');
     setHoraEstimada(horaParaInput(turno.hora_estimada));
     setErrorLocal('');
   }, [turno]);
@@ -109,6 +111,7 @@ export default function EditTurnoModal({
       lado_unico: medio ? ladoUnico : null,
       son,
       alabado,
+      direccion,
       hora_estimada: horaEstimada || null,
     });
   };
@@ -191,6 +194,16 @@ export default function EditTurnoModal({
               value={etiqueta}
               onChange={(e) => setEtiqueta(e.target.value)}
               placeholder={`Ej. Ordinario ${numeroTurno || ''}, Extraordinario…`}
+            />
+          </label>
+
+          <label>
+            Dirección / tramo del recorrido
+            <input
+              type="text"
+              value={direccion}
+              onChange={(e) => setDireccion(e.target.value)}
+              placeholder="Ej. 6a. Avenida y 3a. Calle"
             />
           </label>
 

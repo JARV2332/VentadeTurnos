@@ -749,10 +749,10 @@ export default function ConfigSaaS() {
               titulo="Programa de turnos (Excel)"
               descripcion={
                 <>
-                  Columnas: <strong>Turno</strong>, <strong>Melodía</strong>,{' '}
-                  <strong>Asignacion de turno</strong>, <strong>Ofrenda</strong>. Varias filas con
-                  la misma columna Turno = varias melodías. Asignación: disponible, reservado (no
-                  vender) o mixto (ej. reservado 20 brazos, venta 26).
+                  Columnas: <strong>Turno</strong>, <strong>Dirección</strong>,{' '}
+                  <strong>Marcha</strong>, <strong>Precio</strong>, <strong>Brazos</strong>. Varias
+                  filas con el mismo Turno = varias marchas. La dirección es el tramo del recorrido.
+                  También se acepta el formato anterior (Melodía / Asignacion / Ofrenda).
                 </>
               }
             >
@@ -771,7 +771,7 @@ export default function ConfigSaaS() {
               </div>
 
               <label>
-                Brazos por turno (aplica a todos los turnos del Excel)
+                Brazos por turno (si el Excel no trae columna Brazos)
                 <input
                   type="number"
                   min={2}
@@ -780,9 +780,9 @@ export default function ConfigSaaS() {
                   onChange={(e) => setConfigField('brazosDefault', Number(e.target.value))}
                 />
                 <small className="field-hint">
-                  Para turnos que dicen solo &quot;Disponible para la venta&quot; se usa este total.
-                  Si el Excel indica cantidades (ej. 20 reservados + 26 venta), ese turno usa la suma
-                  del Excel. Al importar se detecta automáticamente (ej. 46).
+                  Si el Excel trae la columna <strong>Brazos</strong>, cada turno usa ese valor. Si no,
+                  se aplica este total. Con formato antiguo de asignación mixta (ej. 20 reservados + 26
+                  venta) se usa la suma del Excel.
                 </small>
               </label>
 
@@ -809,10 +809,11 @@ export default function ConfigSaaS() {
                         <th>#</th>
                         <th>Turno</th>
                         <th>Tipo</th>
-                        <th>Melodía(s)</th>
+                        <th>Dirección</th>
+                        <th>Marcha(s)</th>
                         <th>Asignación</th>
                         <th>Brazos</th>
-                        <th>Ofrenda</th>
+                        <th>Precio</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -821,6 +822,7 @@ export default function ConfigSaaS() {
                           <td>{t.numero_turno}</td>
                           <td>{t.etiqueta}</td>
                           <td>{t.tipo_turno}</td>
+                          <td>{t.direccion || '—'}</td>
                           <td className="import-cell-melodia">
                             {melodiasDeTurno(t).length > 0 ? (
                               <ul className="import-melodias-lista">
@@ -1056,6 +1058,11 @@ export default function ConfigSaaS() {
                         <strong>{r.tipo}:</strong> {r.texto}
                       </span>
                     ))}
+                  </div>
+                )}
+                {t.direccion && (
+                  <div className="preview-turno__asignacion text-muted">
+                    <strong>Dirección:</strong> {t.direccion}
                   </div>
                 )}
                 {t.asignacion && (

@@ -240,6 +240,11 @@ export default function BoletaContraseñaTurno({
                   <span>Melodía:</span> {melodiaTexto}
                 </p>
               )}
+              {turnoPrincipal?.direccion && (
+                <p className="boleta-formal__melodia">
+                  <span>Dirección:</span> {turnoPrincipal.direccion}
+                </p>
+              )}
             </div>
             {cfg.mostrar_precio !== false && (
               <div className="boleta-formal__precio-caja">

@@ -29,6 +29,7 @@ export default function AgregarTurnoModal({
   const [precio, setPrecio] = useState(150);
   const [son, setSon] = useState('');
   const [alabado, setAlabado] = useState('');
+  const [direccion, setDireccion] = useState('');
 
   useEffect(() => {
     const n = Number(numeroTurno);
@@ -70,6 +71,7 @@ export default function AgregarTurnoModal({
       precio: Number(precio),
       son,
       alabado,
+      direccion,
     });
   };
 
@@ -156,6 +158,16 @@ export default function AgregarTurnoModal({
               value={etiqueta}
               onChange={(e) => setEtiqueta(e.target.value)}
               placeholder="Ej. Ordinario 5, Honor Salida…"
+            />
+          </label>
+
+          <label>
+            Dirección / tramo del recorrido
+            <input
+              type="text"
+              value={direccion}
+              onChange={(e) => setDireccion(e.target.value)}
+              placeholder="Ej. 6a. Avenida y 3a. Calle"
             />
           </label>
 

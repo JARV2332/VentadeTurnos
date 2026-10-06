@@ -1400,6 +1400,13 @@ html {
   color: var(--text-muted);
 }
 
+.turno-cartulina__direccion {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
 .turno-cartulina__meta {
   display: flex;
   align-items: center;

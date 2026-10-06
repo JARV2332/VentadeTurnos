@@ -97,6 +97,11 @@ export function TurnoCartulina({
         <div>
           <span className="turno-cartulina__num">Turno #{turno.numero_turno}</span>
           <span className="turno-cartulina__tipo">{turno.etiqueta || turno.tipo_turno}</span>
+          {turno.direccion && (
+            <span className="turno-cartulina__direccion" title="Tramo del recorrido">
+              {turno.direccion}
+            </span>
+          )}
         </div>
         <div className="turno-cartulina__meta">
           <StatusBadge status={turno.tipo_turno} />

@@ -90,7 +90,7 @@ const BRAZO_DEVOTO_FIELDS =
   'id, turno_id, numero_turno, numero_brazo, lado, estado, reserva_apartado, apartado_notas, asignado_nombre, cargador_id, precio_pagado, codigo_boleta_qr, compra_id, estado_entrega';
 
 const TURNO_LIST_FIELDS =
-  'id, cortejo_id, numero_turno, tipo_turno, etiqueta, precio, son, alabado, hora_estimada, total_brazos, organizacion_id';
+  'id, cortejo_id, numero_turno, tipo_turno, etiqueta, precio, son, alabado, direccion, hora_estimada, total_brazos, organizacion_id';
 
 async function fetchPaginatedRows(buildQuery, pageSize = BRAZOS_PAGE) {
   const all = [];
@@ -601,7 +601,15 @@ export async function getTurnoById(turnoId) {
 export async function getTurnosByIds(turnoIds) {
   const ids = [...new Set((turnoIds || []).filter(Boolean))];
   if (!ids.length) return {};
-  const { data, error } = await supabase.from('turnos').select(TURNO_LIST_FIELDS).in('id', ids);
+  let { data, error } = await supabase.from('turnos').select(TURNO_LIST_FIELDS).in('id', ids);
+  if (error && isMissingColumn(error, 'direccion')) {
+    ({ data, error } = await supabase
+      .from('turnos')
+      .select(
+        'id, cortejo_id, numero_turno, tipo_turno, etiqueta, precio, son, alabado, hora_estimada, total_brazos, organizacion_id'
+      )
+      .in('id', ids));
+  }
   if (error) throw error;
   return Object.fromEntries((data || []).map((t) => [t.id, t]));
 }
@@ -663,6 +671,9 @@ export async function updateTurno(organizacionId, turnoId, datos) {
   if (datos.hora_estimada !== undefined) {
     payload.hora_estimada = normalizarHoraInput(datos.hora_estimada);
   }
+  if (datos.direccion !== undefined) {
+    payload.direccion = datos.direccion?.trim() || null;
+  }
 
   const nuevoTotal = payload.total_brazos ?? turnoActual.total_brazos;
   if (Number(nuevoTotal) !== Number(turnoActual.total_brazos)) {
@@ -708,6 +719,17 @@ export async function updateTurno(organizacionId, turnoId, datos) {
 
   if (error && datos.hora_estimada !== undefined && isMissingColumn(error, 'hora_estimada')) {
     delete payload.hora_estimada;
+    ({ data, error } = await supabase
+      .from('turnos')
+      .update(payload)
+      .eq('id', turnoId)
+      .eq('organizacion_id', organizacionId)
+      .select()
+      .single());
+  }
+
+  if (error && datos.direccion !== undefined && isMissingColumn(error, 'direccion')) {
+    delete payload.direccion;
     ({ data, error } = await supabase
       .from('turnos')
       .update(payload)
@@ -810,12 +832,23 @@ export async function agregarTurnoProcesion(organizacionId, cortejoId, datos) {
     son: datos.son?.trim() || null,
     alabado: datos.alabado?.trim() || null,
   };
+  if (datos.direccion !== undefined) {
+    payload.direccion = datos.direccion?.trim() || null;
+  }
 
-  const { data: turno, error: tErr } = await supabase
+  let { data: turno, error: tErr } = await supabase
     .from('turnos')
     .insert(payload)
     .select()
     .single();
+  if (tErr && payload.direccion !== undefined && isMissingColumn(tErr, 'direccion')) {
+    delete payload.direccion;
+    ({ data: turno, error: tErr } = await supabase
+      .from('turnos')
+      .insert(payload)
+      .select()
+      .single());
+  }
   if (tErr) return err(tErr);
 
   const brazosTurno = crearBrazosParaTurno({
@@ -837,11 +870,20 @@ export async function agregarTurnoProcesion(organizacionId, cortejoId, datos) {
 }
 
 export async function getTurnosByCortejo(cortejoId) {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('turnos')
     .select(TURNO_LIST_FIELDS)
     .eq('cortejo_id', cortejoId)
     .order('numero_turno');
+  if (error && isMissingColumn(error, 'direccion')) {
+    ({ data, error } = await supabase
+      .from('turnos')
+      .select(
+        'id, cortejo_id, numero_turno, tipo_turno, etiqueta, precio, son, alabado, hora_estimada, total_brazos, organizacion_id'
+      )
+      .eq('cortejo_id', cortejoId)
+      .order('numero_turno'));
+  }
   if (error) throw error;
   return data || [];
 }
@@ -2735,7 +2777,7 @@ export async function generarProcesion(cortejo, configProcesion, organizacionId)
         };
       }
 
-      const { data: turno, error: tErr } = await supabase
+      let { data: turno, error: tErr } = await supabase
         .from('turnos')
         .insert({
           organizacion_id: organizacionId,
@@ -2747,9 +2789,27 @@ export async function generarProcesion(cortejo, configProcesion, organizacionId)
           precio: cfg.precio ?? 0,
           son: cfg.son,
           alabado: cfg.alabado,
+          direccion: (typeof cfg.direccion === 'string' ? cfg.direccion.trim() : cfg.direccion) || null,
         })
         .select()
         .single();
+      if (tErr && isMissingColumn(tErr, 'direccion')) {
+        ({ data: turno, error: tErr } = await supabase
+          .from('turnos')
+          .insert({
+            organizacion_id: organizacionId,
+            cortejo_id: nuevoCortejo.id,
+            numero_turno: cfg.numero_turno,
+            tipo_turno: cfg.tipo_turno,
+            etiqueta: cfg.etiqueta,
+            total_brazos: totalBrazos,
+            precio: cfg.precio ?? 0,
+            son: cfg.son,
+            alabado: cfg.alabado,
+          })
+          .select()
+          .single());
+      }
       if (tErr) {
         await rollbackCortejo();
         return err(tErr);
@@ -2896,7 +2956,7 @@ export async function duplicarProcesion(cortejoOrigenId, datos, organizacionId) 
         };
       }
 
-      const { data: turno, error: tErr } = await supabase
+      let { data: turno, error: tErr } = await supabase
         .from('turnos')
         .insert({
           organizacion_id: organizacionId,
@@ -2908,10 +2968,29 @@ export async function duplicarProcesion(cortejoOrigenId, datos, organizacionId) 
           precio: turnoOrigen.precio ?? 0,
           son: turnoOrigen.son,
           alabado: turnoOrigen.alabado,
+          direccion: turnoOrigen.direccion || null,
           hora_estimada: turnoOrigen.hora_estimada || null,
         })
         .select()
         .single();
+      if (tErr && isMissingColumn(tErr, 'direccion')) {
+        ({ data: turno, error: tErr } = await supabase
+          .from('turnos')
+          .insert({
+            organizacion_id: organizacionId,
+            cortejo_id: nuevoCortejo.id,
+            numero_turno: turnoOrigen.numero_turno,
+            tipo_turno: turnoOrigen.tipo_turno,
+            etiqueta: turnoOrigen.etiqueta,
+            total_brazos: totalBrazos,
+            precio: turnoOrigen.precio ?? 0,
+            son: turnoOrigen.son,
+            alabado: turnoOrigen.alabado,
+            hora_estimada: turnoOrigen.hora_estimada || null,
+          })
+          .select()
+          .single());
+      }
       if (tErr) {
         await rollbackCortejo();
         return err(tErr);

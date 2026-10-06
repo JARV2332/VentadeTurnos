@@ -388,6 +388,9 @@ export function updateTurnoMock(organizacionId, turnoId, datos) {
   if (datos.hora_estimada !== undefined) {
     actualizado.hora_estimada = normalizarHoraInput(datos.hora_estimada);
   }
+  if (datos.direccion !== undefined) {
+    actualizado.direccion = datos.direccion?.trim() || null;
+  }
   store.turnos[idx] = actualizado;
   if (Number(numeroDestino) !== Number(turnoActual.numero_turno)) {
     store.brazos = store.brazos.map((b) =>
@@ -458,6 +461,7 @@ export function agregarTurnoProcesionMock(organizacionId, cortejoId, datos) {
     precio: Number(datos.precio) || 0,
     son: datos.son?.trim() || null,
     alabado: datos.alabado?.trim() || null,
+    direccion: datos.direccion?.trim() || null,
   };
 
   const brazos = crearBrazosParaTurno({
@@ -1307,6 +1311,7 @@ export function generarProcesionMock(cortejo, configProcesion, organizacionId) {
       etiqueta: cfg.etiqueta || null,
       son: cfg.son || null,
       alabado: cfg.alabado || null,
+      direccion: cfg.direccion || null,
     });
 
     const brazos = aplicarAsignacionBrazos(

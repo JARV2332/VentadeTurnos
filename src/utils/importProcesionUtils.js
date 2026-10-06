@@ -1,19 +1,27 @@
 /**
  * Importación de procesión desde Excel.
- * Columnas: Turno | Melodía | Asignacion de turno | Ofrenda
  *
- * - Varios renglones con la misma fila de turno = varias melodías.
- * - Asignación: disponible, reservado total (apartado), o mixto N reservados + M venta.
+ * Formato recomendado:
+ *   Turno | Dirección | Marcha | Precio | Brazos
+ *
+ * Formato anterior (sigue soportado):
+ *   Turno | Melodía | Asignacion de turno | Ofrenda
+ *
+ * - Varios renglones con la misma fila de turno = varias marchas/melodías.
+ * - Asignación (opcional): disponible, reservado total, o mixto N reservados + M venta.
+ * - Si hay columna Brazos, ese número define el total del turno.
  */
 
 import * as XLSX from 'xlsx';
 import { validarBrazosPares } from './turnoUtils';
 
+/** Columnas de la plantilla descargable (formato nuevo). */
 export const PROCESION_EXCEL_COLUMNAS = [
   { key: 'turno', label: 'Turno' },
-  { key: 'melodia', label: 'Melodía' },
-  { key: 'asignacion', label: 'Asignacion de turno' },
-  { key: 'ofrenda', label: 'Ofrenda' },
+  { key: 'direccion', label: 'Dirección' },
+  { key: 'melodia', label: 'Marcha' },
+  { key: 'ofrenda', label: 'Precio' },
+  { key: 'brazos', label: 'Brazos' },
 ];
 
 function norm(texto) {
@@ -34,6 +42,13 @@ function parseOfrenda(valor) {
   const limpio = raw.replace(/[^\d.,]/g, '').replace(',', '.');
   const n = Number(limpio);
   return Number.isFinite(n) ? n : null;
+}
+
+function parseBrazosCol(valor) {
+  const raw = String(valor ?? '').trim();
+  if (!raw) return null;
+  const n = parseInt(raw.replace(/[^\d]/g, ''), 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 function normalizarBrazosDefault(brazosDefault) {
@@ -66,6 +81,7 @@ function extraerNumerosMixto(texto) {
 export function inferirBrazosDefaultDesdeBloques(bloques) {
   const totals = [];
   (bloques || []).forEach((bloque) => {
+    if (bloque.brazosExplicitos) totals.push(ajustarPar(bloque.brazosExplicitos));
     const mixto = extraerNumerosMixto(bloque.asignacionTexto);
     if (mixto?.totalBrazos) totals.push(mixto.totalBrazos);
   });
@@ -126,24 +142,34 @@ export function detectarTipoTurno(etiqueta) {
 
 export function extraerNumeroTurno(etiqueta) {
   const m = String(etiqueta || '').match(/turno\s*(\d+)/i);
-  return m ? Number(m[1]) : null;
+  if (m) return Number(m[1]);
+  const solo = String(etiqueta || '').trim().match(/^(\d+)$/);
+  return solo ? Number(solo[1]) : null;
+}
+
+function mapearColumna(c) {
+  if (c === 'turno' || c.startsWith('turno ')) return 'turno';
+  if (c.includes('direccion') || c.includes('recorrido')) return 'direccion';
+  if (c.includes('melodia') || c.includes('marcha') || c === 'son' || c.startsWith('son ')) {
+    return 'melodia';
+  }
+  if (c.includes('asignacion')) return 'asignacion';
+  if (c.includes('ofrenda') || c === 'precio' || c.startsWith('precio ')) return 'ofrenda';
+  if (c === 'brazos' || c.startsWith('brazos ') || c.includes('total brazos')) return 'brazos';
+  return null;
 }
 
 function encontrarFilaEncabezado(rows) {
   for (let i = 0; i < Math.min(rows.length, 30); i += 1) {
     const cells = (rows[i] || []).map((c) => norm(c));
-    const tieneTurno = cells.some((c) => c === 'turno' || c.startsWith('turno '));
-    const tieneMelodia = cells.some((c) => c.includes('melodia'));
-    const tieneAsignacion = cells.some((c) => c.includes('asignacion'));
-    const tieneOfrenda = cells.some((c) => c.includes('ofrenda'));
-    if (tieneTurno && tieneMelodia && tieneAsignacion && tieneOfrenda) {
-      const map = {};
-      cells.forEach((c, idx) => {
-        if (c === 'turno' || c.startsWith('turno ')) map.turno = idx;
-        if (c.includes('melodia')) map.melodia = idx;
-        if (c.includes('asignacion')) map.asignacion = idx;
-        if (c.includes('ofrenda')) map.ofrenda = idx;
-      });
+    const map = {};
+    cells.forEach((c, idx) => {
+      const key = mapearColumna(c);
+      if (key && map[key] === undefined) map[key] = idx;
+    });
+    const tieneTurno = map.turno !== undefined;
+    const tieneMelodia = map.melodia !== undefined;
+    if (tieneTurno && tieneMelodia) {
       return { headerIdx: i, colMap: map };
     }
   }
@@ -157,7 +183,7 @@ function inferirMeta(rows, headerIdx) {
   previas.forEach((row) => {
     const texto = row.map((c) => String(c ?? '').trim()).filter(Boolean).join(' ').trim();
     if (!texto) return;
-    if (/programa de melodias/i.test(texto)) return;
+    if (/programa de melodias/i.test(texto) || /programa de marchas/i.test(texto)) return;
 
     const fechaMatch = texto.match(/(\d{1,2})\s+de\s+\w+\s+de\s+(\d{4})/i);
     if (fechaMatch) {
@@ -227,6 +253,29 @@ export function esFilaContinuacionMelodia(turnoTxt, melodia) {
   return !String(turnoTxt || '').trim() && !!String(melodia || '').trim();
 }
 
+function resolverAsignacion(bloque, brazosDefault) {
+  let asignacion = parseAsignacionTurno(bloque.asignacionTexto, brazosDefault);
+  if (bloque.brazosExplicitos == null) return asignacion;
+
+  const total = ajustarPar(bloque.brazosExplicitos);
+  if (!bloque.asignacionTexto) {
+    return { tipo: 'disponible', totalBrazos: total, reservados: 0, disponibles: total };
+  }
+  if (asignacion.tipo === 'disponible') {
+    return { tipo: 'disponible', totalBrazos: total, reservados: 0, disponibles: total };
+  }
+  if (asignacion.tipo === 'reservado_total') {
+    return { tipo: 'reservado_total', totalBrazos: total, reservados: total, disponibles: 0 };
+  }
+  const reservados = Math.min(asignacion.reservados, total);
+  return {
+    ...asignacion,
+    totalBrazos: total,
+    reservados,
+    disponibles: total - reservados,
+  };
+}
+
 function bloquesDesdeFilas(rows, headerIdx, colMap) {
   const bloques = [];
   let actual = null;
@@ -244,6 +293,9 @@ function bloquesDesdeFilas(rows, headerIdx, colMap) {
     const melodia = get(row, 'melodia');
     const asignacion = get(row, 'asignacion');
     const ofrendaRaw = get(row, 'ofrenda');
+    const direccion = get(row, 'direccion');
+    const brazosRaw = get(row, 'brazos');
+    const brazosNum = parseBrazosCol(brazosRaw);
 
     if (turnoTxt) {
       if (actual) bloques.push(actual);
@@ -253,17 +305,22 @@ function bloquesDesdeFilas(rows, headerIdx, colMap) {
         melodias: melodia ? [melodia] : [],
         asignacionTexto: asignacion,
         ofrenda: parseOfrenda(ofrendaRaw),
+        direccion: direccion || '',
+        brazosExplicitos: brazosNum,
       };
     } else if (actual && esFilaContinuacionMelodia(turnoTxt, melodia)) {
       actual.melodias.push(melodia);
       if (asignacion && !actual.asignacionTexto) actual.asignacionTexto = asignacion;
       if (ofrendaRaw && actual.ofrenda == null) actual.ofrenda = parseOfrenda(ofrendaRaw);
-    } else if (actual && !melodia && !asignacion && !ofrendaRaw) {
+      if (direccion && !actual.direccion) actual.direccion = direccion;
+      if (brazosNum != null && actual.brazosExplicitos == null) actual.brazosExplicitos = brazosNum;
+    } else if (actual && !melodia && !asignacion && !ofrendaRaw && !direccion && !brazosRaw) {
       /* fila en blanco dentro del bloque — ignorar */
     } else if (actual) {
-      /* turno vacío pero sin melodía: sigue siendo parte del bloque anterior si no hay nuevo turno */
       if (asignacion && !actual.asignacionTexto) actual.asignacionTexto = asignacion;
       if (ofrendaRaw && actual.ofrenda == null) actual.ofrenda = parseOfrenda(ofrendaRaw);
+      if (direccion && !actual.direccion) actual.direccion = direccion;
+      if (brazosNum != null && actual.brazosExplicitos == null) actual.brazosExplicitos = brazosNum;
     } else if (melodia) {
       actual = {
         filaExcel: i + 1,
@@ -271,6 +328,8 @@ function bloquesDesdeFilas(rows, headerIdx, colMap) {
         melodias: [melodia],
         asignacionTexto: asignacion,
         ofrenda: parseOfrenda(ofrendaRaw),
+        direccion: direccion || '',
+        brazosExplicitos: brazosNum,
       };
     }
   }
@@ -285,8 +344,9 @@ export function construirTurnosPlanDesdeBloques(bloques, { brazosDefault = 20 } 
   const errores = [];
 
   const turnosPlan = numerados.map((bloque) => {
-    const asignacion = parseAsignacionTurno(bloque.asignacionTexto, brazosDefault);
+    const asignacion = resolverAsignacion(bloque, brazosDefault);
     const { melodias, son, alabado } = melodiasParaPersistir(bloque.melodias);
+    const direccion = String(bloque.direccion || '').trim() || null;
 
     if (!validarBrazosPares(asignacion.totalBrazos)) {
       errores.push(
@@ -295,7 +355,7 @@ export function construirTurnosPlanDesdeBloques(bloques, { brazosDefault = 20 } 
     }
 
     if (bloque.ofrenda == null) {
-      advertencias.push(`Fila ${bloque.filaExcel} (${bloque.etiqueta}): sin ofrenda — se usará Q 0.`);
+      advertencias.push(`Fila ${bloque.filaExcel} (${bloque.etiqueta}): sin precio — se usará Q 0.`);
     }
 
     return {
@@ -304,6 +364,7 @@ export function construirTurnosPlanDesdeBloques(bloques, { brazosDefault = 20 } 
       etiqueta: bloque.etiqueta.trim(),
       precio: bloque.ofrenda ?? 0,
       total_brazos: asignacion.totalBrazos,
+      direccion,
       melodias,
       son,
       alabado,
@@ -331,7 +392,7 @@ export function parseFilasProcesionExcel(rows, { brazosDefault = 20 } = {}) {
   if (!header) {
     return {
       error:
-        'No se encontraron las columnas Turno, Melodía, Asignacion de turno y Ofrenda. Verifique la plantilla.',
+        'No se encontraron columnas Turno y Marcha/Melodía. Use: Turno, Dirección, Marcha, Precio, Brazos (o el formato anterior con Melodía / Asignacion / Ofrenda).',
       turnosPlan: [],
       meta: {},
       advertencias: [],
@@ -409,20 +470,20 @@ export function reconstruirTurnosPlanExcel(excelImport, brazosDefault) {
 
 export function descargarPlantillaProcesionExcel() {
   const ws = XLSX.utils.aoa_to_sheet([
-    ['Programa de Melodias'],
+    ['Programa de Marchas'],
     ['Procesión Solemne 2026'],
     ['15 de agosto de 2026'],
     [],
     PROCESION_EXCEL_COLUMNAS.map((c) => c.label),
-    ['Honor Salida', 'Himno a la Asunción', 'Reservado 20 BRAZOS, disponible para la venta 26', 'Q250.00'],
-    ['', 'La Granadera', '', ''],
-    ['Turno 7', 'El Poder del amor', 'Disponible para la venta', 'Q30.00'],
-    ['Turno 8', 'El Buey y la Mula', 'Disponible para la venta', 'Q30.00'],
-    ['Extraordinario Portal', 'Ave María', 'RESERVADO, NO VENDER', 'Q60.00'],
-    ['', 'El Jilguero', '', ''],
-    ['Honor Entrada', 'La Danza de los Venados', 'RESERVADO, NO VENDER', 'Q250.00'],
+    ['Honor Salida', 'Iglesia — 6a. Avenida', 'Himno a la Asunción', '250', '46'],
+    ['', '', 'La Granadera', '', ''],
+    ['Turno 7', '6a. Avenida y 3a. Calle', 'El Poder del amor', '30', '20'],
+    ['Turno 8', 'Parque Central', 'El Buey y la Mula', '30', '20'],
+    ['Extraordinario Portal', 'Portal — Plaza', 'Ave María', '60', '20'],
+    ['', '', 'El Jilguero', '', ''],
+    ['Honor Entrada', 'Iglesia — atrio', 'La Danza de los Venados', '250', '20'],
   ]);
-  ws['!cols'] = [{ wch: 28 }, { wch: 32 }, { wch: 42 }, { wch: 12 }];
+  ws['!cols'] = [{ wch: 24 }, { wch: 28 }, { wch: 28 }, { wch: 10 }, { wch: 10 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Turnos');
   XLSX.writeFile(wb, 'plantilla_procesion_turnos.xlsx');

@@ -32,6 +32,10 @@ function safeName(schema, table) {
   return `${schema}__${table}`;
 }
 
+function quoteIdent(name) {
+  return `"${String(name).replace(/"/g, '""')}"`;
+}
+
 if (!DATABASE_URL) {
   console.error(`
 ❌ Falta DATABASE_URL en .env.local
@@ -73,7 +77,9 @@ for (const { schemaname, tablename } of tables) {
   process.stdout.write(`  ${fullName}…`);
 
   try {
-    const { rows } = await client.query(`SELECT * FROM ${schemaname}.${tablename}`);
+    const { rows } = await client.query(
+      `SELECT * FROM ${quoteIdent(schemaname)}.${quoteIdent(tablename)}`
+    );
     fs.writeFileSync(path.join(outDir, fileName), JSON.stringify(rows, null, 2), 'utf8');
     manifest.tables[fullName] = { rows: rows.length, file: fileName };
     process.stdout.write(` ${rows.length} filas\n`);
