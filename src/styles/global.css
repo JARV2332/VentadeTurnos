@@ -2218,6 +2218,79 @@ html {
   border-radius: 8px;
 }
 
+.mini-boleta-preregistro {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.mini-boleta-preregistro__ticket {
+  background: #fff;
+  border: 1px dashed #94a3b8;
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  text-align: center;
+}
+
+.mini-boleta-preregistro__org {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.mini-boleta-preregistro__titulo {
+  margin: 0.35rem 0 0.15rem;
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+}
+
+.mini-boleta-preregistro__sub {
+  margin: 0 0 0.75rem;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.mini-boleta-preregistro__datos {
+  margin: 0 0 0.85rem;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.mini-boleta-preregistro__datos div {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.mini-boleta-preregistro__datos dt {
+  margin: 0;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.mini-boleta-preregistro__datos dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.mini-boleta-preregistro__qr {
+  display: flex;
+  justify-content: center;
+  margin: 0.5rem 0;
+}
+
+.mini-boleta-preregistro__pie {
+  margin: 0.5rem 0 0;
+  font-size: 0.72rem;
+  color: #64748b;
+  line-height: 1.35;
+}
+
 .dashboard-mis-turnos { margin-bottom: 1rem; }
 
 .caja-editar-pago__metodo-label {

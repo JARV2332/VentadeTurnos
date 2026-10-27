@@ -2,8 +2,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import AppFooter from '../components/AppFooter';
 import PhoneInput502 from '../components/PhoneInput502';
+import MiniBoletaPreregistro from '../components/MiniBoletaPreregistro';
 import { isValidCui, normalizarCui } from '../utils/cuiUtils';
 import { isValidGtWhatsapp } from '../utils/phoneGtUtils';
+import { descargarPdfPreregistro } from '../utils/preregistroPdfUtils';
 
 const EMPTY = {
   nombre_completo: '',
@@ -18,9 +20,11 @@ export default function PreregistroPublico() {
   const { orgSlug } = useParams();
   const [cargando, setCargando] = useState(true);
   const [enviando, setEnviando] = useState(false);
+  const [descargandoPdf, setDescargandoPdf] = useState(false);
   const [error, setError] = useState('');
   const [exito, setExito] = useState('');
   const [yaRegistrado, setYaRegistrado] = useState(false);
+  const [comprobante, setComprobante] = useState(null);
   const [orgInfo, setOrgInfo] = useState(null);
   const [config, setConfig] = useState(null);
   const [form, setForm] = useState(EMPTY);
@@ -64,12 +68,51 @@ export default function PreregistroPublico() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const generarComprobanteYPdf = useCallback(
+    async ({ nombre, cui, whatsapp, correo, yaReg }) => {
+      const data = {
+        orgNombre: orgInfo?.nombre_oficial || 'Organización',
+        orgSlug,
+        nombre,
+        cui,
+        whatsapp,
+        correo,
+        yaRegistrado: yaReg,
+        fecha: new Date(),
+      };
+      setComprobante(data);
+      setDescargandoPdf(true);
+      try {
+        await descargarPdfPreregistro(data);
+      } catch {
+        setError('Preregistro guardado, pero no se pudo descargar el PDF. Use el botón Descarga.');
+      } finally {
+        setDescargandoPdf(false);
+      }
+    },
+    [orgInfo?.nombre_oficial, orgSlug]
+  );
+
+  const redescargarPdf = useCallback(async () => {
+    if (!comprobante) return;
+    setDescargandoPdf(true);
+    setError('');
+    try {
+      await descargarPdfPreregistro(comprobante);
+    } catch {
+      setError('No se pudo generar el PDF. Intente de nuevo.');
+    } finally {
+      setDescargandoPdf(false);
+    }
+  }, [comprobante]);
+
   const enviar = useCallback(
     async (e) => {
       e?.preventDefault();
       setError('');
       setExito('');
       setYaRegistrado(false);
+      setComprobante(null);
 
       if (config?.activo === false) {
         setError('El preregistro no está disponible en este momento.');
@@ -79,6 +122,7 @@ export default function PreregistroPublico() {
       const nombre = form.nombre_completo.trim();
       const cui = normalizarCui(form.cui_o_identificacion);
       const correo = form.correo.trim().toLowerCase();
+      const whatsapp = form.whatsapp;
 
       if (nombre.length < 3) {
         setError('Ingrese su nombre completo.');
@@ -88,7 +132,7 @@ export default function PreregistroPublico() {
         setError('Ingrese un DPI/CUI válido (13 dígitos).');
         return;
       }
-      if (!isValidGtWhatsapp(form.whatsapp)) {
+      if (!isValidGtWhatsapp(whatsapp)) {
         setError('WhatsApp inválido (+502 y 8 dígitos).');
         return;
       }
@@ -106,7 +150,7 @@ export default function PreregistroPublico() {
             org: orgSlug,
             nombre_completo: nombre,
             cui_o_identificacion: cui,
-            whatsapp: form.whatsapp,
+            whatsapp,
             correo,
             telefono_emergencia: form.telefono_emergencia,
             website: form.website,
@@ -120,6 +164,13 @@ export default function PreregistroPublico() {
               'Este DPI ya está preregistrado. En taquilla indiquen su DPI para continuar.'
           );
           setForm(EMPTY);
+          await generarComprobanteYPdf({
+            nombre,
+            cui,
+            whatsapp,
+            correo,
+            yaReg: true,
+          });
           return;
         }
         if (res.status === 429) {
@@ -131,15 +182,22 @@ export default function PreregistroPublico() {
           return;
         }
         setYaRegistrado(false);
-        setExito(json.mensaje || 'Preregistro guardado.');
+        setExito(json.mensaje || 'Preregistro guardado. Se descargó su comprobante en PDF.');
         setForm(EMPTY);
+        await generarComprobanteYPdf({
+          nombre: json.nombre_completo || nombre,
+          cui: json.cui || cui,
+          whatsapp,
+          correo,
+          yaReg: false,
+        });
       } catch {
         setError('No se pudo completar el preregistro. Intente más tarde.');
       } finally {
         setEnviando(false);
       }
     },
-    [config?.activo, form, orgSlug]
+    [config?.activo, form, generarComprobanteYPdf, orgSlug]
   );
 
   const nombreOrg = orgInfo?.nombre_oficial || 'Su organización';
@@ -151,11 +209,7 @@ export default function PreregistroPublico() {
       <header className="boleta-publica__head">
         <div className="boleta-publica__brand" style={{ ['--preregistro-accent']: color }}>
           {config?.logo_url ? (
-            <img
-              src={config.logo_url}
-              alt=""
-              className="preregistro-publico__logo"
-            />
+            <img src={config.logo_url} alt="" className="preregistro-publico__logo" />
           ) : null}
           <p className="boleta-publica__hint">{nombreOrg}</p>
           <h1 className="mis-turnos-publico__titulo">{config?.titulo || 'Preregistro'}</h1>
@@ -171,25 +225,43 @@ export default function PreregistroPublico() {
 
         {!cargando && orgInfo && (
           <section className="mis-turnos-publico__formulario preregistro-publico__card">
-            {config?.mensaje && (
+            {config?.mensaje && !exito && (
               <p className="mis-turnos-publico__intro">{config.mensaje}</p>
             )}
 
             {exito ? (
-              <div className={`alert ${yaRegistrado ? 'alert--info' : 'alert--success'}`}>
-                <p>{exito}</p>
+              <>
+                <div className={`alert ${yaRegistrado ? 'alert--info' : 'alert--success'}`}>
+                  <p>{exito}</p>
+                  {descargandoPdf && (
+                    <p className="text-muted" style={{ marginTop: '0.5rem' }}>
+                      Generando PDF…
+                    </p>
+                  )}
+                </div>
+
+                {comprobante && (
+                  <MiniBoletaPreregistro
+                    {...comprobante}
+                    onDescargar={redescargarPdf}
+                    descargando={descargandoPdf}
+                  />
+                )}
+
                 <button
                   type="button"
                   className="btn btn--ghost btn--sm"
+                  style={{ marginTop: '0.75rem' }}
                   onClick={() => {
                     setExito('');
                     setError('');
                     setYaRegistrado(false);
+                    setComprobante(null);
                   }}
                 >
                   Registrar otra persona
                 </button>
-              </div>
+              </>
             ) : (
               <form className="preregistro-publico__form" onSubmit={enviar}>
                 {error && <div className="alert alert--error">{error}</div>}
@@ -248,7 +320,6 @@ export default function PreregistroPublico() {
                   onChange={(v) => setField('telefono_emergencia', v)}
                 />
 
-                {/* honeypot */}
                 <label className="preregistro-publico__hp" aria-hidden="true">
                   Sitio web
                   <input

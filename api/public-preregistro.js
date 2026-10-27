@@ -301,7 +301,9 @@ export default async function handler(req, res) {
     ok: true,
     actualizado: false,
     mensaje:
-      'Preregistro listo. En taquilla indiquen su DPI: sus datos aparecerán automáticamente para la venta.',
+      'Preregistro listo. Se descarga su comprobante en PDF. En taquilla indiquen su DPI.',
     id: data.id,
+    nombre_completo: data.nombre_completo,
+    cui,
   });
 }
