@@ -46,6 +46,10 @@ export const DEFAULT_RECIBO_CONFIG = {
   texto_entrega_prefijo:
     'Esta contraseña debe presentarse para la entrega del turno los días:',
   qr_tamano_px: 56,
+  /* Portal público de preregistro de devotos */
+  preregistro_activo: true,
+  preregistro_titulo: '',
+  preregistro_mensaje: '',
 };
 
 export function mergeReciboConfig(guardado) {

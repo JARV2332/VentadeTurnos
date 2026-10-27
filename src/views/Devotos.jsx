@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import Loader from '../components/Loader';
 import EditDevotoModal from '../components/EditDevotoModal';
+import PreregistroEnlaceAdmin from '../components/PreregistroEnlaceAdmin';
 import { useAuth } from '../context/AuthContext';
 import {
   getCargadoresByOrg,
@@ -33,7 +34,7 @@ function formatTelefonoGt(valor) {
 }
 
 export default function Devotos() {
-  const { organizacionId } = useAuth();
+  const { organizacionId, organizacion } = useAuth();
   const [searchParams] = useSearchParams();
   const [devotos, setDevotos] = useState(null);
   const [busqueda, setBusqueda] = useState('');
@@ -158,6 +159,13 @@ export default function Devotos() {
     >
       {okMsg && <div className="alert alert--success">{okMsg}</div>}
       {errorMsg && <div className="alert alert--error">{errorMsg}</div>}
+
+      <PreregistroEnlaceAdmin
+        organizacion={organizacion}
+        organizacionId={organizacionId}
+        className="devotos-preregistro"
+        mostrarConfig
+      />
 
       <section className="panel devotos-panel">
         <div className="devotos-panel__head">

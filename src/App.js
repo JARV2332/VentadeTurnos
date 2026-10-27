@@ -23,6 +23,7 @@ import PerfilUsuario from './views/PerfilUsuario';
 import PlataformaAdmin from './views/PlataformaAdmin';
 import BoletaPublica from './views/BoletaPublica';
 import MisTurnosPublico from './views/MisTurnosPublico';
+import PreregistroPublico from './views/PreregistroPublico';
 import ConsultaTurnosDevoto from './views/ConsultaTurnosDevoto';
 import ListadoTurnos from './views/ListadoTurnos';
 import DisponibilidadTurnos from './views/DisponibilidadTurnos';
@@ -43,6 +44,7 @@ function App() {
           <Route path="/confirmar-correo" element={<ConfirmarCorreo />} />
           <Route path="/boleta/:codigo" element={<BoletaPublica />} />
           <Route path="/mis-turnos/:orgSlug" element={<MisTurnosPublico />} />
+          <Route path="/preregistro/:orgSlug" element={<PreregistroPublico />} />
           <Route
             path="/plataforma"
             element={

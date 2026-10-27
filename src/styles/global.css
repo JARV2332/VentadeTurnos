@@ -2147,6 +2147,77 @@ html {
   margin-top: 0.65rem;
 }
 
+.preregistro-publico__logo {
+  display: block;
+  max-height: 72px;
+  width: auto;
+  margin: 0 auto 0.75rem;
+  object-fit: contain;
+}
+
+.preregistro-publico__card {
+  max-width: 28rem;
+  margin: 0 auto;
+}
+
+.preregistro-publico__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.preregistro-publico__form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.preregistro-publico__form input {
+  font-weight: 400;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+.preregistro-publico__hp {
+  position: absolute !important;
+  left: -10000px !important;
+  height: 1px;
+  width: 1px;
+  overflow: hidden;
+}
+
+.preregistro-admin-config {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.preregistro-admin-config__titulo {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.preregistro-admin-config__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+
+.preregistro-admin-config textarea,
+.preregistro-admin-config input[type='text'] {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
 .dashboard-mis-turnos { margin-bottom: 1rem; }
 
 .caja-editar-pago__metodo-label {

@@ -10,6 +10,7 @@ import {
 } from '../services/dataService';
 import HorarioTurnosPanel from '../components/HorarioTurnosPanel';
 import MisTurnosEnlaceAdmin from '../components/MisTurnosEnlaceAdmin';
+import PreregistroEnlaceAdmin from '../components/PreregistroEnlaceAdmin';
 
 export default function Dashboard() {
   const { organizacionId, organizacion } = useAuth();
@@ -39,6 +40,12 @@ export default function Dashboard() {
       ) : (
       <>
       <MisTurnosEnlaceAdmin organizacion={organizacion} className="dashboard-mis-turnos" />
+      <PreregistroEnlaceAdmin
+        organizacion={organizacion}
+        organizacionId={organizacionId}
+        className="dashboard-mis-turnos"
+        mostrarConfig={false}
+      />
       <div className="metrics-grid metrics-grid--5 dashboard-operacion">
         <div className="metric-card metric-card--primary">
           <span className="metric-card__label">Ventas de hoy</span>
