@@ -31,6 +31,7 @@ function enmascararWhatsapp(wa) {
 
 /**
  * Genera y descarga un PDF mini (tipo ticket) de preinscripción.
+ * El alto se calcula para que el QR y el pie no se corten.
  */
 export async function descargarPdfPreregistro({
   orgNombre,
@@ -43,79 +44,99 @@ export async function descargarPdfPreregistro({
   yaRegistrado = false,
   fecha = new Date(),
 }) {
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: [80, 130],
-  });
-
+  const pageW = 80;
   const margen = 6;
-  const ancho = 80 - margen * 2;
-  let y = 10;
+  const ancho = pageW - margen * 2;
+  const qrSize = 34;
+  const pieExtra = 16;
+  const margenInferior = 8;
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text(String(orgNombre || 'Organización').slice(0, 42), 40, y, { align: 'center', maxWidth: ancho });
-  y += 8;
-
-  doc.setFontSize(13);
-  doc.text(yaRegistrado ? 'YA PREINSCRITO' : 'PREINSCRIPCIÓN', 40, y, { align: 'center' });
-  y += 6;
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.text('Comprobante de preregistro (no es boleta de turno)', 40, y, {
-    align: 'center',
-    maxWidth: ancho,
-  });
-  y += 8;
-
-  doc.setDrawColor(180);
-  doc.line(margen, y, 80 - margen, y);
-  y += 7;
-
-  doc.setFontSize(9);
+  // Estimación de alto del bloque de datos (para dimensionar la página).
+  const probe = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [pageW, 200] });
+  probe.setFontSize(9);
   const filas = [
     ['Nombre', String(nombre || '—')],
     ['DPI / CUI', String(cui || '—')],
     ['Sexo', etiquetaSexo(sexo)],
     ['WhatsApp', enmascararWhatsapp(whatsapp)],
-    ['Correo', String(correo || '—').slice(0, 36)],
+    ['Correo', String(correo || '—').slice(0, 42)],
     ['Fecha', formatearFecha(fecha)],
   ];
+  let datosH = 0;
+  filas.forEach(([, valor]) => {
+    const lines = probe.splitTextToSize(valor, ancho - 2);
+    datosH += 3.5 + lines.length * 3.6 + 1.5;
+  });
 
+  const orgLines = probe.splitTextToSize(String(orgNombre || 'Organización').slice(0, 60), ancho);
+  const headerH = 8 + orgLines.length * 4.5 + 6 + 6 + 8;
+  const pageH = Math.ceil(
+    headerH + datosH + 6 + qrSize + pieExtra + margenInferior + 4
+  );
+
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: [pageW, Math.max(150, pageH)],
+  });
+
+  let y = 8;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text(orgLines, pageW / 2, y, { align: 'center' });
+  y += orgLines.length * 4.5 + 3;
+
+  doc.setFontSize(12);
+  doc.text(yaRegistrado ? 'YA PREINSCRITO' : 'PREINSCRIPCIÓN', pageW / 2, y, {
+    align: 'center',
+  });
+  y += 5;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text('Comprobante de preregistro (no es boleta de turno)', pageW / 2, y, {
+    align: 'center',
+    maxWidth: ancho,
+  });
+  y += 6;
+
+  doc.setDrawColor(180);
+  doc.line(margen, y, pageW - margen, y);
+  y += 5;
+
+  doc.setFontSize(9);
   filas.forEach(([label, valor]) => {
     doc.setFont('helvetica', 'bold');
     doc.text(`${label}:`, margen, y);
     doc.setFont('helvetica', 'normal');
     const lines = doc.splitTextToSize(valor, ancho - 2);
-    doc.text(lines, margen, y + 4);
-    y += 4 + lines.length * 4 + 2;
+    doc.text(lines, margen, y + 3.5);
+    y += 3.5 + lines.length * 3.6 + 1.5;
   });
 
-  y += 2;
+  y += 1;
   doc.setDrawColor(180);
-  doc.line(margen, y, 80 - margen, y);
+  doc.line(margen, y, pageW - margen, y);
   y += 4;
 
   const qrPayload = payloadQrPreregistro({ orgSlug, cui, nombre });
   const qrDataUrl = await QRCode.toDataURL(qrPayload, {
-    width: 280,
+    width: 320,
     margin: 1,
     errorCorrectionLevel: 'M',
   });
-  const qrSize = 36;
-  const qrX = (80 - qrSize) / 2;
+  const qrX = (pageW - qrSize) / 2;
   doc.addImage(qrDataUrl, 'PNG', qrX, y, qrSize, qrSize);
-  y += qrSize + 5;
+  y += qrSize + 4;
 
   doc.setFontSize(7);
-  doc.text('Presente este comprobante o su DPI en taquilla.', 40, y, {
+  doc.text('Presente este comprobante o su DPI en taquilla.', pageW / 2, y, {
     align: 'center',
     maxWidth: ancho,
   });
-  y += 5;
-  doc.text('El QR identifica su preregistro (no reemplaza la compra).', 40, y, {
+  y += 4;
+  doc.text('El QR identifica su preregistro (no reemplaza la compra).', pageW / 2, y, {
     align: 'center',
     maxWidth: ancho,
   });
