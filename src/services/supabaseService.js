@@ -17,6 +17,7 @@ import {
   resolverTurnoEnLista,
 } from '../utils/importReservasUtils';
 import { isValidCui, normalizarCui } from '../utils/cuiUtils';
+import { isValidSexo, normalizarSexo } from '../utils/sexoUtils';
 import { aplicarAsignacionBrazos } from '../utils/aplicarAsignacionBrazos';
 import { RESET_BRAZO_VENTA, RESET_BRAZO_APARTADO, esBrazoReservadoLiberable, normalizarCodigoBoleta } from '../utils/ventaAnulacionUtils';
 import { PERMISOS_ADMIN_COMPLETO } from '../config/permisos';
@@ -84,7 +85,7 @@ const BRAZO_ENTREGA_REPORT_FIELDS =
   'id, turno_id, numero_turno, numero_brazo, lado, estado, precio_pagado, codigo_boleta_qr, compra_id, cargador_id, mesa_id, vendedor_id, operador_nombre, metodo_pago, estado_entrega, entregado_en, entregado_por, entregado_a_tercero, entregado_receptor_nombre, pago_confirmado_en, updated_at, created_at';
 
 const CARGADOR_LIST_FIELDS =
-  'id, organizacion_id, nombre_completo, whatsapp, correo, cui_o_identificacion, telefono_emergencia';
+  'id, organizacion_id, nombre_completo, whatsapp, correo, cui_o_identificacion, telefono_emergencia, sexo';
 
 const BRAZO_DEVOTO_FIELDS =
   'id, turno_id, numero_turno, numero_brazo, lado, estado, reserva_apartado, apartado_notas, asignado_nombre, cargador_id, precio_pagado, codigo_boleta_qr, compra_id, estado_entrega';
@@ -1210,10 +1211,18 @@ export async function getCargadorById(cargadorId) {
 }
 
 export async function getCargadoresByOrg(organizacionId) {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('cargadores_organizacion')
     .select(CARGADOR_LIST_FIELDS)
     .eq('organizacion_id', organizacionId);
+  if (error && isMissingColumn(error, 'sexo')) {
+    ({ data, error } = await supabase
+      .from('cargadores_organizacion')
+      .select(
+        'id, organizacion_id, nombre_completo, whatsapp, correo, cui_o_identificacion, telefono_emergencia'
+      )
+      .eq('organizacion_id', organizacionId));
+  }
   if (error) throw error;
   return data || [];
 }
@@ -1254,6 +1263,10 @@ export async function updateDevoto(organizacionId, cargadorId, datos) {
   if (!/^502[0-9]{8}$/.test(whatsapp)) {
     return { error: 'WhatsApp inválido (+502 y 8 dígitos).' };
   }
+  const sexo = normalizarSexo(datos.sexo);
+  if (!isValidSexo(sexo)) {
+    return { error: 'Seleccione el sexo (masculino o femenino).' };
+  }
 
   const { data: actual, error: findErr } = await supabase
     .from('cargadores_organizacion')
@@ -1275,13 +1288,22 @@ export async function updateDevoto(organizacionId, cargadorId, datos) {
     correo: datos.correo?.trim() || '',
     cui_o_identificacion: cuiNorm,
     telefono_emergencia: datos.telefono_emergencia?.replace(/\D/g, '') || '',
+    sexo,
   };
 
-  const { data, error } = await saveCargadorOrganizacion({
+  let { data, error } = await saveCargadorOrganizacion({
     id: cargadorId,
     organizacion_id: organizacionId,
     ...campos,
   });
+  if (error && isMissingColumn(error, 'sexo')) {
+    delete campos.sexo;
+    ({ data, error } = await saveCargadorOrganizacion({
+      id: cargadorId,
+      organizacion_id: organizacionId,
+      ...campos,
+    }));
+  }
 
   if (error) return err(error);
   return { data };
@@ -1300,6 +1322,10 @@ export async function createDevoto(organizacionId, datos) {
   if (!/^502[0-9]{8}$/.test(whatsapp)) {
     return { error: 'WhatsApp inválido (+502 y 8 dígitos).' };
   }
+  const sexo = normalizarSexo(datos.sexo);
+  if (!isValidSexo(sexo)) {
+    return { error: 'Seleccione el sexo (masculino o femenino).' };
+  }
 
   const otroCui = await buscarCargadorPorCui(organizacionId, cuiNorm);
   if (otroCui) return { error: 'Ese CUI ya está registrado.' };
@@ -1311,13 +1337,23 @@ export async function createDevoto(organizacionId, datos) {
     correo: datos.correo?.trim() || '',
     cui_o_identificacion: cuiNorm,
     telefono_emergencia: datos.telefono_emergencia?.replace(/\D/g, '') || '',
+    sexo,
   };
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('cargadores_organizacion')
     .insert(campos)
     .select()
     .single();
+
+  if (error && isMissingColumn(error, 'sexo')) {
+    delete campos.sexo;
+    ({ data, error } = await supabase
+      .from('cargadores_organizacion')
+      .insert(campos)
+      .select()
+      .single());
+  }
 
   if (error) return err(error);
   return { data };
@@ -1595,6 +1631,10 @@ async function upsertDevotoVenta(orgId, cargadorData) {
   if (!cargadorData.nombre_completo?.trim()) {
     return { error: 'Nombre del devoto(a) obligatorio.' };
   }
+  const sexo = normalizarSexo(cargadorData.sexo);
+  if (!isValidSexo(sexo)) {
+    return { error: 'Seleccione el sexo (masculino o femenino).' };
+  }
 
   let devoto = await buscarCargadorPorCui(orgId, cuiNorm);
 
@@ -1604,23 +1644,42 @@ async function upsertDevotoVenta(orgId, cargadorData) {
     correo: cargadorData.correo?.trim() || '',
     cui_o_identificacion: cuiNorm,
     telefono_emergencia: cargadorData.telefono_emergencia || '',
+    sexo,
   };
 
   if (!devoto) {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('cargadores_organizacion')
       .insert({ organizacion_id: orgId, ...campos })
       .select()
       .single();
+    if (error && isMissingColumn(error, 'sexo')) {
+      const sinSexo = { ...campos };
+      delete sinSexo.sexo;
+      ({ data, error } = await supabase
+        .from('cargadores_organizacion')
+        .insert({ organizacion_id: orgId, ...sinSexo })
+        .select()
+        .single());
+    }
     if (error) return err(error);
     return { cargador: data };
   }
 
-  const { data, error } = await saveCargadorOrganizacion({
+  let { data, error } = await saveCargadorOrganizacion({
     id: devoto.id,
     organizacion_id: orgId,
     ...campos,
   });
+  if (error && isMissingColumn(error, 'sexo')) {
+    const sinSexo = { ...campos };
+    delete sinSexo.sexo;
+    ({ data, error } = await saveCargadorOrganizacion({
+      id: devoto.id,
+      organizacion_id: orgId,
+      ...sinSexo,
+    }));
+  }
   if (error) return err(error);
   return { cargador: data };
 }

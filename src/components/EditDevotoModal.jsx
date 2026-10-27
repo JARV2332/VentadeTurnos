@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import PhoneInput502 from './PhoneInput502';
 import { normalizarCui, isValidCui, CUI_DIGITS } from '../utils/cuiUtils';
+import { SEXO_OPCIONES, isValidSexo } from '../utils/sexoUtils';
 import { TERMINO_DEVOTO } from '../constants/terminologia';
 
 function devotoToForm(devoto) {
   return {
     nombre_completo: devoto?.nombre_completo || '',
     cui_o_identificacion: normalizarCui(devoto?.cui_o_identificacion || ''),
+    sexo: devoto?.sexo === 'M' || devoto?.sexo === 'F' ? devoto.sexo : '',
     whatsapp: devoto?.whatsapp || '',
     correo: devoto?.correo || '',
     telefono_emergencia: devoto?.telefono_emergencia || '',
@@ -54,6 +56,10 @@ export default function EditDevotoModal({
     }
     if (!isValidCui(form.cui_o_identificacion)) {
       setErrorLocal('Ingrese un CUI válido (13 dígitos).');
+      return;
+    }
+    if (!isValidSexo(form.sexo)) {
+      setErrorLocal('Seleccione el sexo (masculino o femenino).');
       return;
     }
     onGuardar(form);
@@ -114,6 +120,25 @@ export default function EditDevotoModal({
               required
             />
           </label>
+
+          <fieldset className="preregistro-publico__sexo">
+            <legend>Sexo</legend>
+            <div className="preregistro-publico__sexo-opciones">
+              {SEXO_OPCIONES.map((op) => (
+                <label key={op.value} className="preregistro-publico__sexo-opcion">
+                  <input
+                    type="radio"
+                    name="sexo-devoto"
+                    value={op.value}
+                    checked={form.sexo === op.value}
+                    onChange={() => setForm({ ...form, sexo: op.value })}
+                    required
+                  />
+                  {op.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
 
           <PhoneInput502
             label="WhatsApp"

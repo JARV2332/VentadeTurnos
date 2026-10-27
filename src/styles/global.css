@@ -2189,6 +2189,34 @@ html {
   overflow: hidden;
 }
 
+.preregistro-publico__sexo {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.preregistro-publico__sexo legend {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+  padding: 0;
+}
+
+.preregistro-publico__sexo-opciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+}
+
+.preregistro-publico__sexo-opcion {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 500 !important;
+  cursor: pointer;
+}
+
 .preregistro-admin-config {
   margin-top: 1rem;
   padding-top: 1rem;

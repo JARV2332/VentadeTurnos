@@ -1,5 +1,6 @@
 import QRCode from 'qrcode';
 import { jsPDF } from 'jspdf';
+import { etiquetaSexo } from './sexoUtils';
 
 /** Payload compacto para el QR (útil en taquilla: tipo + org + DPI). */
 export function payloadQrPreregistro({ orgSlug, cui, nombre }) {
@@ -36,6 +37,7 @@ export async function descargarPdfPreregistro({
   orgSlug,
   nombre,
   cui,
+  sexo,
   whatsapp,
   correo,
   yaRegistrado = false,
@@ -76,6 +78,7 @@ export async function descargarPdfPreregistro({
   const filas = [
     ['Nombre', String(nombre || '—')],
     ['DPI / CUI', String(cui || '—')],
+    ['Sexo', etiquetaSexo(sexo)],
     ['WhatsApp', enmascararWhatsapp(whatsapp)],
     ['Correo', String(correo || '—').slice(0, 36)],
     ['Fecha', formatearFecha(fecha)],

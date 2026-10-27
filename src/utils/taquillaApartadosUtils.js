@@ -135,6 +135,7 @@ export function formDesdeApartado(brazo, cargador) {
       whatsapp: cargador.whatsapp || '',
       correo: cargador.correo || '',
       cui_o_identificacion: normalizarCui(cargador.cui_o_identificacion || ''),
+      sexo: cargador.sexo === 'M' || cargador.sexo === 'F' ? cargador.sexo : '',
       telefono_emergencia: cargador.telefono_emergencia || '',
     };
   }
@@ -143,6 +144,7 @@ export function formDesdeApartado(brazo, cargador) {
     whatsapp: '',
     correo: '',
     cui_o_identificacion: dpiMatch?.[1] || '',
+    sexo: '',
     telefono_emergencia: '',
   };
 }

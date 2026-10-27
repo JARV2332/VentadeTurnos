@@ -52,6 +52,7 @@ const SQL_FILES = [
   '032_perf_auth_org_index.sql',
   '033_turno_direccion.sql',
   '034_preregistro_rate.sql',
+  '035_devoto_sexo.sql',
 ];
 
 if (!DATABASE_URL || DATABASE_URL.includes('[YOUR-PASSWORD]')) {

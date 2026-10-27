@@ -40,6 +40,17 @@ function correoPareceValido(texto) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c);
 }
 
+function normalizarSexo(valor) {
+  const raw = String(valor || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  if (raw === 'm' || raw === 'masculino' || raw === 'hombre' || raw === 'caballero') return 'M';
+  if (raw === 'f' || raw === 'femenino' || raw === 'mujer' || raw === 'dama') return 'F';
+  return '';
+}
+
 function clientIp(req) {
   const xf = String(req.headers['x-forwarded-for'] || '')
     .split(',')[0]
@@ -236,12 +247,16 @@ export default async function handler(req, res) {
   const whatsapp = normalizarWhatsapp(body.whatsapp);
   const correo = String(body.correo || '').trim().toLowerCase();
   const telefonoEmergencia = String(body.telefono_emergencia || '').replace(/\D/g, '');
+  const sexo = normalizarSexo(body.sexo);
 
   if (!nombre || nombre.length < 3) {
     return res.status(400).json({ error: 'Ingrese su nombre completo.' });
   }
   if (!isValidCui(cui)) {
     return res.status(400).json({ error: 'Ingrese un DPI/CUI válido (13 dígitos).' });
+  }
+  if (!sexo) {
+    return res.status(400).json({ error: 'Seleccione el sexo (masculino o femenino).' });
   }
   if (!isValidWhatsapp(whatsapp)) {
     return res.status(400).json({ error: 'WhatsApp inválido (+502 y 8 dígitos).' });
@@ -275,13 +290,23 @@ export default async function handler(req, res) {
     correo,
     cui_o_identificacion: cui,
     telefono_emergencia: telefonoEmergencia || '',
+    sexo,
   };
 
-  const { data, error } = await admin
+  let { data, error } = await admin
     .from('cargadores_organizacion')
     .insert(campos)
-    .select('id, nombre_completo')
+    .select('id, nombre_completo, sexo')
     .single();
+
+  if (error && /sexo|column|Could not find/i.test(error.message || '')) {
+    delete campos.sexo;
+    ({ data, error } = await admin
+      .from('cargadores_organizacion')
+      .insert(campos)
+      .select('id, nombre_completo')
+      .single());
+  }
 
   if (error) {
     if (error.code === '23505') {
@@ -305,5 +330,6 @@ export default async function handler(req, res) {
     id: data.id,
     nombre_completo: data.nombre_completo,
     cui,
+    sexo: data.sexo || sexo,
   });
 }

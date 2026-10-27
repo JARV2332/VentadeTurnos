@@ -1,6 +1,7 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { payloadQrPreregistro } from '../utils/preregistroPdfUtils';
+import { etiquetaSexo } from '../utils/sexoUtils';
 
 function enmascararWhatsapp(wa) {
   const d = String(wa || '').replace(/\D/g, '');
@@ -13,6 +14,7 @@ export default function MiniBoletaPreregistro({
   orgSlug,
   nombre,
   cui,
+  sexo,
   whatsapp,
   correo,
   yaRegistrado = false,
@@ -54,6 +56,10 @@ export default function MiniBoletaPreregistro({
           <div>
             <dt>DPI / CUI</dt>
             <dd>{cui || '—'}</dd>
+          </div>
+          <div>
+            <dt>Sexo</dt>
+            <dd>{etiquetaSexo(sexo)}</dd>
           </div>
           <div>
             <dt>WhatsApp</dt>

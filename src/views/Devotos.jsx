@@ -12,6 +12,7 @@ import {
   deleteDevoto,
 } from '../services/dataService';
 import { TERMINO_DEVOTO } from '../constants/terminologia';
+import { etiquetaSexo } from '../utils/sexoUtils';
 
 function normalizarBusqueda(texto) {
   return String(texto || '')
@@ -195,6 +196,7 @@ export default function Devotos() {
               <tr>
                 <th>Nombre</th>
                 <th>CUI / DPI</th>
+                <th>Sexo</th>
                 <th>WhatsApp</th>
                 <th>Correo</th>
                 <th>Emergencia</th>
@@ -204,7 +206,7 @@ export default function Devotos() {
             <tbody>
               {devotosFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-muted">
+                  <td colSpan={7} className="text-muted">
                     {busqueda ? 'Sin resultados para la búsqueda.' : 'Aún no hay devotos registrados.'}
                   </td>
                 </tr>
@@ -217,6 +219,7 @@ export default function Devotos() {
                     <td>
                       <code>{d.cui_o_identificacion || '—'}</code>
                     </td>
+                    <td>{etiquetaSexo(d.sexo)}</td>
                     <td>{formatTelefonoGt(d.whatsapp)}</td>
                     <td>{d.correo || '—'}</td>
                     <td>{formatTelefonoGt(d.telefono_emergencia)}</td>

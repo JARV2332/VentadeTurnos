@@ -6,10 +6,12 @@ import MiniBoletaPreregistro from '../components/MiniBoletaPreregistro';
 import { isValidCui, normalizarCui } from '../utils/cuiUtils';
 import { isValidGtWhatsapp } from '../utils/phoneGtUtils';
 import { descargarPdfPreregistro } from '../utils/preregistroPdfUtils';
+import { SEXO_OPCIONES, isValidSexo } from '../utils/sexoUtils';
 
 const EMPTY = {
   nombre_completo: '',
   cui_o_identificacion: '',
+  sexo: '',
   whatsapp: '',
   correo: '',
   telefono_emergencia: '',
@@ -69,12 +71,13 @@ export default function PreregistroPublico() {
   };
 
   const generarComprobanteYPdf = useCallback(
-    async ({ nombre, cui, whatsapp, correo, yaReg }) => {
+    async ({ nombre, cui, sexo, whatsapp, correo, yaReg }) => {
       const data = {
         orgNombre: orgInfo?.nombre_oficial || 'Organización',
         orgSlug,
         nombre,
         cui,
+        sexo,
         whatsapp,
         correo,
         yaRegistrado: yaReg,
@@ -121,6 +124,7 @@ export default function PreregistroPublico() {
 
       const nombre = form.nombre_completo.trim();
       const cui = normalizarCui(form.cui_o_identificacion);
+      const sexo = form.sexo;
       const correo = form.correo.trim().toLowerCase();
       const whatsapp = form.whatsapp;
 
@@ -130,6 +134,10 @@ export default function PreregistroPublico() {
       }
       if (!isValidCui(cui)) {
         setError('Ingrese un DPI/CUI válido (13 dígitos).');
+        return;
+      }
+      if (!isValidSexo(sexo)) {
+        setError('Seleccione el sexo (masculino o femenino).');
         return;
       }
       if (!isValidGtWhatsapp(whatsapp)) {
@@ -150,6 +158,7 @@ export default function PreregistroPublico() {
             org: orgSlug,
             nombre_completo: nombre,
             cui_o_identificacion: cui,
+            sexo,
             whatsapp,
             correo,
             telefono_emergencia: form.telefono_emergencia,
@@ -167,6 +176,7 @@ export default function PreregistroPublico() {
           await generarComprobanteYPdf({
             nombre,
             cui,
+            sexo,
             whatsapp,
             correo,
             yaReg: true,
@@ -187,6 +197,7 @@ export default function PreregistroPublico() {
         await generarComprobanteYPdf({
           nombre: json.nombre_completo || nombre,
           cui: json.cui || cui,
+          sexo: json.sexo || sexo,
           whatsapp,
           correo,
           yaReg: false,
@@ -293,6 +304,26 @@ export default function PreregistroPublico() {
                     placeholder="13 dígitos"
                   />
                 </label>
+
+                <fieldset className="preregistro-publico__sexo">
+                  <legend>Sexo</legend>
+                  <div className="preregistro-publico__sexo-opciones">
+                    {SEXO_OPCIONES.map((op) => (
+                      <label key={op.value} className="preregistro-publico__sexo-opcion">
+                        <input
+                          type="radio"
+                          name="sexo"
+                          value={op.value}
+                          checked={form.sexo === op.value}
+                          onChange={() => setField('sexo', op.value)}
+                          required
+                          disabled={formDeshabilitado}
+                        />
+                        {op.label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
 
                 <PhoneInput502
                   label="WhatsApp"

@@ -28,6 +28,7 @@ import { etiquetaHonorTurno } from '../utils/turnoUtils';
 import { construirLineasRecibo } from '../utils/compraUtils';
 import { isValidGtWhatsapp, fullGtPhoneFromLocal } from '../utils/phoneGtUtils';
 import { normalizarCui, isValidCui, CUI_DIGITS } from '../utils/cuiUtils';
+import { SEXO_OPCIONES, isValidSexo } from '../utils/sexoUtils';
 import { TERMINO_DEVOTO, TERMINO_DEVOTO_ARTICULO } from '../constants/terminologia';
 import PhoneInput502 from '../components/PhoneInput502';
 import VentaExitoModal from '../components/VentaExitoModal';
@@ -64,6 +65,7 @@ export default function Taquilla() {
     whatsapp: '',
     correo: '',
     cui_o_identificacion: '',
+    sexo: '',
     telefono_emergencia: '',
   });
   const [pago, setPago] = useState({
@@ -183,6 +185,7 @@ export default function Taquilla() {
     whatsapp: devoto?.whatsapp || '',
     correo: devoto?.correo || '',
     cui_o_identificacion: normalizarCui(devoto?.cui_o_identificacion || ''),
+    sexo: devoto?.sexo === 'M' || devoto?.sexo === 'F' ? devoto.sexo : '',
     telefono_emergencia: devoto?.telefono_emergencia || '',
   });
 
@@ -195,6 +198,7 @@ export default function Taquilla() {
       whatsapp: '',
       correo: '',
       cui_o_identificacion: '',
+      sexo: '',
       telefono_emergencia: '',
     });
   };
@@ -393,6 +397,7 @@ export default function Taquilla() {
           whatsapp: '',
           correo: '',
           cui_o_identificacion: '',
+          sexo: '',
           telefono_emergencia: '',
         });
       }
@@ -408,6 +413,7 @@ export default function Taquilla() {
             whatsapp: '',
             correo: '',
             cui_o_identificacion: dpiMatch?.[1] || '',
+            sexo: '',
             telefono_emergencia: '',
           }
         );
@@ -481,6 +487,11 @@ export default function Taquilla() {
     }
     if (!form.nombre_completo?.trim()) {
       setError(`Ingrese el nombre ${TERMINO_DEVOTO_ARTICULO}.`);
+      scrollVentaPanelTop();
+      return;
+    }
+    if (!isValidSexo(form.sexo)) {
+      setError('Seleccione el sexo (masculino o femenino).');
       scrollVentaPanelTop();
       return;
     }
@@ -872,6 +883,24 @@ export default function Taquilla() {
                       required
                     />
                   </label>
+                  <fieldset className="preregistro-publico__sexo">
+                    <legend>Sexo</legend>
+                    <div className="preregistro-publico__sexo-opciones">
+                      {SEXO_OPCIONES.map((op) => (
+                        <label key={op.value} className="preregistro-publico__sexo-opcion">
+                          <input
+                            type="radio"
+                            name="sexo-taquilla-a"
+                            value={op.value}
+                            checked={form.sexo === op.value}
+                            onChange={() => setForm({ ...form, sexo: op.value })}
+                            required
+                          />
+                          {op.label}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
                   <PhoneInput502
                     label="WhatsApp"
                     value={form.whatsapp}
@@ -1114,6 +1143,24 @@ export default function Taquilla() {
                         required
                       />
                     </label>
+                    <fieldset className="preregistro-publico__sexo">
+                      <legend>Sexo</legend>
+                      <div className="preregistro-publico__sexo-opciones">
+                        {SEXO_OPCIONES.map((op) => (
+                          <label key={op.value} className="preregistro-publico__sexo-opcion">
+                            <input
+                              type="radio"
+                              name="sexo-taquilla-b"
+                              value={op.value}
+                              checked={form.sexo === op.value}
+                              onChange={() => setForm({ ...form, sexo: op.value })}
+                              required
+                            />
+                            {op.label}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
                     <PhoneInput502
                       label="WhatsApp"
                       value={form.whatsapp}
