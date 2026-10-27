@@ -1,14 +1,22 @@
 /**
  * Preregistro público de devotos (sin login).
  * GET  ?org=slug → meta org + textos del formulario
- * POST { org, nombre_completo, cui, whatsapp, correo, telefono_emergencia? }
- * Upsert en cargadores_organizacion por CUI (mismo catálogo que taquilla).
+ * POST → inserta 1 sola vez por DPI; rate limit por IP y por org.
  */
 import { createClient } from '@supabase/supabase-js';
+import { createHash } from 'crypto';
 import { getSupabaseConfig } from './_lib/verifyCaller.js';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** Máx. envíos por IP (hash) en 10 minutos, por organización. */
+const MAX_POR_IP_10_MIN = 5;
+/** Máx. preregistros nuevos por organización en 60 segundos (anti-volcado). */
+const MAX_POR_ORG_60_SEG = 80;
+
+const orgCache = new Map();
+const ORG_CACHE_MS = 60_000;
 
 function normalizarCui(texto) {
   return String(texto || '').replace(/\D/g, '').slice(0, 13);
@@ -32,9 +40,26 @@ function correoPareceValido(texto) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c);
 }
 
+function clientIp(req) {
+  const xf = String(req.headers['x-forwarded-for'] || '')
+    .split(',')[0]
+    .trim();
+  const real = String(req.headers['x-real-ip'] || '').trim();
+  return xf || real || req.socket?.remoteAddress || 'unknown';
+}
+
+function hashIp(ip) {
+  return createHash('sha256').update(`preregistro:${ip}`).digest('hex').slice(0, 32);
+}
+
 async function resolverOrganizacion(admin, orgParam) {
   const slug = String(orgParam || '').trim();
   if (!slug) return null;
+
+  const cached = orgCache.get(slug);
+  if (cached && Date.now() - cached.at < ORG_CACHE_MS) {
+    return cached.org;
+  }
 
   let query = admin
     .from('organizaciones')
@@ -47,6 +72,7 @@ async function resolverOrganizacion(admin, orgParam) {
 
   const { data, error } = await query.maybeSingle();
   if (error || !data) return null;
+  orgCache.set(slug, { org: data, at: Date.now() });
   return data;
 }
 
@@ -61,10 +87,66 @@ function leerConfigPreregistro(reciboRow) {
     titulo: String(diseño.preregistro_titulo || '').trim() || 'Preregistro de turnos',
     mensaje:
       String(diseño.preregistro_mensaje || '').trim() ||
-      'Complete sus datos para agilizar la compra en taquilla. Al llegar, indiquen su DPI.',
+      'Complete sus datos una sola vez. Con su DPI, en taquilla aparecerán automáticamente.',
     logo_url: diseño.logo_url || null,
     color_primario: diseño.color_primario || '#1d4ed8',
   };
+}
+
+async function comprobarRateLimit(admin, orgId, ipHash) {
+  const hace10Min = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const hace60Seg = new Date(Date.now() - 60 * 1000).toISOString();
+
+  const [{ count: porIp, error: e1 }, { count: porOrg, error: e2 }] = await Promise.all([
+    admin
+      .from('preregistro_rate')
+      .select('id', { count: 'exact', head: true })
+      .eq('organizacion_id', orgId)
+      .eq('ip_hash', ipHash)
+      .gte('created_at', hace10Min),
+    admin
+      .from('preregistro_rate')
+      .select('id', { count: 'exact', head: true })
+      .eq('organizacion_id', orgId)
+      .gte('created_at', hace60Seg),
+  ]);
+
+  // Si la tabla aún no existe en prod, no bloqueamos el preregistro.
+  if (e1 || e2) {
+    const msg = `${e1?.message || ''} ${e2?.message || ''}`;
+    if (/relation|does not exist|schema cache/i.test(msg)) {
+      return { ok: true, sinTabla: true };
+    }
+    return { ok: true, sinTabla: true };
+  }
+
+  if ((porIp || 0) >= MAX_POR_IP_10_MIN) {
+    return {
+      ok: false,
+      status: 429,
+      error:
+        'Demasiados intentos desde esta conexión. Espere unos minutos e intente de nuevo.',
+    };
+  }
+  if ((porOrg || 0) >= MAX_POR_ORG_60_SEG) {
+    return {
+      ok: false,
+      status: 429,
+      error:
+        'Hay mucha demanda en este momento. Espere 1 minuto e intente enviar de nuevo.',
+    };
+  }
+  return { ok: true, sinTabla: false };
+}
+
+async function registrarRateEvento(admin, orgId, ipHash) {
+  const { error } = await admin.from('preregistro_rate').insert({
+    organizacion_id: orgId,
+    ip_hash: ipHash,
+  });
+  if (error && !/relation|does not exist|schema cache/i.test(error.message || '')) {
+    console.warn('preregistro_rate insert:', error.message);
+  }
 }
 
 export default async function handler(req, res) {
@@ -92,6 +174,7 @@ export default async function handler(req, res) {
       .eq('organizacion_id', org.id)
       .maybeSingle();
     const config = leerConfigPreregistro(recibo);
+    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
     return res.status(200).json({
       organizacion: {
         id: org.id,
@@ -117,7 +200,7 @@ export default async function handler(req, res) {
   }
   body = body || {};
 
-  // Honeypot anti-bots: si viene lleno, fingimos éxito
+  // Honeypot anti-bots
   if (String(body.website || body.company || '').trim()) {
     return res.status(200).json({ ok: true, actualizado: false });
   }
@@ -142,6 +225,12 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'El preregistro no está disponible en este momento.' });
   }
 
+  const ipHash = hashIp(clientIp(req));
+  const rate = await comprobarRateLimit(admin, org.id, ipHash);
+  if (!rate.ok) {
+    return res.status(rate.status || 429).json({ error: rate.error, codigo: 'RATE_LIMIT' });
+  }
+
   const nombre = String(body.nombre_completo || '').trim();
   const cui = normalizarCui(body.cui_o_identificacion || body.cui || body.dpi);
   const whatsapp = normalizarWhatsapp(body.whatsapp);
@@ -163,10 +252,21 @@ export default async function handler(req, res) {
 
   const { data: existente } = await admin
     .from('cargadores_organizacion')
-    .select('id')
+    .select('id, nombre_completo')
     .eq('organizacion_id', org.id)
     .eq('cui_o_identificacion', cui)
     .maybeSingle();
+
+  // 1 DPI = 1 preregistro: no se actualiza ni se duplica.
+  if (existente?.id) {
+    await registrarRateEvento(admin, org.id, ipHash);
+    return res.status(409).json({
+      codigo: 'DPI_YA_REGISTRADO',
+      error:
+        'Este DPI ya está preregistrado. No es necesario enviarlo otra vez. En taquilla indiquen su DPI para continuar.',
+      ya_registrado: true,
+    });
+  }
 
   const campos = {
     organizacion_id: org.id,
@@ -177,26 +277,6 @@ export default async function handler(req, res) {
     telefono_emergencia: telefonoEmergencia || '',
   };
 
-  if (existente?.id) {
-    const { data, error } = await admin
-      .from('cargadores_organizacion')
-      .update(campos)
-      .eq('id', existente.id)
-      .eq('organizacion_id', org.id)
-      .select('id, nombre_completo')
-      .single();
-    if (error) {
-      return res.status(500).json({ error: error.message || 'No se pudo actualizar el registro.' });
-    }
-    return res.status(200).json({
-      ok: true,
-      actualizado: true,
-      mensaje:
-        'Sus datos ya estaban registrados y fueron actualizados. En taquilla indiquen su DPI para continuar la compra.',
-      id: data.id,
-    });
-  }
-
   const { data, error } = await admin
     .from('cargadores_organizacion')
     .insert(campos)
@@ -206,11 +286,16 @@ export default async function handler(req, res) {
   if (error) {
     if (error.code === '23505') {
       return res.status(409).json({
-        error: 'Ese DPI ya está registrado. Si necesita corregir datos, vuelva a enviar el formulario.',
+        codigo: 'DPI_YA_REGISTRADO',
+        error:
+          'Este DPI ya está preregistrado. No es necesario enviarlo otra vez. En taquilla indiquen su DPI para continuar.',
+        ya_registrado: true,
       });
     }
     return res.status(500).json({ error: error.message || 'No se pudo completar el registro.' });
   }
+
+  await registrarRateEvento(admin, org.id, ipHash);
 
   return res.status(201).json({
     ok: true,

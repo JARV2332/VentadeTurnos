@@ -51,6 +51,7 @@ const SQL_FILES = [
   '031_buscar_boleta_entrega_org.sql',
   '032_perf_auth_org_index.sql',
   '033_turno_direccion.sql',
+  '034_preregistro_rate.sql',
 ];
 
 if (!DATABASE_URL || DATABASE_URL.includes('[YOUR-PASSWORD]')) {

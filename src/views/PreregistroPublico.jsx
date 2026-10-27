@@ -20,6 +20,7 @@ export default function PreregistroPublico() {
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState('');
   const [exito, setExito] = useState('');
+  const [yaRegistrado, setYaRegistrado] = useState(false);
   const [orgInfo, setOrgInfo] = useState(null);
   const [config, setConfig] = useState(null);
   const [form, setForm] = useState(EMPTY);
@@ -68,6 +69,7 @@ export default function PreregistroPublico() {
       e?.preventDefault();
       setError('');
       setExito('');
+      setYaRegistrado(false);
 
       if (config?.activo === false) {
         setError('El preregistro no está disponible en este momento.');
@@ -111,10 +113,24 @@ export default function PreregistroPublico() {
           }),
         });
         const json = await res.json().catch(() => ({}));
+        if (res.status === 409 && (json.ya_registrado || json.codigo === 'DPI_YA_REGISTRADO')) {
+          setYaRegistrado(true);
+          setExito(
+            json.error ||
+              'Este DPI ya está preregistrado. En taquilla indiquen su DPI para continuar.'
+          );
+          setForm(EMPTY);
+          return;
+        }
+        if (res.status === 429) {
+          setError(json.error || 'Hay mucha demanda. Espere un minuto e intente de nuevo.');
+          return;
+        }
         if (!res.ok) {
           setError(json.error || 'No se pudo completar el preregistro.');
           return;
         }
+        setYaRegistrado(false);
         setExito(json.mensaje || 'Preregistro guardado.');
         setForm(EMPTY);
       } catch {
@@ -160,7 +176,7 @@ export default function PreregistroPublico() {
             )}
 
             {exito ? (
-              <div className="alert alert--success">
+              <div className={`alert ${yaRegistrado ? 'alert--info' : 'alert--success'}`}>
                 <p>{exito}</p>
                 <button
                   type="button"
@@ -168,6 +184,7 @@ export default function PreregistroPublico() {
                   onClick={() => {
                     setExito('');
                     setError('');
+                    setYaRegistrado(false);
                   }}
                 >
                   Registrar otra persona
